@@ -106,74 +106,94 @@ const DISHES = [
 ];
 
 const RECIPES = {
-  r1: { name: "Hainanese Chicken Rice", prepTime: 15, cookTime: 45, steps: [
-    "Rub chicken breast with salt and ginger. Bring a pot of water to boil.",
-    "Poach chicken in gently simmering water for 20 minutes. Remove and plunge into ice water.",
-    "Use the poaching liquid to cook rice with garlic and a pandan leaf if available.",
-    "Slice cucumber. Chop spring onion finely.",
-    "Slice chicken, arrange over rice with cucumber. Drizzle with sesame oil and soy sauce. Garnish with spring onion."
-  ]},
-  r2: { name: "Nasi Lemak", prepTime: 10, cookTime: 30, steps: [
-    "Cook rice with coconut milk and a pinch of salt until fluffy.",
-    "Hard-boil egg, peel and halve.",
-    "Deep fry anchovies until crispy. Toast peanuts in a dry pan.",
-    "Prepare sambal chili by blending and frying chili paste.",
-    "Arrange coconut rice on plate with egg, anchovies, peanuts, cucumber slices, and sambal on the side."
-  ]},
-  r3: { name: "Chicken Congee", prepTime: 5, cookTime: 60, steps: [
-    "Rinse rice and add to a large pot with 8 cups of water.",
-    "Bring to a boil, then reduce heat to low. Simmer for 40 minutes, stirring occasionally.",
-    "Add chicken breast pieces and ginger slices. Cook another 15 minutes until chicken is done.",
-    "Shred the chicken. Season congee with sesame oil and soy sauce.",
-    "Serve topped with spring onion."
-  ]},
-  r4: { name: "Stir Fry Kangkong", prepTime: 5, cookTime: 5, steps: [
-    "Wash kangkong thoroughly. Cut into 3-inch lengths.",
-    "Heat oil in a wok over high heat. Add minced garlic and chili, stir 15 seconds.",
-    "Add kangkong and toss rapidly for 2-3 minutes until just wilted.",
-    "Season with soy sauce. Serve immediately."
-  ]},
-  r5: { name: "Steamed Fish with Ginger & Soy", prepTime: 10, cookTime: 12, steps: [
-    "Place fish fillet on a heatproof plate. Top with julienned ginger.",
-    "Steam over high heat for 10-12 minutes until fish is just cooked through.",
-    "Discard any liquid. Top with spring onion shreds.",
-    "Heat sesame oil until smoking and pour over fish. Drizzle soy sauce and serve."
-  ]},
-  r6: { name: "Egg Fried Rice", prepTime: 5, cookTime: 10, steps: [
-    "Use day-old cold rice for best results. Dice carrot finely.",
-    "Beat eggs in a bowl. Heat oil in a wok over high heat.",
-    "Scramble eggs until just set, break into pieces.",
-    "Add carrot, stir fry 1 minute. Add rice and toss vigorously.",
-    "Season with soy sauce, add spring onion, toss and serve."
-  ]},
-  r7: { name: "Tofu Vegetable Soup", prepTime: 10, cookTime: 15, steps: [
-    "Cut tofu into cubes. Shred cabbage. Slice carrot thinly.",
-    "Bring 4 cups of water to a boil with ginger slices.",
-    "Add carrot and cook 3 minutes. Add cabbage and tofu.",
-    "Simmer for 8 minutes. Season with a pinch of salt.",
-    "Garnish with spring onion and serve hot."
-  ]},
-  r8: { name: "Mee Goreng", prepTime: 10, cookTime: 10, steps: [
-    "Blanch yellow noodles briefly in hot water. Drain well.",
-    "Heat oil in a wok. Stir fry shrimp until pink, set aside.",
-    "Scramble egg in the same wok. Add cabbage and bean sprouts, toss 1 minute.",
-    "Add noodles, soy sauce, and chili paste. Toss everything over high heat.",
-    "Return shrimp to wok, toss to combine. Serve hot."
-  ]},
-  r9: { name: "Kaya Toast & Soft-Boiled Eggs", prepTime: 3, cookTime: 5, steps: [
-    "Toast bread slices until golden and crispy.",
-    "Spread kaya generously on one side, butter on the other. Sandwich together and cut diagonally.",
-    "Bring water to a boil, turn off heat. Gently lower eggs in and cover for 6 minutes.",
-    "Crack eggs into a small dish. Season with soy sauce and white pepper.",
-    "Serve kaya toast alongside the soft-boiled eggs."
-  ]},
-  r10: { name: "Cheng Tng", prepTime: 10, cookTime: 40, steps: [
-    "Soak barley and white fungus in water for 30 minutes. Drain.",
-    "Boil 6 cups of water with pandan leaf (tied in a knot).",
-    "Add barley and ginkgo nuts, simmer 20 minutes.",
-    "Add white fungus and longan, simmer another 10 minutes.",
-    "Add rock sugar to taste. Remove pandan leaf. Serve warm or chilled."
-  ]},
+  r1: {
+    name: "Hainanese Chicken Rice", prepTime: 15, cookTime: 45, steps: [
+      "Rub chicken breast with salt and ginger. Bring a pot of water to boil.",
+      "Poach chicken in gently simmering water for 20 minutes. Remove and plunge into ice water.",
+      "Use the poaching liquid to cook rice with garlic and a pandan leaf if available.",
+      "Slice cucumber. Chop spring onion finely.",
+      "Slice chicken, arrange over rice with cucumber. Drizzle with sesame oil and soy sauce. Garnish with spring onion."
+    ]
+  },
+  r2: {
+    name: "Nasi Lemak", prepTime: 10, cookTime: 30, steps: [
+      "Cook rice with coconut milk and a pinch of salt until fluffy.",
+      "Hard-boil egg, peel and halve.",
+      "Deep fry anchovies until crispy. Toast peanuts in a dry pan.",
+      "Prepare sambal chili by blending and frying chili paste.",
+      "Arrange coconut rice on plate with egg, anchovies, peanuts, cucumber slices, and sambal on the side."
+    ]
+  },
+  r3: {
+    name: "Chicken Congee", prepTime: 5, cookTime: 60, steps: [
+      "Rinse rice and add to a large pot with 8 cups of water.",
+      "Bring to a boil, then reduce heat to low. Simmer for 40 minutes, stirring occasionally.",
+      "Add chicken breast pieces and ginger slices. Cook another 15 minutes until chicken is done.",
+      "Shred the chicken. Season congee with sesame oil and soy sauce.",
+      "Serve topped with spring onion."
+    ]
+  },
+  r4: {
+    name: "Stir Fry Kangkong", prepTime: 5, cookTime: 5, steps: [
+      "Wash kangkong thoroughly. Cut into 3-inch lengths.",
+      "Heat oil in a wok over high heat. Add minced garlic and chili, stir 15 seconds.",
+      "Add kangkong and toss rapidly for 2-3 minutes until just wilted.",
+      "Season with soy sauce. Serve immediately."
+    ]
+  },
+  r5: {
+    name: "Steamed Fish with Ginger & Soy", prepTime: 10, cookTime: 12, steps: [
+      "Place fish fillet on a heatproof plate. Top with julienned ginger.",
+      "Steam over high heat for 10-12 minutes until fish is just cooked through.",
+      "Discard any liquid. Top with spring onion shreds.",
+      "Heat sesame oil until smoking and pour over fish. Drizzle soy sauce and serve."
+    ]
+  },
+  r6: {
+    name: "Egg Fried Rice", prepTime: 5, cookTime: 10, steps: [
+      "Use day-old cold rice for best results. Dice carrot finely.",
+      "Beat eggs in a bowl. Heat oil in a wok over high heat.",
+      "Scramble eggs until just set, break into pieces.",
+      "Add carrot, stir fry 1 minute. Add rice and toss vigorously.",
+      "Season with soy sauce, add spring onion, toss and serve."
+    ]
+  },
+  r7: {
+    name: "Tofu Vegetable Soup", prepTime: 10, cookTime: 15, steps: [
+      "Cut tofu into cubes. Shred cabbage. Slice carrot thinly.",
+      "Bring 4 cups of water to a boil with ginger slices.",
+      "Add carrot and cook 3 minutes. Add cabbage and tofu.",
+      "Simmer for 8 minutes. Season with a pinch of salt.",
+      "Garnish with spring onion and serve hot."
+    ]
+  },
+  r8: {
+    name: "Mee Goreng", prepTime: 10, cookTime: 10, steps: [
+      "Blanch yellow noodles briefly in hot water. Drain well.",
+      "Heat oil in a wok. Stir fry shrimp until pink, set aside.",
+      "Scramble egg in the same wok. Add cabbage and bean sprouts, toss 1 minute.",
+      "Add noodles, soy sauce, and chili paste. Toss everything over high heat.",
+      "Return shrimp to wok, toss to combine. Serve hot."
+    ]
+  },
+  r9: {
+    name: "Kaya Toast & Soft-Boiled Eggs", prepTime: 3, cookTime: 5, steps: [
+      "Toast bread slices until golden and crispy.",
+      "Spread kaya generously on one side, butter on the other. Sandwich together and cut diagonally.",
+      "Bring water to a boil, turn off heat. Gently lower eggs in and cover for 6 minutes.",
+      "Crack eggs into a small dish. Season with soy sauce and white pepper.",
+      "Serve kaya toast alongside the soft-boiled eggs."
+    ]
+  },
+  r10: {
+    name: "Cheng Tng", prepTime: 10, cookTime: 40, steps: [
+      "Soak barley and white fungus in water for 30 minutes. Drain.",
+      "Boil 6 cups of water with pandan leaf (tied in a knot).",
+      "Add barley and ginkgo nuts, simmer 20 minutes.",
+      "Add white fungus and longan, simmer another 10 minutes.",
+      "Add rock sugar to taste. Remove pandan leaf. Serve warm or chilled."
+    ]
+  },
 };
 
 const CONDITION_RULES = {
@@ -192,26 +212,43 @@ const DAYS_FULL = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satu
 // UTILITY FUNCTIONS
 // ============================================================
 
-function getDishNutrients(dish, servings = 1) {
+function getNutrientsFromIngredients(ingredientsObj) {
   const n = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0, cholesterol: 0, sugar: 0 };
-  for (const [ing, amountG] of Object.entries(dish.ingredients)) {
+  for (const [ing, amountG] of Object.entries(ingredientsObj)) {
     const nd = INGREDIENTS_NUTRIENTS[ing];
-    if (!nd) continue;
-    const scale = (amountG / 100) * servings;
+    if (!nd) {
+      console.warn(`[MealWise] Unknown ingredient "${ing}" — nutrients will be zero for this item.`);
+      continue;
+    }
+    const scale = amountG / 100;
     NUTRIENT_KEYS.forEach((k, i) => { n[k] += nd[i] * scale; });
   }
   Object.keys(n).forEach(k => n[k] = Math.round(n[k] * 10) / 10);
   return n;
 }
 
+// Note: when customIngredients is provided, it already contains final gram amounts
+// (user-edited values), so servings is not applied on top of it.
+function getDishNutrients(dish, servings = 1, customIngredients = null) {
+  if (customIngredients) return getNutrientsFromIngredients(customIngredients);
+  const scaled = {};
+  for (const [ing, amountG] of Object.entries(dish.ingredients)) {
+    scaled[ing] = amountG * servings;
+  }
+  return getNutrientsFromIngredients(scaled);
+}
+
+// mealPlan[dayIndex][mealType] is an ARRAY of entries
 function getDayNutrients(mealPlan, dayIndex) {
   const n = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sodium: 0, cholesterol: 0, sugar: 0 };
   MEAL_TYPES.forEach(mt => {
-    const entry = mealPlan[dayIndex]?.[mt];
-    if (entry) {
-      const dn = getDishNutrients(DISHES.find(d => d.id === entry.dishId), entry.servings);
+    const entries = mealPlan[dayIndex]?.[mt] || [];
+    entries.forEach(entry => {
+      const dish = DISHES.find(d => d.id === entry.dishId);
+      if (!dish) return;
+      const dn = getDishNutrients(dish, entry.servings, entry.customIngredients);
       NUTRIENT_KEYS.forEach(k => n[k] += dn[k]);
-    }
+    });
   });
   Object.keys(n).forEach(k => n[k] = Math.round(n[k] * 10) / 10);
   return n;
@@ -227,9 +264,9 @@ function getWeekNutrients(mealPlan) {
   return n;
 }
 
-function getWarnings(dish, conditions) {
+function getWarnings(dishOrNutrients, conditions) {
   const warnings = [];
-  const n = getDishNutrients(dish);
+  const n = dishOrNutrients.calories !== undefined ? dishOrNutrients : getDishNutrients(dishOrNutrients);
   conditions.forEach(c => {
     const rule = CONDITION_RULES[c];
     if (!rule) return;
@@ -243,79 +280,90 @@ function getWarnings(dish, conditions) {
   return [...new Set(warnings)];
 }
 
+// Compute warnings for a meal plan entry, using custom ingredients if present
+function getEntryWarnings(entry, conditions) {
+  const dish = DISHES.find(d => d.id === entry.dishId);
+  if (!dish) return [];
+  const nutrients = getDishNutrients(dish, entry.servings, entry.customIngredients);
+  return getWarnings(nutrients, conditions);
+}
+
 function scoreDish(dish, userProfile, mealPlan, dayIndex, mealType) {
   const dn = getDishNutrients(dish);
   const dayN = getDayNutrients(mealPlan, dayIndex);
 
-  // Health condition score (0-30)
-  let healthScore = 30;
+  // --- Health condition safety score (0-60) — per planning.md 60% weight ---
+  let healthScore = 60;
   userProfile.conditions.forEach(c => {
     const rule = CONDITION_RULES[c];
     if (!rule) return;
     for (const [nutrient, limit] of Object.entries(rule.limit)) {
       const ratio = dn[nutrient] / limit;
-      if (ratio > 1.2) healthScore -= 12;
-      else if (ratio > 0.8) healthScore -= 5;
+      if (ratio > 1.2) healthScore -= 24;
+      else if (ratio > 0.8) healthScore -= 10;
     }
   });
   healthScore = Math.max(0, healthScore);
 
-  // Nutrient gap score (0-40)
-  const mealTarget = {};
-  NUTRIENT_KEYS.forEach(k => mealTarget[k] = RDA[k] / 3);
+  // --- Nutrient balance score (0-30) — per planning.md 30% weight ---
   const remaining = {};
   NUTRIENT_KEYS.forEach(k => remaining[k] = Math.max(0, RDA[k] - dayN[k]));
 
-  let gapScore = 0;
+  let nutrientScore = 0;
   const importantNutrients = ["protein", "fiber", "calories"];
   const limitNutrients = ["sodium", "cholesterol", "sugar"];
 
   importantNutrients.forEach(k => {
     if (remaining[k] > 0) {
       const fillRatio = Math.min(1, dn[k] / (remaining[k] * 0.4));
-      gapScore += fillRatio * 10;
+      nutrientScore += fillRatio * 7;
     }
   });
 
   limitNutrients.forEach(k => {
     const headroom = remaining[k];
     if (headroom > 0 && dn[k] <= headroom) {
-      gapScore += 3.3;
+      nutrientScore += 3;
     } else if (dn[k] > headroom * 1.2) {
-      gapScore -= 2;
+      nutrientScore -= 2;
     }
   });
-  gapScore = Math.max(0, Math.min(40, gapScore));
+  nutrientScore = Math.max(0, Math.min(30, nutrientScore));
 
-  // Variety score (0-15)
-  let varietyScore = 15;
+  // --- User preference score (0-10) — per planning.md 10% weight ---
+  let prefScore = 0;
+
+  // Variety: penalize repeated dishes across the week (0-5)
   const selectedDishIds = [];
   for (let d = 0; d < 7; d++) {
     MEAL_TYPES.forEach(mt => {
-      if (mealPlan[d]?.[mt]) selectedDishIds.push(mealPlan[d][mt].dishId);
+      const entries = mealPlan[d]?.[mt] || [];
+      entries.forEach(e => selectedDishIds.push(e.dishId));
     });
   }
   const count = selectedDishIds.filter(id => id === dish.id).length;
-  varietyScore = Math.max(0, 15 - count * 5);
+  prefScore += Math.max(0, 5 - count * 2);
 
-  // Meal appropriateness (0-15)
-  let mealScore = dish.mealTypes.includes(mealType) ? 15 : 5;
+  // Meal appropriateness (0-5)
+  prefScore += dish.mealTypes.includes(mealType) ? 5 : 1;
 
-  const total = Math.round(Math.max(0, Math.min(100, healthScore + gapScore + varietyScore + mealScore)));
-  return { total, healthScore: Math.round(healthScore), gapScore: Math.round(gapScore), varietyScore: Math.round(varietyScore), mealScore: Math.round(mealScore) };
+  const total = Math.round(Math.max(0, Math.min(100, healthScore + nutrientScore + prefScore)));
+  return { total, healthScore: Math.round(healthScore), nutrientScore: Math.round(nutrientScore), prefScore: Math.round(prefScore) };
 }
 
 function getShoppingList(mealPlan) {
   const list = {};
   for (let d = 0; d < 7; d++) {
     MEAL_TYPES.forEach(mt => {
-      const entry = mealPlan[d]?.[mt];
-      if (!entry) return;
-      const dish = DISHES.find(di => di.id === entry.dishId);
-      if (!dish) return;
-      for (const [ing, amount] of Object.entries(dish.ingredients)) {
-        list[ing] = (list[ing] || 0) + amount * entry.servings;
-      }
+      const entries = mealPlan[d]?.[mt] || [];
+      entries.forEach(entry => {
+        const dish = DISHES.find(di => di.id === entry.dishId);
+        if (!dish) return;
+        const ings = entry.customIngredients || Object.fromEntries(Object.entries(dish.ingredients).map(([k, v]) => [k, v * entry.servings]));
+        for (const [ing, amount] of Object.entries(ings)) {
+          list[ing] = (list[ing] || 0) + amount;
+        }
+      });
     });
   }
   return Object.entries(list).sort((a, b) => a[0].localeCompare(b[0])).map(([name, grams]) => ({ name, grams: Math.round(grams) }));
@@ -523,6 +571,22 @@ function WarningTag({ text }) {
   );
 }
 
+// ---- Filter Toggle Chip ----
+function FilterChip({ label, active, onToggle }) {
+  return (
+    <button onClick={onToggle}
+      style={{
+        padding: "6px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: "pointer",
+        border: `1.5px solid ${active ? COLORS.accent : COLORS.grayLight}`,
+        background: active ? COLORS.accentLight : COLORS.card,
+        color: active ? COLORS.accent : COLORS.gray,
+        transition: "all 0.2s",
+      }}>
+      {active ? "✓ " : ""}{label}
+    </button>
+  );
+}
+
 // ---- Dish Card (for recommendation list) ----
 function DishCard({ dish, score, warnings, onSelect, onDetail }) {
   const nutrients = getDishNutrients(dish);
@@ -578,9 +642,24 @@ function DishCard({ dish, score, warnings, onSelect, onDetail }) {
 // ---- Dish Detail Panel ----
 function DishDetail({ dish, userProfile, onAdd, onClose }) {
   const [servings, setServings] = useState(dish.baseServings);
-  const nutrients = getDishNutrients(dish, servings);
+  const [customOverrides, setCustomOverrides] = useState({});
+
+  const activeIngredients = useMemo(() => {
+    const res = {};
+    for (const [ing, amt] of Object.entries(dish.ingredients)) {
+      res[ing] = customOverrides[ing] !== undefined ? customOverrides[ing] : amt * servings;
+    }
+    return res;
+  }, [dish, servings, customOverrides]);
+
+  const nutrients = getNutrientsFromIngredients(activeIngredients);
   const recipe = RECIPES[dish.recipeId];
-  const warnings = getWarnings(dish, userProfile.conditions);
+  const warnings = getWarnings(nutrients, userProfile.conditions);
+
+  const updateIngredient = (ing, newAmtStr) => {
+    const val = Math.max(0, parseInt(newAmtStr) || 0);
+    setCustomOverrides({ ...customOverrides, [ing]: val });
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "flex-end" }}
@@ -631,12 +710,15 @@ function DishDetail({ dish, userProfile, onAdd, onClose }) {
 
         {/* Ingredients */}
         <div style={{ padding: 16, background: COLORS.card, borderRadius: 14, border: `1px solid ${COLORS.grayLight}`, marginBottom: 16 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy, margin: "0 0 10px 0" }}>Ingredients</h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {Object.entries(dish.ingredients).map(([ing, amt]) => (
-              <span key={ing} style={{ fontSize: 13, padding: "4px 10px", borderRadius: 8, background: COLORS.accentLight, color: COLORS.navy }}>
-                {ing} <b>{Math.round(amt * servings)}g</b>
-              </span>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy, margin: "0 0 10px 0" }}>Ingredients (Editable)</h3>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {Object.entries(activeIngredients).map(([ing, amt]) => (
+              <div key={ing} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, padding: "4px 8px", borderRadius: 8, background: COLORS.accentLight, color: COLORS.navy }}>
+                <span>{ing}</span>
+                <input type="number" value={Math.round(amt)} onChange={(e) => updateIngredient(ing, e.target.value)}
+                  style={{ width: 45, padding: "2px 4px", fontSize: 13, border: `1px solid ${COLORS.accent}`, borderRadius: 4, background: "#fff", textAlign: "right" }} />
+                <span>g</span>
+              </div>
             ))}
           </div>
         </div>
@@ -660,7 +742,7 @@ function DishDetail({ dish, userProfile, onAdd, onClose }) {
           </div>
         )}
 
-        <button onClick={() => onAdd(dish, servings)}
+        <button onClick={() => onAdd(dish, servings, activeIngredients)}
           style={{
             width: "100%", padding: "14px", borderRadius: 14, border: "none", background: COLORS.accent, color: "#fff",
             fontWeight: 700, fontSize: 16, cursor: "pointer", boxShadow: "0 2px 8px rgba(212,113,59,0.3)",
@@ -672,25 +754,42 @@ function DishDetail({ dish, userProfile, onAdd, onClose }) {
   );
 }
 
-// ---- Add Dish Modal ----
+// ---- Add Dish Modal (with toggleable filters) ----
 function AddDishModal({ dayIndex, mealType, userProfile, mealPlan, onAdd, onClose }) {
   const [search, setSearch] = useState("");
   const [detailDish, setDetailDish] = useState(null);
 
-  const { filtered, scored } = useMemo(() => {
+  // Toggleable filters — auto-enabled from profile, user can toggle off
+  const [filterMealType, setFilterMealType] = useState(true);
+  const [filterDiet, setFilterDiet] = useState(true);
+  const [filterAllergies, setFilterAllergies] = useState(true);
+  const [filterConditions, setFilterConditions] = useState(true);
+
+  const { scored } = useMemo(() => {
     let available = DISHES.filter(d => {
-      // Hard filter: allergies
-      for (const allergy of userProfile.allergies) {
-        if (d.ingredients[allergy] !== undefined) return false;
+      // Hard filter: allergies (toggleable)
+      if (filterAllergies) {
+        for (const allergy of userProfile.allergies) {
+          if (d.ingredients[allergy] !== undefined) return false;
+        }
       }
-      // Hard filter: dietary
-      if (userProfile.diet === "vegetarian" && !d.tags.includes("vegetarian") && (
-        d.ingredients["chicken breast"] || d.ingredients["fish"] || d.ingredients["shrimp"] || d.ingredients["anchovies"]
-      )) return false;
-      if (userProfile.diet === "vegan" && (
-        d.ingredients["chicken breast"] || d.ingredients["fish"] || d.ingredients["shrimp"] || d.ingredients["anchovies"] || d.ingredients["egg"] || d.ingredients["butter"]
-      )) return false;
-      if (userProfile.diet === "pescatarian" && (d.ingredients["chicken breast"])) return false;
+      // Hard filter: dietary (toggleable)
+      if (filterDiet && userProfile.diet !== "none") {
+        if (userProfile.diet === "vegetarian" && !d.tags.includes("vegetarian") && (
+          d.ingredients["chicken breast"] || d.ingredients["fish"] || d.ingredients["shrimp"] || d.ingredients["anchovies"]
+        )) return false;
+        if (userProfile.diet === "vegan" && (
+          d.ingredients["chicken breast"] || d.ingredients["fish"] || d.ingredients["shrimp"] || d.ingredients["anchovies"] || d.ingredients["egg"] || d.ingredients["butter"]
+        )) return false;
+        if (userProfile.diet === "pescatarian" && (d.ingredients["chicken breast"])) return false;
+      }
+      // Meal type filter (toggleable)
+      if (filterMealType && !d.mealTypes.includes(mealType)) return false;
+      // Health condition filter: exclude dishes with warnings (toggleable)
+      if (filterConditions && userProfile.conditions.length > 0) {
+        const w = getWarnings(d, userProfile.conditions);
+        if (w.length > 0) return false;
+      }
       return true;
     });
 
@@ -705,13 +804,13 @@ function AddDishModal({ dayIndex, mealType, userProfile, mealPlan, onAdd, onClos
       warnings: getWarnings(d, userProfile.conditions),
     })).sort((a, b) => b.score.total - a.score.total);
 
-    return { filtered: available, scored };
-  }, [search, userProfile, mealPlan, dayIndex, mealType]);
+    return { scored };
+  }, [search, userProfile, mealPlan, dayIndex, mealType, filterMealType, filterDiet, filterAllergies, filterConditions]);
 
   const dayNutrients = getDayNutrients(mealPlan, dayIndex);
 
   if (detailDish) {
-    return <DishDetail dish={detailDish} userProfile={userProfile} onAdd={(d, s) => { onAdd(d, s); }} onClose={() => setDetailDish(null)} />;
+    return <DishDetail dish={detailDish} userProfile={userProfile} onAdd={(d, s, customIngs) => { onAdd(d, s, customIngs); }} onClose={() => setDetailDish(null)} />;
   }
 
   return (
@@ -731,13 +830,27 @@ function AddDishModal({ dayIndex, mealType, userProfile, mealPlan, onAdd, onClos
         </div>
 
         {/* Day nutrient progress */}
-        <div style={{ padding: 12, background: COLORS.card, borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, marginBottom: 16 }}>
+        <div style={{ padding: 12, background: COLORS.card, borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, marginBottom: 8 }}>Today's intake so far</div>
           <div style={{ display: "flex", gap: 14, fontSize: 12 }}>
             <span style={{ color: COLORS.accent }}>🔥 {Math.round(dayNutrients.calories)} cal</span>
             <span style={{ color: COLORS.green }}>💪 {Math.round(dayNutrients.protein)}g protein</span>
             <span style={{ color: COLORS.gold }}>🌾 {Math.round(dayNutrients.carbs)}g carbs</span>
           </div>
+        </div>
+
+        {/* Toggleable Filters */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+          <FilterChip label={mealType} active={filterMealType} onToggle={() => setFilterMealType(!filterMealType)} />
+          {userProfile.diet !== "none" && (
+            <FilterChip label={userProfile.diet} active={filterDiet} onToggle={() => setFilterDiet(!filterDiet)} />
+          )}
+          {userProfile.allergies.length > 0 && (
+            <FilterChip label="No allergens" active={filterAllergies} onToggle={() => setFilterAllergies(!filterAllergies)} />
+          )}
+          {userProfile.conditions.length > 0 && (
+            <FilterChip label="Health-safe only" active={filterConditions} onToggle={() => setFilterConditions(!filterConditions)} />
+          )}
         </div>
 
         {/* Search */}
@@ -756,11 +869,14 @@ function AddDishModal({ dayIndex, mealType, userProfile, mealPlan, onAdd, onClos
         {/* Dish list */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {scored.length === 0 && (
-            <div style={{ textAlign: "center", padding: 30, color: COLORS.gray }}>No dishes match your filters.</div>
+            <div style={{ textAlign: "center", padding: 30, color: COLORS.gray }}>
+              <div style={{ fontSize: 14, marginBottom: 8 }}>No dishes match your filters.</div>
+              <div style={{ fontSize: 12 }}>Try toggling off some filters above to see more options.</div>
+            </div>
           )}
           {scored.map(({ dish, score, warnings }) => (
             <DishCard key={dish.id} dish={dish} score={score} warnings={warnings}
-              onSelect={(d) => onAdd(d, 1)}
+              onSelect={(d) => onAdd(d, 1, null)}
               onDetail={(d) => setDetailDish(d)}
             />
           ))}
@@ -775,7 +891,7 @@ function ShoppingListPanel({ mealPlan, onClose }) {
   const items = getShoppingList(mealPlan);
   const totalDishes = (() => {
     let c = 0;
-    for (let d = 0; d < 7; d++) MEAL_TYPES.forEach(mt => { if (mealPlan[d]?.[mt]) c++; });
+    for (let d = 0; d < 7; d++) MEAL_TYPES.forEach(mt => { c += (mealPlan[d]?.[mt] || []).length; });
     return c;
   })();
 
@@ -788,7 +904,7 @@ function ShoppingListPanel({ mealPlan, onClose }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 700, color: COLORS.navy, margin: 0 }}>🛒 Shopping List</h2>
-            <p style={{ color: COLORS.gray, fontSize: 13, margin: "4px 0 0 0" }}>{totalDishes} dishes planned this week</p>
+            <p style={{ color: COLORS.gray, fontSize: 13, margin: "4px 0 0 0" }}>{totalDishes} dish{totalDishes !== 1 ? "es" : ""} planned this week</p>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 24, color: COLORS.gray, cursor: "pointer" }}>×</button>
         </div>
@@ -818,11 +934,79 @@ function ShoppingListPanel({ mealPlan, onClose }) {
   );
 }
 
+// ---- Recipe View Modal ----
+function RecipeViewModal({ entry, dish, onClose }) {
+  const recipe = RECIPES[dish.recipeId];
+  const ings = entry.customIngredients || Object.fromEntries(Object.entries(dish.ingredients).map(([k, v]) => [k, v * entry.servings]));
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1100, display: "flex", justifyContent: "center", alignItems: "center", padding: 16 }} onClick={onClose}>
+      <div style={{ background: COLORS.bg, borderRadius: 24, width: "100%", maxWidth: 640, maxHeight: "90vh", overflow: "auto", padding: 32 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 24 }}>
+          <div>
+            <h2 style={{ fontSize: 28, fontWeight: 800, color: COLORS.navy, margin: 0 }}>{recipe ? recipe.name : dish.name}</h2>
+            <div style={{ fontSize: 16, color: COLORS.gray, marginTop: 8 }}>
+              {recipe ? `Prep: ${recipe.prepTime} min · Cook: ${recipe.cookTime} min` : "No recipe available"}
+            </div>
+            <div style={{ fontSize: 16, color: COLORS.accent, fontWeight: 700, marginTop: 4 }}>
+              Serving size: {entry.servings}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 32, color: COLORS.gray, cursor: "pointer" }}>×</button>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 24 }}>
+          <div style={{ flex: "1 1 200px" }}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, color: COLORS.navy, borderBottom: `2px solid ${COLORS.grayLight}`, paddingBottom: 8 }}>Ingredients</h3>
+            <ul style={{ listStyle: "none", padding: 0, fontSize: 18, color: COLORS.navy }}>
+              {Object.entries(ings).map(([ing, amt]) => (
+                <li key={ing} style={{ padding: "8px 0", borderBottom: `1px solid ${COLORS.grayLight}` }}>
+                  <b>{Math.round(amt)}g</b> {ing}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div style={{ flex: "2 1 300px" }}>
+            <h3 style={{ fontSize: 20, fontWeight: 700, color: COLORS.navy, borderBottom: `2px solid ${COLORS.grayLight}`, paddingBottom: 8 }}>Instructions</h3>
+            {recipe ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16 }}>
+                {recipe.steps.map((s, i) => (
+                  <div key={i} style={{ display: "flex", gap: 16, background: COLORS.card, padding: 16, borderRadius: 16, boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
+                    <div style={{ minWidth: 32, height: 32, borderRadius: 16, background: COLORS.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700 }}>
+                      {i + 1}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 20, color: COLORS.navy, lineHeight: 1.6 }}>{s}</p>
+                  </div>
+                ))}
+              </div>
+            ) : <p style={{ fontSize: 18 }}>Enjoy your meal!</p>}
+          </div>
+        </div>
+        <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "12px 24px", borderRadius: 12, background: COLORS.green, color: "#fff", fontSize: 16, fontWeight: 700, border: "none", cursor: "pointer" }}>Got it!</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---- Weekly Nutrient Summary ----
 function NutrientSummaryPanel({ mealPlan, userProfile, onClose }) {
+  const [viewMode, setViewMode] = useState("table");
   const weekN = getWeekNutrients(mealPlan);
   const weekRDA = {};
   NUTRIENT_KEYS.forEach(k => weekRDA[k] = RDA[k] * 7);
+
+  const chartData = [
+    { name: "Cals", pct: Math.round(weekN.calories / weekRDA.calories * 100), fill: COLORS.accent },
+    { name: "Pro", pct: Math.round(weekN.protein / weekRDA.protein * 100), fill: COLORS.green },
+    { name: "Carbs", pct: Math.round(weekN.carbs / weekRDA.carbs * 100), fill: COLORS.gold },
+    { name: "Fat", pct: Math.round(weekN.fat / weekRDA.fat * 100), fill: COLORS.accent },
+    { name: "Fiber", pct: Math.round(weekN.fiber / weekRDA.fiber * 100), fill: COLORS.green },
+    { name: "Sod", pct: Math.round(weekN.sodium / weekRDA.sodium * 100), fill: COLORS.gray },
+    { name: "Chol", pct: Math.round(weekN.cholesterol / weekRDA.cholesterol * 100), fill: COLORS.gray },
+  ];
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "flex-end" }}
@@ -836,21 +1020,55 @@ function NutrientSummaryPanel({ mealPlan, userProfile, onClose }) {
         </div>
 
         <div style={{ padding: 16, background: COLORS.card, borderRadius: 14, border: `1px solid ${COLORS.grayLight}`, marginBottom: 16 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy, margin: "0 0 14px 0" }}>Weekly Totals vs RDA × 7</h3>
-          <NutrientBar label="Calories" value={weekN.calories} max={weekRDA.calories} unit=" kcal" color={COLORS.accent} />
-          <NutrientBar label="Protein" value={weekN.protein} max={weekRDA.protein} unit="g" color={COLORS.green} />
-          <NutrientBar label="Carbs" value={weekN.carbs} max={weekRDA.carbs} unit="g" color={COLORS.gold} />
-          <NutrientBar label="Fat" value={weekN.fat} max={weekRDA.fat} unit="g" color={COLORS.accent} />
-          <NutrientBar label="Fiber" value={weekN.fiber} max={weekRDA.fiber} unit="g" color={COLORS.green} />
-          <NutrientBar label="Sodium" value={weekN.sodium} max={weekRDA.sodium} unit="mg" color={COLORS.gray} warn />
-          <NutrientBar label="Cholesterol" value={weekN.cholesterol} max={weekRDA.cholesterol} unit="mg" color={COLORS.gray} warn />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy, margin: 0 }}>Weekly Totals vs RDA × 7</h3>
+            <div style={{ display: "flex", background: COLORS.grayLight, borderRadius: 8, padding: 2 }}>
+              <button onClick={() => setViewMode("table")} style={{ background: viewMode === "table" ? "#fff" : "transparent", border: "none", padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: COLORS.navy, transition: "background 0.2s" }}>Table</button>
+              <button onClick={() => setViewMode("chart")} style={{ background: viewMode === "chart" ? "#fff" : "transparent", border: "none", padding: "4px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", color: COLORS.navy, transition: "background 0.2s" }}>Chart</button>
+            </div>
+          </div>
+
+          {viewMode === "table" ? (
+            <>
+              <NutrientBar label="Calories" value={weekN.calories} max={weekRDA.calories} unit=" kcal" color={COLORS.accent} />
+              <NutrientBar label="Protein" value={weekN.protein} max={weekRDA.protein} unit="g" color={COLORS.green} />
+              <NutrientBar label="Carbs" value={weekN.carbs} max={weekRDA.carbs} unit="g" color={COLORS.gold} />
+              <NutrientBar label="Fat" value={weekN.fat} max={weekRDA.fat} unit="g" color={COLORS.accent} />
+              <NutrientBar label="Fiber" value={weekN.fiber} max={weekRDA.fiber} unit="g" color={COLORS.green} />
+              <NutrientBar label="Sodium" value={weekN.sodium} max={weekRDA.sodium} unit="mg" color={COLORS.gray} warn />
+              <NutrientBar label="Cholesterol" value={weekN.cholesterol} max={weekRDA.cholesterol} unit="mg" color={COLORS.gray} warn />
+            </>
+          ) : (
+            <div style={{ height: 260, width: "100%" }}>
+              {window.Recharts ? (
+                <window.Recharts.ResponsiveContainer width="100%" height="100%">
+                  <window.Recharts.BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <window.Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} stroke={COLORS.grayLight} />
+                    <window.Recharts.XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: COLORS.gray }} interval={0} />
+                    <window.Recharts.YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: COLORS.gray }} tickFormatter={(val) => `${val}%`} />
+                    <window.Recharts.Tooltip cursor={{ fill: COLORS.bg }} contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} formatter={(val) => [`${val}% of RDA`, "Intake"]} />
+                    <window.Recharts.ReferenceLine y={100} stroke={COLORS.warn} strokeDasharray="3 3" />
+                    <window.Recharts.Bar dataKey="pct" radius={[4, 4, 0, 0]}>
+                      {chartData.map((entry, index) => (
+                        <window.Recharts.Cell key={`cell-${index}`} fill={entry.pct > 100 ? COLORS.warn : entry.fill} />
+                      ))}
+                    </window.Recharts.Bar>
+                  </window.Recharts.BarChart>
+                </window.Recharts.ResponsiveContainer>
+              ) : (
+                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.gray }}>
+                  Charting library not loaded.
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Daily breakdown */}
         <h3 style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy, margin: "0 0 10px 0" }}>Daily Breakdown</h3>
         {DAYS.map((day, di) => {
           const dn = getDayNutrients(mealPlan, di);
-          const hasMeals = MEAL_TYPES.some(mt => mealPlan[di]?.[mt]);
+          const hasMeals = MEAL_TYPES.some(mt => (mealPlan[di]?.[mt] || []).length > 0);
           if (!hasMeals) return (
             <div key={day} style={{ padding: "10px 14px", marginBottom: 6, borderRadius: 10, background: COLORS.card, border: `1px solid ${COLORS.grayLight}`, color: COLORS.gray, fontSize: 13 }}>
               {DAYS_FULL[di]}: No meals planned
@@ -894,6 +1112,10 @@ function NutrientSummaryPanel({ mealPlan, userProfile, onClose }) {
 // ---- Main Calendar Screen ----
 function CalendarScreen({ userProfile, onEditProfile }) {
   const [mealPlan, setMealPlan] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mealwise_mealplan");
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
     const plan = {};
     for (let i = 0; i < 7; i++) plan[i] = {};
     return plan;
@@ -901,30 +1123,39 @@ function CalendarScreen({ userProfile, onEditProfile }) {
   const [addModal, setAddModal] = useState(null); // { dayIndex, mealType }
   const [showShopping, setShowShopping] = useState(false);
   const [showNutrients, setShowNutrients] = useState(false);
+  const [recipeView, setRecipeView] = useState(null);
 
-  const handleAdd = useCallback((dish, servings) => {
+  // Persist meal plan to localStorage
+  useEffect(() => {
+    try { localStorage.setItem("mealwise_mealplan", JSON.stringify(mealPlan)); } catch (e) { /* ignore */ }
+  }, [mealPlan]);
+
+  // Add dish appends to the array for that slot
+  const handleAdd = useCallback((dish, servings, customIngredients = null) => {
     if (!addModal) return;
-    setMealPlan(prev => ({
-      ...prev,
-      [addModal.dayIndex]: {
-        ...prev[addModal.dayIndex],
-        [addModal.mealType]: { dishId: dish.id, servings },
-      }
-    }));
+    setMealPlan(prev => {
+      const daySlots = { ...prev[addModal.dayIndex] };
+      const existing = daySlots[addModal.mealType] || [];
+      daySlots[addModal.mealType] = [...existing, { dishId: dish.id, servings, customIngredients }];
+      return { ...prev, [addModal.dayIndex]: daySlots };
+    });
     setAddModal(null);
   }, [addModal]);
 
-  const handleRemove = useCallback((dayIndex, mealType) => {
+  // Remove a specific dish by index within a slot
+  const handleRemove = useCallback((dayIndex, mealType, entryIndex) => {
     setMealPlan(prev => {
-      const day = { ...prev[dayIndex] };
-      delete day[mealType];
-      return { ...prev, [dayIndex]: day };
+      const daySlots = { ...prev[dayIndex] };
+      const entries = [...(daySlots[mealType] || [])];
+      entries.splice(entryIndex, 1);
+      daySlots[mealType] = entries;
+      return { ...prev, [dayIndex]: daySlots };
     });
   }, []);
 
   const totalPlanned = (() => {
     let c = 0;
-    for (let d = 0; d < 7; d++) MEAL_TYPES.forEach(mt => { if (mealPlan[d]?.[mt]) c++; });
+    for (let d = 0; d < 7; d++) MEAL_TYPES.forEach(mt => { c += (mealPlan[d]?.[mt] || []).length; });
     return c;
   })();
 
@@ -970,7 +1201,7 @@ function CalendarScreen({ userProfile, onEditProfile }) {
             🛒 Shopping List
           </button>
           <span style={{ fontSize: 12, color: COLORS.gray, display: "flex", alignItems: "center", marginLeft: 8 }}>
-            {totalPlanned} meal{totalPlanned !== 1 ? "s" : ""} planned
+            {totalPlanned} dish{totalPlanned !== 1 ? "es" : ""} planned
           </span>
         </div>
       </div>
@@ -985,54 +1216,64 @@ function CalendarScreen({ userProfile, onEditProfile }) {
         <div style={{ display: "grid", gridTemplateColumns: "80px repeat(7, 1fr)", gap: 4, minWidth: 700 }}>
           {/* Header row */}
           <div />
-          {DAYS.map((d, i) => (
+          {DAYS.map((d) => (
             <div key={d} style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: COLORS.navy, padding: "8px 0" }}>{d}</div>
           ))}
 
           {/* Meal rows */}
           {MEAL_TYPES.map(mt => (
-            <>
-              <div key={`label-${mt}`} style={{
+            <React.Fragment key={mt}>
+              <div style={{
                 display: "flex", alignItems: "center", fontSize: 12, fontWeight: 700, color: COLORS.gray,
                 textTransform: "capitalize", paddingLeft: 4,
               }}>
                 {mt === "breakfast" ? "🌅" : mt === "lunch" ? "☀️" : mt === "dinner" ? "🌙" : "🍪"} {mt}
               </div>
               {DAYS.map((d, di) => {
-                const entry = mealPlan[di]?.[mt];
-                const dish = entry ? DISHES.find(dd => dd.id === entry.dishId) : null;
+                const entries = mealPlan[di]?.[mt] || [];
 
                 return (
                   <div key={`${mt}-${di}`}
                     style={{
                       background: COLORS.card, borderRadius: 12, minHeight: 60, padding: 6,
                       border: `1px solid ${COLORS.grayLight}`, display: "flex", flexDirection: "column",
-                      justifyContent: "center", alignItems: "center", position: "relative",
+                      justifyContent: entries.length > 0 ? "flex-start" : "center", alignItems: "center", position: "relative",
                       cursor: "pointer", transition: "all 0.15s",
                     }}
-                    onClick={() => !dish && setAddModal({ dayIndex: di, mealType: mt })}
-                    onMouseEnter={e => { if (!dish) e.currentTarget.style.borderColor = COLORS.accent; }}
+                    onClick={() => setAddModal({ dayIndex: di, mealType: mt })}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = COLORS.accent; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = COLORS.grayLight; }}
                   >
-                    {dish ? (
-                      <div style={{ width: "100%", textAlign: "center" }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.navy, lineHeight: 1.3, marginBottom: 2 }}>
-                          {dish.name}
-                        </div>
-                        {entry.servings !== 1 && (
-                          <div style={{ fontSize: 10, color: COLORS.gray }}>×{entry.servings}</div>
-                        )}
-                        {getWarnings(dish, userProfile.conditions).map(w => (
-                          <div key={w} style={{ fontSize: 9, color: COLORS.warn, fontWeight: 700 }}>⚠ {w.replace("High ", "")}</div>
-                        ))}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleRemove(di, mt); }}
-                          style={{
-                            position: "absolute", top: 2, right: 4, background: "none", border: "none",
-                            color: COLORS.gray, cursor: "pointer", fontSize: 14, padding: 0, lineHeight: 1,
-                          }}
-                          title="Remove"
-                        >×</button>
+                    {entries.length > 0 ? (
+                      <div style={{ width: "100%" }}>
+                        {entries.map((entry, ei) => {
+                          const dish = DISHES.find(dd => dd.id === entry.dishId);
+                          if (!dish) return null;
+                          const entryWarnings = getEntryWarnings(entry, userProfile.conditions);
+                          return (
+                            <div key={ei} style={{ textAlign: "center", position: "relative", padding: "2px 0", borderBottom: ei < entries.length - 1 ? `1px dashed ${COLORS.grayLight}` : "none" }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.navy, lineHeight: 1.3 }}
+                                onClick={(e) => { e.stopPropagation(); setRecipeView({ entry, dish }); }}>
+                                {dish.name}
+                              </div>
+                              {entry.servings !== 1 && (
+                                <div style={{ fontSize: 10, color: COLORS.gray }}>×{entry.servings}</div>
+                              )}
+                              {entryWarnings.map(w => (
+                                <div key={w} style={{ fontSize: 9, color: COLORS.warn, fontWeight: 700 }}>⚠ {w.replace("High ", "")}</div>
+                              ))}
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleRemove(di, mt, ei); }}
+                                style={{
+                                  position: "absolute", top: 0, right: 0, background: "none", border: "none",
+                                  color: COLORS.gray, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1,
+                                }}
+                                title="Remove"
+                              >×</button>
+                            </div>
+                          );
+                        })}
+                        <div style={{ color: COLORS.grayLight, fontSize: 14, fontWeight: 300, textAlign: "center", marginTop: 2 }}>+</div>
                       </div>
                     ) : (
                       <div style={{ color: COLORS.grayLight, fontSize: 22, fontWeight: 300 }}>+</div>
@@ -1040,7 +1281,7 @@ function CalendarScreen({ userProfile, onEditProfile }) {
                   </div>
                 );
               })}
-            </>
+            </React.Fragment>
           ))}
         </div>
       </div>
@@ -1058,6 +1299,7 @@ function CalendarScreen({ userProfile, onEditProfile }) {
       )}
       {showShopping && <ShoppingListPanel mealPlan={mealPlan} onClose={() => setShowShopping(false)} />}
       {showNutrients && <NutrientSummaryPanel mealPlan={mealPlan} userProfile={userProfile} onClose={() => setShowNutrients(false)} />}
+      {recipeView && <RecipeViewModal entry={recipeView.entry} dish={recipeView.dish} onClose={() => setRecipeView(null)} />}
     </div>
   );
 }
@@ -1067,7 +1309,21 @@ function CalendarScreen({ userProfile, onEditProfile }) {
 // ============================================================
 
 export default function App() {
-  const [userProfile, setUserProfile] = useState(null);
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mealwise_profile");
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+    return null;
+  });
+
+  // Persist profile to localStorage
+  useEffect(() => {
+    try {
+      if (userProfile) localStorage.setItem("mealwise_profile", JSON.stringify(userProfile));
+      else localStorage.removeItem("mealwise_profile");
+    } catch (e) { /* ignore */ }
+  }, [userProfile]);
 
   if (!userProfile) {
     return <OnboardingScreen onComplete={setUserProfile} />;

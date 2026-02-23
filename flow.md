@@ -28,18 +28,20 @@ This document outlines the detailed step-by-step user journey, explaining exactl
 **Goal:** Select dishes tailored dynamically to the user's daily dietary needs.
 1.  **Initiate:** User clicks an empty `+ Add Dish` slot for "Tuesday - Lunch".
     *   *Reaction:* App opens the "Add Dish Modal".
-2.  **Display Recommendations:** 
-    *   *Algorithm execution:* The app filters out all dishes containing user allergies/diet restrictions. It then scores remaining dishes prioritizing: Health Condition safety (60%), remaining Daily Nutrient balance (30%), and variety constraint (10%).
-    *   *Reaction:* A grid of recommended dishes appears, sorted highest score first. Each dish card shows "Match Score" (e.g., 95%), Name, core macros, and any warning tags (e.g., ⚠ High Sodium).
-3.  **Filters & Search:** A search bar and toggles (Vegan, Low Sugar, etc.) sit at the top.
-    *   *Action:* User can type "Chicken" or toggle off auto-filters manually to see a wider range of dishes.
-4.  **Dish Detail & Selection:** 
+2.  **Display Recommendations:**
+    *   *Algorithm execution:* The app filters out all dishes containing user allergies/diet restrictions. It then scores remaining dishes prioritizing: Health Condition safety (60%), remaining Daily Nutrient balance (30%), and user preference/variety (10%).
+    *   *Reaction:* A scrollable list of recommended dishes appears, sorted highest score first. Each dish card shows "Match Score" (e.g., 95%), Name, core macros, and any warning tags (e.g., ⚠ High Sodium).
+3.  **Filters & Search:** Filter toggle chips sit above the search bar, auto-enabled from the user's profile: meal type, dietary preference, allergen exclusion, and health-safe only. Users can toggle any filter off to broaden the dish selection.
+    *   *Action:* User can type "Chicken" in the search bar or toggle off any of the auto-enabled filter chips to see a wider range of dishes.
+4.  **Dish Detail & Selection:**
     *   *Action:* User clicks "Details" on "Hainanese Chicken Rice".
     *   *Reaction:* A slide-up panel opens showing ingredients, full nutrition breakdown for 1 serving, cooking steps, and preparation time.
     *   *Action:* User adjusts servings via `+ / -` buttons.
     *   *Reaction:* The ingredient amounts and nutritional summary recalculate instantly in the UI.
     *   *Action:* User clicks `+ Add to Plan`.
     *   *Reaction:* Modal closes. Dish appears in the "Tuesday - Lunch" slot.
+    *   The user can add multiple dishes to the same meal slot. After adding one dish, they can click the slot again (which now shows a small `+` below existing dishes) to add another.
+    *   The app dynamically re-ranks remaining dishes based on the updated daily nutrient totals.
 5.  **Dynamic Adjustment:**
     *   *Reaction:* The App instantly recalculates the Daily Nutrient Summary Pane. Since the user consumed significant carbs for lunch, remaining recommended dishes for *Dinner* will dynamically re-rank to push lower-carb options to the top.
 
@@ -61,6 +63,15 @@ This document outlines the detailed step-by-step user journey, explaining exactl
 1.  **Adjusting Ingredients:** While viewing a recipe, a user wants less salt or sugar for health reasons.
     *   *Action:* User clicks "Edit Recipe". They lower the salt or sugar amount.
     *   *Reaction:* The app recalculates the nutritional profile dynamically (e.g., lowering sodium or sugar levels). The quantities for the *other* ingredients in the recipe remain exactly the same; they do not automatically adjust.
-2.  **Substitutions:** App flags "High Cholesterol" for an ingredient like Chicken Wing.
+2.  **Substitutions:** *(Future Feature — Phase 2)* App flags "High Cholesterol" for an ingredient like Chicken Wing.
     *   *Action:* App displays a prompt: "Swap with Chicken Breast?". User clicks "Yes".
     *   *Reaction:* Nutrients metrics update immediately.
+
+## 7. Profile Editing
+1.  User clicks the "⚙ Profile" button on the main dashboard.
+2.  App returns to the onboarding flow where user can update health conditions, diet, and allergies.
+3.  After completing, the meal plan is preserved but dish recommendations are re-scored based on the updated profile.
+
+## 8. Edge Cases
+1.  **No matching dishes:** If all dishes are filtered out (e.g., vegan + multiple allergies), the app displays "No dishes match your filters" with a suggestion to toggle off some filters.
+2.  **Page refresh:** Meal plan and user profile are persisted in localStorage, so data survives page refreshes.
