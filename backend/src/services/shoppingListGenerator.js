@@ -1,14 +1,15 @@
 const { getDb } = require("../db");
 
-function getShoppingList(userId) {
+function getShoppingList(userId, weekStart) {
   const db = getDb();
+  const ws = weekStart || getCurrentWeekStart();
 
   const entries = db.prepare(`
     SELECT mp.servings, mp.custom_ingredients, d.ingredients
     FROM meal_plans mp
     JOIN dishes d ON d.id = mp.dish_id
-    WHERE mp.user_id = ?
-  `).all(userId);
+    WHERE mp.user_id = ? AND mp.week_start = ?
+  `).all(userId, ws);
 
   const list = {};
 
@@ -28,6 +29,14 @@ function getShoppingList(userId) {
   return Object.entries(list)
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([name, grams]) => ({ name, grams: Math.round(grams) }));
+}
+
+function getCurrentWeekStart() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
 }
 
 module.exports = { getShoppingList };

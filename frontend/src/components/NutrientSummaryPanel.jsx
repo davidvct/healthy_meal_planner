@@ -5,14 +5,14 @@ import NutrientBar from "./ui/NutrientBar";
 import WarningTag from "./ui/WarningTag";
 import * as api from "../services/api";
 
-export default function NutrientSummaryPanel({ userId, onClose }) {
+export default function NutrientSummaryPanel({ userId, weekStart, onClose }) {
   const [viewMode, setViewMode] = useState("table");
   const [weekData, setWeekData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getWeekNutrients(userId).then(setWeekData).catch(() => {}).finally(() => setLoading(false));
-  }, [userId]);
+    api.getWeekNutrients(userId, weekStart).then(setWeekData).catch(() => {}).finally(() => setLoading(false));
+  }, [userId, weekStart]);
 
   if (loading || !weekData) {
     return (

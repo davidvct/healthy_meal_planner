@@ -2,17 +2,17 @@ import { useState, useEffect } from "react";
 import { COLORS } from "../constants/colors";
 import * as api from "../services/api";
 
-export default function ShoppingListPanel({ userId, onClose }) {
+export default function ShoppingListPanel({ userId, weekStart, onClose }) {
   const [items, setItems] = useState([]);
   const [totalDishes, setTotalDishes] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getShoppingList(userId).then(data => {
+    api.getShoppingList(userId, weekStart).then(data => {
       setItems(data.items);
       setTotalDishes(data.totalDishes);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, [userId]);
+  }, [userId, weekStart]);
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "flex-end" }}

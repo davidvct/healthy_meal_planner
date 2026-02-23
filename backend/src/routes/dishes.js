@@ -50,8 +50,9 @@ router.get("/:id", (req, res) => {
 // Returns scored + filtered dish list for a specific meal slot
 router.get("/recommend/:userId", (req, res) => {
   const db = getDb();
-  const { day, mealType, filterMealType, filterDiet, filterAllergies, filterConditions, search } = req.query;
+  const { day, mealType, filterMealType, filterDiet, filterAllergies, filterConditions, search, weekStart } = req.query;
   const dayIndex = parseInt(day) || 0;
+  const ws = weekStart || getCurrentWeekStart();
 
   // Load user profile
   const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.params.userId);
@@ -66,17 +67,17 @@ router.get("/recommend/:userId", (req, res) => {
   // Load all dishes
   const allDishes = db.prepare("SELECT * FROM dishes").all();
 
-  // Load meal plan entries for scoring context
+  // Load meal plan entries for scoring context (filtered by week)
   const dayEntries = db.prepare(`
     SELECT mp.*, d.ingredients
     FROM meal_plans mp
     JOIN dishes d ON d.id = mp.dish_id
-    WHERE mp.user_id = ? AND mp.day_index = ?
-  `).all(req.params.userId, dayIndex);
+    WHERE mp.user_id = ? AND mp.week_start = ? AND mp.day_index = ?
+  `).all(req.params.userId, ws, dayIndex);
 
   const allWeekEntries = db.prepare(`
-    SELECT mp.dish_id FROM meal_plans mp WHERE mp.user_id = ?
-  `).all(req.params.userId);
+    SELECT mp.dish_id FROM meal_plans mp WHERE mp.user_id = ? AND mp.week_start = ?
+  `).all(req.params.userId, ws);
 
   // Filter
   const filtered = filterDishes(allDishes, userProfile, mealType, {
@@ -122,5 +123,14 @@ router.get("/recommend/:userId", (req, res) => {
 
   res.json({ scored, dayNutrients });
 });
+
+// Helper: get Monday of the current week as YYYY-MM-DD
+function getCurrentWeekStart() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
+}
 
 module.exports = router;

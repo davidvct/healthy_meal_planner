@@ -6,7 +6,7 @@ import DishCard from "./DishCard";
 import DishDetail from "./DishDetail";
 import * as api from "../services/api";
 
-export default function AddDishModal({ dayIndex, mealType, userProfile, userId, onAdd, onClose }) {
+export default function AddDishModal({ dayIndex, mealType, userProfile, userId, weekStart, onAdd, onClose }) {
   const [search, setSearch] = useState("");
   const [detailDish, setDetailDish] = useState(null);
   const [scored, setScored] = useState([]);
@@ -30,6 +30,7 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
       filterAllergies,
       filterConditions,
       search: search.trim(),
+      weekStart,
     }).then(data => {
       setScored(data.scored);
       setDayNutrients(data.dayNutrients);

@@ -23,32 +23,48 @@ function NutritionBarChart({ label, totals, color }) {
   }));
   const maxPct = Math.max(100, ...bars.map(b => b.pct));
 
+  const chartH = 72;
+  const lineBottom = maxPct > 0 ? (100 / maxPct) * chartH : 0;
+
   return (
     <div style={{ marginBottom: 4 }}>
       <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.navy, marginBottom: 6 }}>{label}</div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 90 }}>
-        {bars.map(b => {
-          const barH = maxPct > 0 ? Math.max(2, (b.pct / maxPct) * 72) : 2;
-          const over = b.pct > 100;
-          return (
-            <div key={b.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: over ? COLORS.warn : COLORS.gray, marginBottom: 2 }}>
-                {b.pct}%
+      <div style={{ position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 90 }}>
+          {bars.map(b => {
+            const barH = maxPct > 0 ? Math.max(2, (b.pct / maxPct) * chartH) : 2;
+            const over = b.pct > 100;
+            return (
+              <div key={b.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: over ? COLORS.warn : COLORS.gray, marginBottom: 2 }}>
+                  {b.pct}%
+                </div>
+                <div style={{
+                  width: "80%", height: barH, borderRadius: 4,
+                  background: over ? COLORS.warn : color,
+                  transition: "height 0.3s",
+                }} />
+                <div style={{ fontSize: 8, color: COLORS.gray, marginTop: 3, textAlign: "center", lineHeight: 1.2 }}>
+                  {b.label}
+                </div>
               </div>
-              <div style={{
-                width: "80%", height: barH, borderRadius: 4,
-                background: over ? COLORS.warn : color,
-                transition: "height 0.3s",
-              }} />
-              <div style={{ fontSize: 8, color: COLORS.gray, marginTop: 3, textAlign: "center", lineHeight: 1.2 }}>
-                {b.label}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        {/* 100% reference line */}
+        {lineBottom > 0 && lineBottom <= chartH && (
+          <div style={{
+            position: "absolute",
+            left: 0, right: 0,
+            bottom: lineBottom + 14, /* 14px offset for the label row below bars */
+            borderTop: `1.5px dashed ${COLORS.gray}`,
+            opacity: 0.45,
+            pointerEvents: "none",
+          }}>
+            <span style={{ position: "absolute", right: 0, top: -10, fontSize: 8, color: COLORS.gray, fontWeight: 600 }}>100%</span>
+          </div>
+        )}
       </div>
-      {/* 100% reference line label */}
-      <div style={{ fontSize: 8, color: COLORS.grayLight, textAlign: "right", marginTop: 1 }}>— 100% RDA</div>
     </div>
   );
 }

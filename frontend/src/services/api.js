@@ -35,7 +35,7 @@ export async function getDishDetail(dishId) {
   return request(`/dishes/${dishId}`);
 }
 
-export async function getRecommendedDishes(userId, { day, mealType, filterMealType, filterDiet, filterAllergies, filterConditions, search }) {
+export async function getRecommendedDishes(userId, { day, mealType, filterMealType, filterDiet, filterAllergies, filterConditions, search, weekStart }) {
   const params = new URLSearchParams({
     day: String(day),
     mealType,
@@ -45,19 +45,21 @@ export async function getRecommendedDishes(userId, { day, mealType, filterMealTy
     filterConditions: String(filterConditions),
   });
   if (search) params.set("search", search);
+  if (weekStart) params.set("weekStart", weekStart);
   return request(`/dishes/recommend/${userId}?${params}`);
 }
 
 // ---- Meal Plan ----
 
-export async function getMealPlan(userId) {
-  return request(`/mealplan/${userId}`);
+export async function getMealPlan(userId, weekStart) {
+  const params = weekStart ? `?weekStart=${weekStart}` : "";
+  return request(`/mealplan/${userId}${params}`);
 }
 
-export async function addDishToPlan(userId, { dayIndex, mealType, dishId, servings, customIngredients }) {
+export async function addDishToPlan(userId, { dayIndex, mealType, dishId, servings, customIngredients, weekStart }) {
   return request(`/mealplan/${userId}/add`, {
     method: "POST",
-    body: JSON.stringify({ dayIndex, mealType, dishId, servings, customIngredients }),
+    body: JSON.stringify({ dayIndex, mealType, dishId, servings, customIngredients, weekStart }),
   });
 }
 
@@ -65,16 +67,19 @@ export async function removeDishFromPlan(userId, entryId) {
   return request(`/mealplan/${userId}/remove/${entryId}`, { method: "DELETE" });
 }
 
-export async function getWeekNutrients(userId) {
-  return request(`/mealplan/${userId}/nutrients/week`);
+export async function getWeekNutrients(userId, weekStart) {
+  const params = weekStart ? `?weekStart=${weekStart}` : "";
+  return request(`/mealplan/${userId}/nutrients/week${params}`);
 }
 
-export async function getDayNutrients(userId, dayIndex) {
-  return request(`/mealplan/${userId}/nutrients/day/${dayIndex}`);
+export async function getDayNutrients(userId, dayIndex, weekStart) {
+  const params = weekStart ? `?weekStart=${weekStart}` : "";
+  return request(`/mealplan/${userId}/nutrients/day/${dayIndex}${params}`);
 }
 
 // ---- Shopping List ----
 
-export async function getShoppingList(userId) {
-  return request(`/shopping-list/${userId}`);
+export async function getShoppingList(userId, weekStart) {
+  const params = weekStart ? `?weekStart=${weekStart}` : "";
+  return request(`/shopping-list/${userId}${params}`);
 }

@@ -15,6 +15,7 @@ function getDb() {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   initSchema();
+  migrateSchema();
   seedIfEmpty();
   return db;
 }
@@ -62,6 +63,7 @@ function initSchema() {
     CREATE TABLE IF NOT EXISTS meal_plans (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
+      week_start TEXT NOT NULL DEFAULT '2026-02-23',
       day_index INTEGER NOT NULL,
       meal_type TEXT NOT NULL,
       dish_id TEXT NOT NULL,
@@ -73,8 +75,19 @@ function initSchema() {
     );
 
     CREATE INDEX IF NOT EXISTS idx_meal_plans_user
-      ON meal_plans(user_id, day_index, meal_type);
+      ON meal_plans(user_id, week_start, day_index, meal_type);
   `);
+}
+
+function migrateSchema() {
+  // Add week_start column if it doesn't exist (for existing DBs)
+  const cols = db.prepare("PRAGMA table_info(meal_plans)").all();
+  if (!cols.find(c => c.name === "week_start")) {
+    db.exec("ALTER TABLE meal_plans ADD COLUMN week_start TEXT NOT NULL DEFAULT '2026-02-23'");
+    db.exec("DROP INDEX IF EXISTS idx_meal_plans_user");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_meal_plans_user ON meal_plans(user_id, week_start, day_index, meal_type)");
+    console.log("[MealWise] Migrated meal_plans: added week_start column.");
+  }
 }
 
 function seedIfEmpty() {

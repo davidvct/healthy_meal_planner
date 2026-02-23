@@ -4,17 +4,18 @@ const { getDb } = require("../db");
 const { getDayNutrients, getWeekNutrients, NUTRIENT_KEYS, RDA } = require("../services/nutrientCalculator");
 const { getEntryWarnings, CONDITION_RULES } = require("../services/recommendationEngine");
 
-// GET /api/mealplan/:userId — retrieve the full weekly meal plan
+// GET /api/mealplan/:userId?weekStart=YYYY-MM-DD — retrieve the weekly meal plan for a specific week
 router.get("/:userId", (req, res) => {
   const db = getDb();
+  const weekStart = req.query.weekStart || getCurrentWeekStart();
 
   const entries = db.prepare(`
     SELECT mp.*, d.name as dish_name, d.ingredients as dish_ingredients, d.tags, d.meal_types, d.recipe_id
     FROM meal_plans mp
     JOIN dishes d ON d.id = mp.dish_id
-    WHERE mp.user_id = ?
+    WHERE mp.user_id = ? AND mp.week_start = ?
     ORDER BY mp.day_index, mp.meal_type, mp.entry_order
-  `).all(req.params.userId);
+  `).all(req.params.userId, weekStart);
 
   // Group into the structure frontend expects: { [dayIndex]: { [mealType]: [...entries] } }
   const plan = {};
@@ -43,20 +44,22 @@ router.get("/:userId", (req, res) => {
 // POST /api/mealplan/:userId/add — add a dish to a meal slot
 router.post("/:userId/add", (req, res) => {
   const db = getDb();
-  const { dayIndex, mealType, dishId, servings = 1, customIngredients = null } = req.body;
+  const { dayIndex, mealType, dishId, servings = 1, customIngredients = null, weekStart } = req.body;
+  const ws = weekStart || getCurrentWeekStart();
 
   // Get current max entry_order for this slot
   const maxOrder = db.prepare(`
     SELECT COALESCE(MAX(entry_order), -1) as m
     FROM meal_plans
-    WHERE user_id = ? AND day_index = ? AND meal_type = ?
-  `).get(req.params.userId, dayIndex, mealType);
+    WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?
+  `).get(req.params.userId, ws, dayIndex, mealType);
 
   db.prepare(`
-    INSERT INTO meal_plans (user_id, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     req.params.userId,
+    ws,
     dayIndex,
     mealType,
     dishId,
@@ -76,9 +79,10 @@ router.delete("/:userId/remove/:entryId", (req, res) => {
   res.json({ success: true });
 });
 
-// GET /api/mealplan/:userId/nutrients/week — weekly nutrient summary
+// GET /api/mealplan/:userId/nutrients/week?weekStart=YYYY-MM-DD — weekly nutrient summary
 router.get("/:userId/nutrients/week", (req, res) => {
   const db = getDb();
+  const weekStart = req.query.weekStart || getCurrentWeekStart();
 
   const user = db.prepare("SELECT * FROM users WHERE id = ?").get(req.params.userId);
   const conditions = user ? JSON.parse(user.conditions) : [];
@@ -87,9 +91,9 @@ router.get("/:userId/nutrients/week", (req, res) => {
     SELECT mp.*, d.ingredients
     FROM meal_plans mp
     JOIN dishes d ON d.id = mp.dish_id
-    WHERE mp.user_id = ?
+    WHERE mp.user_id = ? AND mp.week_start = ?
     ORDER BY mp.day_index
-  `).all(req.params.userId);
+  `).all(req.params.userId, weekStart);
 
   const weekN = getWeekNutrients(entries);
   const weekRDA = {};
@@ -117,20 +121,30 @@ router.get("/:userId/nutrients/week", (req, res) => {
   res.json({ weekNutrients: weekN, weekRDA, daily });
 });
 
-// GET /api/mealplan/:userId/nutrients/day/:dayIndex — single day nutrients
+// GET /api/mealplan/:userId/nutrients/day/:dayIndex?weekStart=YYYY-MM-DD — single day nutrients
 router.get("/:userId/nutrients/day/:dayIndex", (req, res) => {
   const db = getDb();
   const dayIndex = parseInt(req.params.dayIndex);
+  const weekStart = req.query.weekStart || getCurrentWeekStart();
 
   const entries = db.prepare(`
     SELECT mp.*, d.ingredients
     FROM meal_plans mp
     JOIN dishes d ON d.id = mp.dish_id
-    WHERE mp.user_id = ? AND mp.day_index = ?
-  `).all(req.params.userId, dayIndex);
+    WHERE mp.user_id = ? AND mp.week_start = ? AND mp.day_index = ?
+  `).all(req.params.userId, weekStart, dayIndex);
 
   const dayNutrients = getDayNutrients(entries);
   res.json(dayNutrients);
 });
+
+// Helper: get Monday of the current week as YYYY-MM-DD
+function getCurrentWeekStart() {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split("T")[0];
+}
 
 module.exports = router;

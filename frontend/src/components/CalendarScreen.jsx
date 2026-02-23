@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import React from "react";
 import { COLORS } from "../constants/colors";
 import { MEAL_TYPES, DAYS } from "../constants/mealTypes";
@@ -8,6 +8,21 @@ import ShoppingListPanel from "./ShoppingListPanel";
 import NutrientSummaryPanel from "./NutrientSummaryPanel";
 import RecipeViewModal from "./RecipeViewModal";
 import * as api from "../services/api";
+
+// Get the Monday of the week containing `date`
+function getMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // 0=Sun,1=Mon,...
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Meal cutoff hours: breakfast 10am, lunch 2pm, dinner 8pm
+const MEAL_CUTOFF = { breakfast: 10, lunch: 14, dinner: 20 };
 
 export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
   const [mealPlan, setMealPlan] = useState(() => {
@@ -21,15 +36,55 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
   const [showNutrients, setShowNutrients] = useState(false);
   const [recipeView, setRecipeView] = useState(null);
 
-  // Fetch meal plan from backend on mount
+  // Week offset from current week (0 = this week, -1 = last week, +1 = next week)
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  // Compute the dates for the displayed week
+  const weekDates = useMemo(() => {
+    const today = new Date();
+    const monday = getMonday(today);
+    monday.setDate(monday.getDate() + weekOffset * 7);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
+    });
+  }, [weekOffset]);
+
+  // Check if a slot is in the past (day passed or meal cutoff passed)
+  const isSlotLocked = useCallback((dayIndex, mealType) => {
+    const now = new Date();
+    const slotDate = weekDates[dayIndex];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const slotDay = new Date(slotDate);
+    slotDay.setHours(0, 0, 0, 0);
+
+    // Past day entirely
+    if (slotDay < today) return true;
+    // Same day — check cutoff
+    if (slotDay.getTime() === today.getTime()) {
+      const cutoff = MEAL_CUTOFF[mealType];
+      if (now.getHours() >= cutoff) return true;
+    }
+    return false;
+  }, [weekDates]);
+
+  // weekStart as YYYY-MM-DD string (Monday of displayed week)
+  const weekStart = useMemo(() => {
+    const d = weekDates[0];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, [weekDates]);
+
+  // Fetch meal plan from backend when week changes
   useEffect(() => {
-    api.getMealPlan(userId).then(setMealPlan).catch(() => {});
-  }, [userId]);
+    api.getMealPlan(userId, weekStart).then(setMealPlan).catch(() => {});
+  }, [userId, weekStart]);
 
   // Reload meal plan after modifications
   const reloadPlan = useCallback(() => {
-    api.getMealPlan(userId).then(setMealPlan).catch(() => {});
-  }, [userId]);
+    api.getMealPlan(userId, weekStart).then(setMealPlan).catch(() => {});
+  }, [userId, weekStart]);
 
   const handleAdd = useCallback(async (dish, servings, customIngredients = null) => {
     if (!addModal) return;
@@ -40,6 +95,7 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
         dishId: dish.id,
         servings,
         customIngredients,
+        weekStart,
       });
       reloadPlan();
     } catch (err) {
@@ -110,19 +166,52 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
         </div>
       </div>
 
-      {/* Week label */}
+      {/* Week navigation */}
       <div style={{ maxWidth: 900, margin: "0 auto", marginBottom: 12 }}>
-        <h2 style={{ fontSize: 16, fontWeight: 700, color: COLORS.navy, margin: 0 }}>This Week</h2>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16 }}>
+          <button onClick={() => setWeekOffset(w => w - 1)}
+            style={{
+              background: "none", border: `1px solid ${COLORS.grayLight}`, borderRadius: 8,
+              width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", fontSize: 18, color: COLORS.navy, fontWeight: 700,
+            }}
+            title="Previous week"
+          >←</button>
+          <div style={{ textAlign: "center", minWidth: 160 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: COLORS.navy }}>
+              {weekDates[0].getFullYear()}
+            </div>
+            <div style={{ fontSize: 13, color: COLORS.gray, fontWeight: 600 }}>
+              {weekDates[0].getDate()} {MONTH_ABBR[weekDates[0].getMonth()]} — {weekDates[6].getDate()} {MONTH_ABBR[weekDates[6].getMonth()]}
+            </div>
+          </div>
+          <button onClick={() => setWeekOffset(w => w + 1)}
+            style={{
+              background: "none", border: `1px solid ${COLORS.grayLight}`, borderRadius: 8,
+              width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", fontSize: 18, color: COLORS.navy, fontWeight: 700,
+            }}
+            title="Next week"
+          >→</button>
+        </div>
       </div>
 
       {/* Calendar Grid */}
       <div style={{ maxWidth: 900, margin: "0 auto", overflowX: "auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "80px repeat(7, 1fr)", gap: 4, minWidth: 700 }}>
-          {/* Header row */}
+          {/* Header row: date + day name */}
           <div />
-          {DAYS.map((d) => (
-            <div key={d} style={{ textAlign: "center", fontSize: 13, fontWeight: 700, color: COLORS.navy, padding: "8px 0" }}>{d}</div>
-          ))}
+          {DAYS.map((d, di) => {
+            const date = weekDates[di];
+            const dd = String(date.getDate()).padStart(2, "0");
+            const mmm = MONTH_ABBR[date.getMonth()];
+            return (
+              <div key={d} style={{ textAlign: "center", padding: "4px 0" }}>
+                <div style={{ fontSize: 11, color: COLORS.gray, fontWeight: 600 }}>{dd} {mmm}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.navy }}>{d}</div>
+              </div>
+            );
+          })}
 
           {/* Meal rows */}
           {MEAL_TYPES.map(mt => (
@@ -135,18 +224,22 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
               </div>
               {DAYS.map((d, di) => {
                 const entries = mealPlan[di]?.[mt] || [];
+                const locked = isSlotLocked(di, mt);
 
                 return (
                   <div key={`${mt}-${di}`}
                     style={{
-                      background: COLORS.card, borderRadius: 12, minHeight: 60, padding: 6,
+                      background: locked ? COLORS.grayLight : COLORS.card,
+                      borderRadius: 12, minHeight: 60, padding: 6,
                       border: `1px solid ${COLORS.grayLight}`, display: "flex", flexDirection: "column",
                       justifyContent: entries.length > 0 ? "flex-start" : "center", alignItems: "center", position: "relative",
-                      cursor: "pointer", transition: "all 0.15s",
+                      cursor: locked ? "default" : "pointer", transition: "all 0.15s",
+                      opacity: locked ? 0.5 : 1,
+                      pointerEvents: locked ? "none" : "auto",
                     }}
-                    onClick={() => setSlotDetail({ dayIndex: di, mealType: mt })}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = COLORS.accent; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = COLORS.grayLight; }}
+                    onClick={() => { if (!locked) setSlotDetail({ dayIndex: di, mealType: mt }); }}
+                    onMouseEnter={e => { if (!locked) e.currentTarget.style.borderColor = COLORS.accent; }}
+                    onMouseLeave={e => { if (!locked) e.currentTarget.style.borderColor = COLORS.grayLight; }}
                   >
                     {entries.length > 0 ? (
                       <div style={{ width: "100%" }}>
@@ -160,10 +253,12 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
                             )}
                           </div>
                         ))}
-                        <div style={{ color: COLORS.grayLight, fontSize: 14, fontWeight: 300, textAlign: "center", marginTop: 2 }}>+</div>
+                        {!locked && <div style={{ color: COLORS.grayLight, fontSize: 14, fontWeight: 300, textAlign: "center", marginTop: 2 }}>+</div>}
                       </div>
                     ) : (
-                      <div style={{ color: COLORS.grayLight, fontSize: 22, fontWeight: 300 }}>+</div>
+                      <div style={{ color: locked ? COLORS.gray : COLORS.grayLight, fontSize: locked ? 14 : 22, fontWeight: 300 }}>
+                        {locked ? "—" : "+"}
+                      </div>
                     )}
                   </div>
                 );
@@ -193,12 +288,13 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
           mealType={addModal.mealType}
           userProfile={userProfile}
           userId={userId}
+          weekStart={weekStart}
           onAdd={handleAdd}
           onClose={() => setAddModal(null)}
         />
       )}
-      {showShopping && <ShoppingListPanel userId={userId} onClose={() => setShowShopping(false)} />}
-      {showNutrients && <NutrientSummaryPanel userId={userId} onClose={() => setShowNutrients(false)} />}
+      {showShopping && <ShoppingListPanel userId={userId} weekStart={weekStart} onClose={() => setShowShopping(false)} />}
+      {showNutrients && <NutrientSummaryPanel userId={userId} weekStart={weekStart} onClose={() => setShowNutrients(false)} />}
       {recipeView && <RecipeViewModal entry={recipeView} onClose={() => setRecipeView(null)} />}
     </div>
   );
