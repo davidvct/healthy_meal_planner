@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { COLORS } from "../constants/colors";
 import { DAYS_FULL } from "../constants/mealTypes";
 import FilterChip from "./ui/FilterChip";
+import NutritionBarChart, { NUTRIENT_KEYS } from "./ui/NutritionBarChart";
 import DishCard from "./DishCard";
 import DishDetail from "./DishDetail";
 import * as api from "../services/api";
@@ -10,8 +11,10 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
   const [search, setSearch] = useState("");
   const [detailDish, setDetailDish] = useState(null);
   const [scored, setScored] = useState([]);
-  const [dayNutrients, setDayNutrients] = useState({ calories: 0, protein: 0, carbs: 0 });
+  const [dayNutrients, setDayNutrients] = useState(Object.fromEntries(NUTRIENT_KEYS.map(k => [k, 0])));
   const [loading, setLoading] = useState(true);
+  const [selectedDishId, setSelectedDishId] = useState(null);
+  const [favorites, setFavorites] = useState(() => new Set());
 
   // Toggleable filters
   const [filterMealType, setFilterMealType] = useState(true);
@@ -33,12 +36,41 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
       weekStart,
     }).then(data => {
       setScored(data.scored);
-      setDayNutrients(data.dayNutrients);
+      if (data.dayNutrients) setDayNutrients(data.dayNutrients);
     }).catch(err => {
       console.error("Failed to fetch recommendations:", err);
       setScored([]);
     }).finally(() => setLoading(false));
   }, [userId, dayIndex, mealType, filterMealType, filterDiet, filterAllergies, filterConditions, search]);
+
+  // Compute meal-level nutrient totals from dayNutrients
+  const mealTotals = useMemo(() => {
+    const totals = Object.fromEntries(NUTRIENT_KEYS.map(k => [k, 0]));
+    NUTRIENT_KEYS.forEach(k => { totals[k] = dayNutrients[k] || 0; });
+    return totals;
+  }, [dayNutrients]);
+
+  // Compute preview totals when a dish is selected
+  const selectedItem = scored.find(s => s.dish.id === selectedDishId);
+  const previewTotals = useMemo(() => {
+    if (!selectedItem) return null;
+    const preview = { ...mealTotals };
+    NUTRIENT_KEYS.forEach(k => {
+      preview[k] += (selectedItem.nutrients?.[k] || selectedItem.dish.nutrients?.[k] || 0);
+    });
+    return preview;
+  }, [selectedItem, mealTotals]);
+
+  const toggleFavorite = (dishId) => {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(dishId)) next.delete(dishId);
+      else next.add(dishId);
+      return next;
+    });
+  };
+
+  const mealLabel = mealType.charAt(0).toUpperCase() + mealType.slice(1);
 
   if (detailDish) {
     return <DishDetail dish={detailDish} userProfile={userProfile}
@@ -47,29 +79,29 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
   }
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "flex-end" }}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
       onClick={onClose}>
       <div style={{
-        background: COLORS.bg, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 500, maxHeight: "85vh", overflow: "auto", padding: 24,
+        background: COLORS.bg, borderRadius: 24, width: "100%", maxWidth: 500, maxHeight: "85vh", overflow: "auto", padding: 24,
       }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: COLORS.navy, margin: 0 }}>
-              {DAYS_FULL[dayIndex]} · {mealType.charAt(0).toUpperCase() + mealType.slice(1)}
+              {DAYS_FULL[dayIndex]} · {mealLabel}
             </h2>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 24, color: COLORS.gray, cursor: "pointer" }}>×</button>
         </div>
 
-        {/* Day nutrient progress */}
+        {/* Meal nutrient bar chart */}
         <div style={{ padding: 12, background: COLORS.card, borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.gray, marginBottom: 8 }}>Today's intake so far</div>
-          <div style={{ display: "flex", gap: 14, fontSize: 12 }}>
-            <span style={{ color: COLORS.accent }}>🔥 {Math.round(dayNutrients.calories)} cal</span>
-            <span style={{ color: COLORS.green }}>💪 {Math.round(dayNutrients.protein)}g protein</span>
-            <span style={{ color: COLORS.gold }}>🌾 {Math.round(dayNutrients.carbs)}g carbs</span>
-          </div>
+          <NutritionBarChart
+            label={`${mealLabel} intake`}
+            totals={mealTotals}
+            color={COLORS.accent}
+            previewTotals={previewTotals}
+          />
         </div>
 
         {/* Toggleable Filters */}
@@ -111,9 +143,19 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
             </div>
           )}
           {!loading && scored.map(({ dish, score, warnings, nutrients }) => (
-            <DishCard key={dish.id} dish={dish} score={score} warnings={warnings} nutrients={nutrients}
-              onSelect={(d) => onAdd(d, 1, null)}
-              onDetail={(d) => setDetailDish(d)}
+            <DishCard
+              key={dish.id}
+              dish={dish}
+              score={score}
+              warnings={warnings}
+              nutrients={nutrients}
+              isFavorite={favorites.has(dish.id)}
+              isSelected={selectedDishId === dish.id}
+              onToggleFavorite={toggleFavorite}
+              onSelect={(d) => setSelectedDishId(d.id)}
+              onAddToPlan={(d) => { onAdd(d, 1, null); setSelectedDishId(null); }}
+              onCancel={() => setSelectedDishId(null)}
+              onInfo={(d) => setDetailDish(d)}
             />
           ))}
         </div>
