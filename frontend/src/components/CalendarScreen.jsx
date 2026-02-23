@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import React from "react";
 import { COLORS } from "../constants/colors";
-import { MEAL_TYPES, DAYS, DAYS_FULL } from "../constants/mealTypes";
+import { MEAL_TYPES, DAYS } from "../constants/mealTypes";
 import AddDishModal from "./AddDishModal";
+import MealSlotDetail from "./MealSlotDetail";
 import ShoppingListPanel from "./ShoppingListPanel";
 import NutrientSummaryPanel from "./NutrientSummaryPanel";
 import RecipeViewModal from "./RecipeViewModal";
-import WarningTag from "./ui/WarningTag";
 import * as api from "../services/api";
 
 export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
@@ -15,6 +15,7 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
     for (let i = 0; i < 7; i++) plan[i] = {};
     return plan;
   });
+  const [slotDetail, setSlotDetail] = useState(null);
   const [addModal, setAddModal] = useState(null);
   const [showShopping, setShowShopping] = useState(false);
   const [showNutrients, setShowNutrients] = useState(false);
@@ -130,7 +131,7 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
                 display: "flex", alignItems: "center", fontSize: 12, fontWeight: 700, color: COLORS.gray,
                 textTransform: "capitalize", paddingLeft: 4,
               }}>
-                {mt === "breakfast" ? "🌅" : mt === "lunch" ? "☀️" : mt === "dinner" ? "🌙" : "🍪"} {mt}
+                {mt === "breakfast" ? "🌅" : mt === "lunch" ? "☀️" : "🌙"} {mt}
               </div>
               {DAYS.map((d, di) => {
                 const entries = mealPlan[di]?.[mt] || [];
@@ -143,29 +144,20 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
                       justifyContent: entries.length > 0 ? "flex-start" : "center", alignItems: "center", position: "relative",
                       cursor: "pointer", transition: "all 0.15s",
                     }}
-                    onClick={() => setAddModal({ dayIndex: di, mealType: mt })}
+                    onClick={() => setSlotDetail({ dayIndex: di, mealType: mt })}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = COLORS.accent; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = COLORS.grayLight; }}
                   >
                     {entries.length > 0 ? (
                       <div style={{ width: "100%" }}>
                         {entries.map((entry, ei) => (
-                          <div key={entry.id || ei} style={{ textAlign: "center", position: "relative", padding: "2px 0", borderBottom: ei < entries.length - 1 ? `1px dashed ${COLORS.grayLight}` : "none" }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.navy, lineHeight: 1.3 }}
-                              onClick={(e) => { e.stopPropagation(); setRecipeView(entry); }}>
+                          <div key={entry.id || ei} style={{ textAlign: "center", padding: "2px 0", borderBottom: ei < entries.length - 1 ? `1px dashed ${COLORS.grayLight}` : "none" }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: COLORS.navy, lineHeight: 1.3 }}>
                               {entry.dishName}
                             </div>
                             {entry.servings !== 1 && (
                               <div style={{ fontSize: 10, color: COLORS.gray }}>×{entry.servings}</div>
                             )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleRemove(entry.id); }}
-                              style={{
-                                position: "absolute", top: 0, right: 0, background: "none", border: "none",
-                                color: COLORS.gray, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1,
-                              }}
-                              title="Remove"
-                            >×</button>
                           </div>
                         ))}
                         <div style={{ color: COLORS.grayLight, fontSize: 14, fontWeight: 300, textAlign: "center", marginTop: 2 }}>+</div>
@@ -182,6 +174,19 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
       </div>
 
       {/* Modals */}
+      {slotDetail && !addModal && (
+        <MealSlotDetail
+          dayIndex={slotDetail.dayIndex}
+          mealType={slotDetail.mealType}
+          entries={mealPlan[slotDetail.dayIndex]?.[slotDetail.mealType] || []}
+          dayPlan={mealPlan[slotDetail.dayIndex] || {}}
+          onRemove={handleRemove}
+          onAddDish={() => setAddModal({ dayIndex: slotDetail.dayIndex, mealType: slotDetail.mealType })}
+          onViewRecipe={(entry) => setRecipeView(entry)}
+          onClose={() => setSlotDetail(null)}
+          reloadPlan={reloadPlan}
+        />
+      )}
       {addModal && (
         <AddDishModal
           dayIndex={addModal.dayIndex}
