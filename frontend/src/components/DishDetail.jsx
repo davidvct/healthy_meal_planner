@@ -5,7 +5,7 @@ import NutrientBar from "./ui/NutrientBar";
 import WarningTag from "./ui/WarningTag";
 import * as api from "../services/api";
 
-export default function DishDetail({ dish, userProfile, onAdd, onClose }) {
+export default function DishDetail({ dish, userProfile, onClose }) {
   const [servings, setServings] = useState(dish.baseServings || 1);
   const [customOverrides, setCustomOverrides] = useState({});
   const [recipe, setRecipe] = useState(null);
@@ -128,14 +128,6 @@ export default function DishDetail({ dish, userProfile, onAdd, onClose }) {
             ))}
           </div>
         )}
-
-        <button onClick={() => onAdd(dish, servings, Object.keys(customOverrides).length > 0 ? activeIngredients : null)}
-          style={{
-            width: "100%", padding: "14px", borderRadius: 14, border: "none", background: COLORS.accent, color: "#fff",
-            fontWeight: 700, fontSize: 16, cursor: "pointer", boxShadow: "0 2px 8px rgba(212,113,59,0.3)",
-          }}>
-          + Add to Plan ({servings} serving{servings !== 1 ? "s" : ""})
-        </button>
       </div>
     </div>
   );
