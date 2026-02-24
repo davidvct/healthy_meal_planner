@@ -52,12 +52,24 @@ function initSchema() {
       steps TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS caretakers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT 'Diner',
+      age INTEGER,
+      sex TEXT,
+      weight_kg REAL,
+      caretaker_id TEXT,
       conditions TEXT NOT NULL DEFAULT '[]',
       diet TEXT NOT NULL DEFAULT 'none',
       allergies TEXT NOT NULL DEFAULT '[]',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (caretaker_id) REFERENCES caretakers(id)
     );
 
     CREATE TABLE IF NOT EXISTS meal_plans (
@@ -81,12 +93,23 @@ function initSchema() {
 
 function migrateSchema() {
   // Add week_start column if it doesn't exist (for existing DBs)
-  const cols = db.prepare("PRAGMA table_info(meal_plans)").all();
-  if (!cols.find(c => c.name === "week_start")) {
+  const mealCols = db.prepare("PRAGMA table_info(meal_plans)").all();
+  if (!mealCols.find(c => c.name === "week_start")) {
     db.exec("ALTER TABLE meal_plans ADD COLUMN week_start TEXT NOT NULL DEFAULT '2026-02-23'");
     db.exec("DROP INDEX IF EXISTS idx_meal_plans_user");
     db.exec("CREATE INDEX IF NOT EXISTS idx_meal_plans_user ON meal_plans(user_id, week_start, day_index, meal_type)");
     console.log("[MealWise] Migrated meal_plans: added week_start column.");
+  }
+
+  // Add caretaker/diner columns if they don't exist (for existing DBs)
+  const userCols = db.prepare("PRAGMA table_info(users)").all();
+  if (!userCols.find(c => c.name === "name")) {
+    db.exec("ALTER TABLE users ADD COLUMN name TEXT NOT NULL DEFAULT 'Diner'");
+    db.exec("ALTER TABLE users ADD COLUMN age INTEGER");
+    db.exec("ALTER TABLE users ADD COLUMN sex TEXT");
+    db.exec("ALTER TABLE users ADD COLUMN weight_kg REAL");
+    db.exec("ALTER TABLE users ADD COLUMN caretaker_id TEXT REFERENCES caretakers(id)");
+    console.log("[MealWise] Migrated users: added diner profile columns.");
   }
 }
 

@@ -24,7 +24,8 @@ const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 // Meal cutoff hours: breakfast 10am, lunch 2pm, dinner 8pm
 const MEAL_CUTOFF = { breakfast: 10, lunch: 14, dinner: 20 };
 
-export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
+export default function CalendarScreen({ userProfile, userId, diners, onSwitchDiner, onEditProfile, onBackToDashboard }) {
+  const [showDinerDropdown, setShowDinerDropdown] = useState(false);
   const [mealPlan, setMealPlan] = useState(() => {
     const plan = {};
     for (let i = 0; i < 7; i++) plan[i] = {};
@@ -124,11 +125,51 @@ export default function CalendarScreen({ userProfile, userId, onEditProfile }) {
       {/* Header */}
       <div style={{ maxWidth: 900, margin: "0 auto", marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-          <span style={{ fontSize: 24, fontWeight: 800, color: COLORS.accent }}>🥘 MealWise</span>
-          <button onClick={onEditProfile}
-            style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            ⚙ Profile
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button onClick={onBackToDashboard}
+              style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: COLORS.navy, padding: "4px" }}
+              title="Back to dashboard"
+            >←</button>
+            <span style={{ fontSize: 24, fontWeight: 800, color: COLORS.accent }}>🥘 MealWise</span>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* Diner Selector */}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setShowDinerDropdown(!showDinerDropdown)}
+                style={{
+                  padding: "8px 14px", borderRadius: 10, border: `1px solid ${COLORS.grayLight}`,
+                  background: COLORS.card, color: COLORS.navy, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}>
+                {userProfile.name || "Diner"} ▾
+              </button>
+              {showDinerDropdown && (
+                <div style={{
+                  position: "absolute", top: "100%", right: 0, marginTop: 4,
+                  background: COLORS.card, borderRadius: 12, border: `1px solid ${COLORS.grayLight}`,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, minWidth: 180, overflow: "hidden",
+                }}>
+                  {diners.map(d => (
+                    <button key={d.userId}
+                      onClick={() => { onSwitchDiner(d); setShowDinerDropdown(false); }}
+                      style={{
+                        display: "block", width: "100%", padding: "10px 16px", border: "none",
+                        background: d.userId === userId ? COLORS.accentLight : "transparent",
+                        color: COLORS.navy, fontSize: 13, fontWeight: d.userId === userId ? 700 : 500,
+                        cursor: "pointer", textAlign: "left",
+                      }}
+                    >
+                      {d.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={onEditProfile}
+              style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              ⚙ Edit
+            </button>
+          </div>
         </div>
 
         {/* Condition tags */}

@@ -12,17 +12,38 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// ---- Users ----
+// ---- Caretakers ----
 
-export async function createOrUpdateProfile({ userId, conditions, diet, allergies }) {
+export async function createCaretaker(name) {
+  return request("/caretakers", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function getCaretaker(caretakerId) {
+  return request(`/caretakers/${caretakerId}`);
+}
+
+export async function getDiners(caretakerId) {
+  return request(`/caretakers/${caretakerId}/diners`);
+}
+
+// ---- Users (Diners) ----
+
+export async function createOrUpdateProfile({ userId, name, age, sex, weightKg, caretakerId, conditions, diet, allergies }) {
   return request("/users/profile", {
     method: "POST",
-    body: JSON.stringify({ userId, conditions, diet, allergies }),
+    body: JSON.stringify({ userId, name, age, sex, weightKg, caretakerId, conditions, diet, allergies }),
   });
 }
 
 export async function getProfile(userId) {
   return request(`/users/${userId}`);
+}
+
+export async function deleteDiner(userId) {
+  return request(`/users/${userId}`, { method: "DELETE" });
 }
 
 // ---- Dishes ----

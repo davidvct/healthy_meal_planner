@@ -17,6 +17,7 @@ app.use("/api/dishes", require("./routes/dishes"));
 app.use("/api/mealplan", require("./routes/mealplan"));
 app.use("/api/shopping-list", require("./routes/shoppingList"));
 app.use("/api/users", require("./routes/users"));
+app.use("/api/caretakers", require("./routes/caretakers"));
 
 // Health check
 app.get("/api/health", (req, res) => {

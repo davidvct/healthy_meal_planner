@@ -1,52 +1,166 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import CaretakerSetup from "./CaretakerSetup";
+import DinerDashboard from "./DinerDashboard";
 import OnboardingScreen from "./OnboardingScreen";
 import CalendarScreen from "./CalendarScreen";
 import * as api from "../services/api";
 
+const VIEWS = { SETUP: "setup", DASHBOARD: "dashboard", ONBOARDING: "onboarding", CALENDAR: "calendar" };
+
 export default function App() {
-  const [userProfile, setUserProfile] = useState(() => {
+  const [caretaker, setCaretaker] = useState(() => {
     try {
-      const saved = localStorage.getItem("mealwise_profile");
+      const saved = localStorage.getItem("mealwise_caretaker");
       if (saved) return JSON.parse(saved);
     } catch (e) { /* ignore */ }
     return null;
   });
 
-  // Persist profile to localStorage as a cache
+  const [activeDiner, setActiveDiner] = useState(null);
+  const [editingDiner, setEditingDiner] = useState(null); // diner being edited, or null for new
+  const [view, setView] = useState(caretaker ? VIEWS.DASHBOARD : VIEWS.SETUP);
+  const [diners, setDiners] = useState([]);
+
+  // Persist caretaker to localStorage
   useEffect(() => {
     try {
-      if (userProfile) localStorage.setItem("mealwise_profile", JSON.stringify(userProfile));
-      else localStorage.removeItem("mealwise_profile");
+      if (caretaker) localStorage.setItem("mealwise_caretaker", JSON.stringify(caretaker));
+      else localStorage.removeItem("mealwise_caretaker");
     } catch (e) { /* ignore */ }
-  }, [userProfile]);
+  }, [caretaker]);
+
+  // Load diners when caretaker is set
+  const loadDiners = useCallback(async () => {
+    if (!caretaker) return;
+    try {
+      const list = await api.getDiners(caretaker.caretakerId);
+      setDiners(list);
+    } catch (err) {
+      console.error("Failed to load diners:", err);
+    }
+  }, [caretaker]);
+
+  useEffect(() => { loadDiners(); }, [loadDiners]);
+
+  // -- Handlers --
+
+  const handleCaretakerSetup = async (name) => {
+    try {
+      const result = await api.createCaretaker(name);
+      setCaretaker(result);
+      setView(VIEWS.DASHBOARD);
+    } catch (err) {
+      console.error("Failed to create caretaker:", err);
+    }
+  };
+
+  const handleSelectDiner = (diner) => {
+    setActiveDiner(diner);
+    setView(VIEWS.CALENDAR);
+  };
+
+  const handleAddDiner = () => {
+    setEditingDiner(null);
+    setView(VIEWS.ONBOARDING);
+  };
+
+  const handleEditDiner = (diner) => {
+    setEditingDiner(diner);
+    setView(VIEWS.ONBOARDING);
+  };
 
   const handleOnboardingComplete = async (profile) => {
     try {
-      // Save profile to backend, get back userId
-      const existingId = userProfile?.userId || undefined;
       const result = await api.createOrUpdateProfile({
-        userId: existingId,
+        userId: editingDiner?.userId || undefined,
+        name: profile.name,
+        age: profile.age,
+        sex: profile.sex,
+        weightKg: profile.weightKg,
+        caretakerId: caretaker.caretakerId,
         conditions: profile.conditions,
         diet: profile.diet,
         allergies: profile.allergies,
       });
-      setUserProfile(result);
+
+      await loadDiners();
+
+      if (editingDiner) {
+        // If editing, go back to calendar with updated profile
+        setActiveDiner(result);
+        setView(VIEWS.CALENDAR);
+      } else {
+        // New diner — go to their calendar
+        setActiveDiner(result);
+        setView(VIEWS.CALENDAR);
+      }
+      setEditingDiner(null);
     } catch (err) {
-      console.error("Failed to save profile:", err);
-      // Fallback: use profile locally with a temporary id
-      setUserProfile({ ...profile, userId: "local-" + Date.now() });
+      console.error("Failed to save diner profile:", err);
     }
   };
 
-  if (!userProfile) {
-    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+  const handleOnboardingCancel = () => {
+    setEditingDiner(null);
+    setView(activeDiner ? VIEWS.CALENDAR : VIEWS.DASHBOARD);
+  };
+
+  const handleBackToDashboard = () => {
+    setActiveDiner(null);
+    setView(VIEWS.DASHBOARD);
+  };
+
+  const handleSwitchDiner = (diner) => {
+    setActiveDiner(diner);
+  };
+
+  const handleLogout = () => {
+    setCaretaker(null);
+    setActiveDiner(null);
+    setDiners([]);
+    setView(VIEWS.SETUP);
+  };
+
+  // -- Render --
+
+  if (view === VIEWS.SETUP) {
+    return <CaretakerSetup onComplete={handleCaretakerSetup} />;
   }
 
-  return (
-    <CalendarScreen
-      userProfile={userProfile}
-      userId={userProfile.userId}
-      onEditProfile={() => setUserProfile(null)}
-    />
-  );
+  if (view === VIEWS.ONBOARDING) {
+    return (
+      <OnboardingScreen
+        onComplete={handleOnboardingComplete}
+        onCancel={handleOnboardingCancel}
+        initialData={editingDiner}
+      />
+    );
+  }
+
+  if (view === VIEWS.DASHBOARD) {
+    return (
+      <DinerDashboard
+        caretakerId={caretaker.caretakerId}
+        caretakerName={caretaker.name}
+        onSelectDiner={handleSelectDiner}
+        onAddDiner={handleAddDiner}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  if (view === VIEWS.CALENDAR && activeDiner) {
+    return (
+      <CalendarScreen
+        userProfile={activeDiner}
+        userId={activeDiner.userId}
+        diners={diners}
+        onSwitchDiner={handleSwitchDiner}
+        onEditProfile={() => handleEditDiner(activeDiner)}
+        onBackToDashboard={handleBackToDashboard}
+      />
+    );
+  }
+
+  return null;
 }
