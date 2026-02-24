@@ -88,6 +88,16 @@ function initSchema() {
 
     CREATE INDEX IF NOT EXISTS idx_meal_plans_user
       ON meal_plans(user_id, week_start, day_index, meal_type);
+
+    CREATE TABLE IF NOT EXISTS shopping_selections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      week_start TEXT NOT NULL,
+      day_index INTEGER NOT NULL,
+      meal_type TEXT NOT NULL,
+      UNIQUE(user_id, week_start, day_index, meal_type),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
 }
 

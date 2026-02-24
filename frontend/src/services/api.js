@@ -104,3 +104,10 @@ export async function getShoppingList(userId, weekStart) {
   const params = weekStart ? `?weekStart=${weekStart}` : "";
   return request(`/shopping-list/${userId}${params}`);
 }
+
+export async function toggleShoppingSelection(userId, weekStart, dayIndex, mealType) {
+  return request(`/shopping-list/${userId}/toggle-selection`, {
+    method: "POST",
+    body: JSON.stringify({ weekStart, dayIndex, mealType }),
+  });
+}

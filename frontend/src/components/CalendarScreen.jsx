@@ -334,7 +334,7 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
           onClose={() => setAddModal(null)}
         />
       )}
-      {showShopping && <ShoppingListPanel userId={userId} weekStart={weekStart} onClose={() => setShowShopping(false)} />}
+      {showShopping && <ShoppingListPanel userId={userId} weekStart={weekStart} mealPlan={mealPlan} weekDates={weekDates} isSlotLocked={isSlotLocked} onClose={() => setShowShopping(false)} />}
       {showNutrients && <NutrientSummaryPanel userId={userId} weekStart={weekStart} onClose={() => setShowNutrients(false)} />}
       {recipeView && <RecipeViewModal entry={recipeView} onClose={() => setRecipeView(null)} />}
     </div>
