@@ -4,11 +4,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /code/
 
-COPY example/pyproject.toml example/uv.lock /code/
+COPY pyproject.toml uv.lock /code/
 
 RUN uv sync --frozen --no-cache --no-dev
 
-COPY ./example/example.py /code/example.py
+COPY ./example/ /code/example/
+COPY ./example/app.py /code/app.py
 
-CMD ["uv", "run", "uvicorn", "example:app", "--host", "0.0.0.0", "--port", "80"]
+CMD ["uv", "run", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
 

@@ -3,3 +3,5 @@ services:
     build: .
     ports:
       - "80:80"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./example/example.db
