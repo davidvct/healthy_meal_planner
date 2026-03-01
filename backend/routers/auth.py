@@ -11,6 +11,7 @@ from email.message import EmailMessage
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import get_db
+from ..security import create_access_token
 from ..schemas import LoginBody, RegisterBody, RequestOtpBody, VerifyOtpBody
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -202,8 +203,10 @@ def login(body: LoginBody, conn: sqlite3.Connection = Depends(get_db)) -> dict:
     if row["password_hash"] != password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    token = create_access_token(auth_user_id=row["id"], email=row["email"])
     return {
         "success": True,
+        "token": token,
         "user": {
             "authUserId": row["id"],
             "email": row["email"],

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class CreateCaretakerBody(BaseModel):
     name: str = Field(min_length=1)
+    authUserId: str | None = None
 
 
 class UserProfileBody(BaseModel):

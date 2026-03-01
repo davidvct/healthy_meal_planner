@@ -94,6 +94,7 @@ def _init_schema(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS caretakers (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
+          auth_user_id TEXT UNIQUE,
           created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -191,6 +192,8 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
     _add_column_if_missing(conn, "users", "recommended_protein", "REAL")
     _add_column_if_missing(conn, "users", "recommended_carbs", "REAL")
     _add_column_if_missing(conn, "users", "recommended_fat", "REAL")
+    _add_column_if_missing(conn, "caretakers", "auth_user_id", "TEXT")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_caretakers_auth_user_id ON caretakers(auth_user_id)")
 
     _add_column_if_missing(conn, "dishes", "description", "TEXT")
     _add_column_if_missing(conn, "dishes", "source_url", "TEXT")

@@ -16,6 +16,12 @@ export default function App() {
     } catch (e) { /* ignore */ }
     return null;
   });
+  const [authToken, setAuthToken] = useState(() => {
+    try {
+      return localStorage.getItem("mealwise_auth_token");
+    } catch (e) { /* ignore */ }
+    return null;
+  });
 
   const [caretaker, setCaretaker] = useState(() => {
     try {
@@ -37,6 +43,12 @@ export default function App() {
       else localStorage.removeItem("mealwise_auth_user");
     } catch (e) { /* ignore */ }
   }, [authUser]);
+  useEffect(() => {
+    try {
+      if (authToken) localStorage.setItem("mealwise_auth_token", authToken);
+      else localStorage.removeItem("mealwise_auth_token");
+    } catch (e) { /* ignore */ }
+  }, [authToken]);
 
   useEffect(() => {
     try {
@@ -44,6 +56,26 @@ export default function App() {
       else localStorage.removeItem("mealwise_caretaker");
     } catch (e) { /* ignore */ }
   }, [caretaker]);
+
+  // Restore caretaker by authenticated account so data persists across re-login.
+  useEffect(() => {
+    let cancelled = false;
+    async function restoreCaretaker() {
+      if (!authUser?.authUserId) return;
+      try {
+        const ct = await api.getCaretakerByAuth(authUser.authUserId);
+        if (cancelled) return;
+        setCaretaker(ct);
+        setView(VIEWS.DASHBOARD);
+      } catch (err) {
+        if (cancelled) return;
+        setCaretaker(null);
+        setView(VIEWS.SETUP);
+      }
+    }
+    restoreCaretaker();
+    return () => { cancelled = true; };
+  }, [authUser]);
 
   // Load diners when caretaker is set
   const loadDiners = useCallback(async () => {
@@ -62,7 +94,7 @@ export default function App() {
 
   const handleCaretakerSetup = async (name) => {
     try {
-      const result = await api.createCaretaker(name);
+      const result = await api.createCaretaker(name, authUser?.authUserId);
       setCaretaker(result);
       setView(VIEWS.DASHBOARD);
     } catch (err) {
@@ -132,19 +164,21 @@ export default function App() {
 
   const handleLogout = () => {
     setAuthUser(null);
+    setAuthToken(null);
     setCaretaker(null);
     setActiveDiner(null);
     setDiners([]);
     setView(VIEWS.SETUP);
     try {
       localStorage.removeItem("mealwise_auth_user");
+      localStorage.removeItem("mealwise_auth_token");
       localStorage.removeItem("mealwise_caretaker");
     } catch (e) { /* ignore */ }
   };
 
   // -- Render --
-  if (!authUser) {
-    return <AuthScreen onAuthenticated={setAuthUser} />;
+  if (!authUser || !authToken) {
+    return <AuthScreen onAuthenticated={(user, token) => { setAuthUser(user); setAuthToken(token); }} />;
   }
 
   if (view === VIEWS.SETUP) {
@@ -162,6 +196,7 @@ export default function App() {
   }
 
   if (view === VIEWS.DASHBOARD) {
+    if (!caretaker) return null;
     return (
       <DinerDashboard
         caretakerId={caretaker.caretakerId}

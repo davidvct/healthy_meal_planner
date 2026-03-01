@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 
 from .db import init_db
 from .routers import auth, caretakers, dishes, health, mealplan, shopping_list, users
+from .security import verify_access_token
 
 
 @asynccontextmanager
@@ -25,6 +26,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def require_jwt_for_api(request: Request, call_next):
+    path = request.url.path
+    if (
+        request.method == "OPTIONS"
+        or not path.startswith("/api")
+        or path.startswith("/api/auth")
+        or path.startswith("/api/health")
+    ):
+        return await call_next(request)
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"error": "Missing bearer token"})
+
+    token = auth_header[len("Bearer ") :].strip()
+    try:
+        payload = verify_access_token(token)
+        request.state.auth = payload
+    except Exception:
+        return JSONResponse(status_code=401, content={"error": "Invalid or expired token"})
+
+    return await call_next(request)
 
 app.include_router(dishes.router, prefix="/api")
 app.include_router(mealplan.router, prefix="/api")

@@ -19,7 +19,7 @@ function isStrongPassword(password) {
 }
 
 export default function AuthScreen({ onAuthenticated }) {
-  const [mode, setMode] = useState("register");
+  const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [verificationToken, setVerificationToken] = useState("");
@@ -115,7 +115,7 @@ export default function AuthScreen({ onAuthenticated }) {
     setLoading(true);
     try {
       const res = await api.login(email, loginPassword);
-      onAuthenticated(res.user);
+      onAuthenticated(res.user, res.token);
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
@@ -158,9 +158,29 @@ export default function AuthScreen({ onAuthenticated }) {
         </div>
 
         <h1 style={{ margin: 0, color: COLORS.navy, fontSize: 22, marginBottom: 8 }}>MealWise Account</h1>
-        <p style={{ marginTop: 0, color: COLORS.gray, fontSize: 13, marginBottom: 18 }}>
-          Register with email OTP, then login with your password.
-        </p>
+        {mode === "login" ? (
+          <p style={{ marginTop: 0, color: COLORS.gray, fontSize: 13, marginBottom: 18 }}>
+            Not a registered user?{" "}
+            <button
+              type="button"
+              onClick={() => setMode("register")}
+              style={{ border: "none", background: "none", color: COLORS.accent, cursor: "pointer", fontWeight: 700, padding: 0 }}
+            >
+              Simply sign up here
+            </button>
+          </p>
+        ) : (
+          <p style={{ marginTop: 0, color: COLORS.gray, fontSize: 13, marginBottom: 18 }}>
+            Already registered?{" "}
+            <button
+              type="button"
+              onClick={() => setMode("login")}
+              style={{ border: "none", background: "none", color: COLORS.accent, cursor: "pointer", fontWeight: 700, padding: 0 }}
+            >
+              Back to login
+            </button>
+          </p>
+        )}
 
         <label style={{ display: "block", color: COLORS.gray, fontSize: 12, marginBottom: 6 }}>Email</label>
         <input

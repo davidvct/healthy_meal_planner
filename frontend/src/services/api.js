@@ -1,8 +1,12 @@
 const BASE_URL = "/api";
 
 async function request(path, options = {}) {
+  const token = localStorage.getItem("mealwise_auth_token");
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers,
     ...options,
   });
   if (!res.ok) {
@@ -44,15 +48,19 @@ export async function login(email, password) {
 
 // ---- Caretakers ----
 
-export async function createCaretaker(name) {
+export async function createCaretaker(name, authUserId) {
   return request("/caretakers", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, authUserId }),
   });
 }
 
 export async function getCaretaker(caretakerId) {
   return request(`/caretakers/${caretakerId}`);
+}
+
+export async function getCaretakerByAuth(authUserId) {
+  return request(`/caretakers/by-auth/${authUserId}`);
 }
 
 export async function getDiners(caretakerId) {
