@@ -8,3 +8,13 @@ dist/
 archive/
 
 *.pyc
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+.python.env
+
+# Local virtual environment
+.venv/
+venv/
