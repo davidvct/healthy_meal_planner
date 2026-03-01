@@ -3,11 +3,20 @@ import CaretakerSetup from "./CaretakerSetup";
 import DinerDashboard from "./DinerDashboard";
 import OnboardingScreen from "./OnboardingScreen";
 import CalendarScreen from "./CalendarScreen";
+import AuthScreen from "./AuthScreen";
 import * as api from "../services/api";
 
 const VIEWS = { SETUP: "setup", DASHBOARD: "dashboard", ONBOARDING: "onboarding", CALENDAR: "calendar" };
 
 export default function App() {
+  const [authUser, setAuthUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("mealwise_auth_user");
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+    return null;
+  });
+
   const [caretaker, setCaretaker] = useState(() => {
     try {
       const saved = localStorage.getItem("mealwise_caretaker");
@@ -22,6 +31,13 @@ export default function App() {
   const [diners, setDiners] = useState([]);
 
   // Persist caretaker to localStorage
+  useEffect(() => {
+    try {
+      if (authUser) localStorage.setItem("mealwise_auth_user", JSON.stringify(authUser));
+      else localStorage.removeItem("mealwise_auth_user");
+    } catch (e) { /* ignore */ }
+  }, [authUser]);
+
   useEffect(() => {
     try {
       if (caretaker) localStorage.setItem("mealwise_caretaker", JSON.stringify(caretaker));
@@ -115,16 +131,24 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    setAuthUser(null);
     setCaretaker(null);
     setActiveDiner(null);
     setDiners([]);
     setView(VIEWS.SETUP);
+    try {
+      localStorage.removeItem("mealwise_auth_user");
+      localStorage.removeItem("mealwise_caretaker");
+    } catch (e) { /* ignore */ }
   };
 
   // -- Render --
+  if (!authUser) {
+    return <AuthScreen onAuthenticated={setAuthUser} />;
+  }
 
   if (view === VIEWS.SETUP) {
-    return <CaretakerSetup onComplete={handleCaretakerSetup} />;
+    return <CaretakerSetup onComplete={handleCaretakerSetup} onLogout={handleLogout} />;
   }
 
   if (view === VIEWS.ONBOARDING) {

@@ -1,7 +1,7 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { COLORS } from "../constants/colors";
 
-export default function CaretakerSetup({ onComplete }) {
+export default function CaretakerSetup({ onComplete, onLogout }) {
   const [name, setName] = useState("");
 
   const handleSubmit = () => {
@@ -12,7 +12,27 @@ export default function CaretakerSetup({ onComplete }) {
   return (
     <div style={{ minHeight: "100vh", background: COLORS.bg, display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }}>
       <div style={{ maxWidth: 420, width: "100%", textAlign: "center" }}>
-        <span style={{ fontSize: 28, fontWeight: 800, color: COLORS.accent }}>🥘 MealWise</span>
+        {onLogout && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 10 }}>
+            <button
+              onClick={onLogout}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 8,
+                border: `1px solid ${COLORS.grayLight}`,
+                background: COLORS.card,
+                color: COLORS.gray,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        )}
+
+        <span style={{ fontSize: 28, fontWeight: 800, color: COLORS.accent }}>MealWise</span>
         <h2 style={{ fontSize: 22, fontWeight: 700, color: COLORS.navy, marginTop: 32, marginBottom: 8 }}>Welcome, Caretaker!</h2>
         <p style={{ color: COLORS.gray, fontSize: 14, marginBottom: 28 }}>
           You'll manage meal plans for your diners. Let's start with your name.

@@ -12,6 +12,36 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+// ---- Auth ----
+
+export async function requestOtp(email) {
+  return request("/auth/request-otp", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function verifyOtp(email, otp) {
+  return request("/auth/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ email, otp }),
+  });
+}
+
+export async function registerWithOtp(email, verificationToken, password) {
+  return request("/auth/register", {
+    method: "POST",
+    body: JSON.stringify({ email, verificationToken, password }),
+  });
+}
+
+export async function login(email, password) {
+  return request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
 // ---- Caretakers ----
 
 export async function createCaretaker(name) {
