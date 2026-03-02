@@ -24,7 +24,7 @@ const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 // Meal cutoff hours: breakfast 10am, lunch 2pm, dinner 8pm
 const MEAL_CUTOFF = { breakfast: 10, lunch: 14, dinner: 20 };
 
-export default function CalendarScreen({ userProfile, userId, diners, onSwitchDiner, onEditProfile, onBackToDashboard }) {
+export default function CalendarScreen({ userProfile, userId, diners, onSwitchDiner, onEditProfile, onBackToDashboard, onLogout }) {
   const [showDinerDropdown, setShowDinerDropdown] = useState(false);
   const [mealPlan, setMealPlan] = useState(() => {
     const plan = {};
@@ -168,6 +168,21 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
             <button onClick={onEditProfile}
               style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               ⚙ Edit
+            </button>
+            <button
+              onClick={onLogout}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: `1px solid ${COLORS.warn}`,
+                background: "#fff",
+                color: COLORS.warn,
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Logout
             </button>
           </div>
         </div>

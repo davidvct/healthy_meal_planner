@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -22,6 +23,45 @@ def parse_json(value: Any, default: Any = None) -> Any:
         except json.JSONDecodeError:
             return default
     return default
+
+
+def parse_float(value: Any, default: float = 0.0) -> float:
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return default
+    cleaned = re.sub(r"[^0-9.\-]", "", text)
+    if not cleaned or cleaned == "-":
+        return default
+    try:
+        return float(cleaned)
+    except ValueError:
+        return default
+
+
+def parse_ingredients_map(value: Any) -> dict[str, float]:
+    parsed = parse_json(value, None)
+    if isinstance(parsed, dict):
+        return {str(k): float(parse_float(v, 0.0)) for k, v in parsed.items()}
+
+    text = str(value or "").strip()
+    if not text:
+        return {}
+
+    items: dict[str, float] = {}
+    for raw_line in text.replace("\r", "\n").split("\n"):
+        line = raw_line.strip().lstrip("-* ").strip()
+        if not line:
+            continue
+        parts = line.split(",", 1)
+        name = parts[0].strip().lower()
+        if not name:
+            continue
+        items[name] = items.get(name, 0.0) + 100.0
+    return items
 
 
 def iso_now() -> str:

@@ -65,27 +65,28 @@ export default function NutrientSummaryPanel({ userId, weekStart, onClose }) {
               <NutrientBar label="Cholesterol" value={weekN.cholesterol} max={weekRDA.cholesterol} unit="mg" color={COLORS.gray} warn />
             </>
           ) : (
-            <div style={{ height: 260, width: "100%" }}>
-              {window.Recharts ? (
-                <window.Recharts.ResponsiveContainer width="100%" height="100%">
-                  <window.Recharts.BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <window.Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} stroke={COLORS.grayLight} />
-                    <window.Recharts.XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: COLORS.gray }} interval={0} />
-                    <window.Recharts.YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: COLORS.gray }} tickFormatter={(val) => `${val}%`} />
-                    <window.Recharts.Tooltip cursor={{ fill: COLORS.bg }} contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} formatter={(val) => [`${val}% of RDA`, "Intake"]} />
-                    <window.Recharts.ReferenceLine y={100} stroke={COLORS.warn} strokeDasharray="3 3" />
-                    <window.Recharts.Bar dataKey="pct" radius={[4, 4, 0, 0]}>
-                      {chartData.map((entry, index) => (
-                        <window.Recharts.Cell key={`cell-${index}`} fill={entry.pct > 100 ? COLORS.warn : entry.fill} />
-                      ))}
-                    </window.Recharts.Bar>
-                  </window.Recharts.BarChart>
-                </window.Recharts.ResponsiveContainer>
-              ) : (
-                <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: COLORS.gray }}>
-                  Charting library not loaded.
+            <div style={{ width: "100%" }}>
+              {chartData.map((entry) => (
+                <div key={entry.name} style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <span style={{ color: COLORS.navy, fontWeight: 700 }}>{entry.name}</span>
+                    <span style={{ color: entry.pct > 100 ? COLORS.warn : COLORS.gray, fontWeight: 700 }}>{entry.pct}%</span>
+                  </div>
+                  <div style={{ height: 10, borderRadius: 6, background: COLORS.grayLight, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${Math.max(2, Math.min(entry.pct, 160))}%`,
+                        background: entry.pct > 100 ? COLORS.warn : entry.fill,
+                        transition: "width 0.25s ease",
+                      }}
+                    />
+                  </div>
                 </div>
-              )}
+              ))}
+              <div style={{ marginTop: 8, fontSize: 11, color: COLORS.gray }}>
+                Target is 100% of weekly RDA.
+              </div>
             </div>
           )}
         </div>

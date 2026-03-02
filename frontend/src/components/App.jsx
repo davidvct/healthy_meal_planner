@@ -217,6 +217,7 @@ export default function App() {
         onSwitchDiner={handleSwitchDiner}
         onEditProfile={() => handleEditDiner(activeDiner)}
         onBackToDashboard={handleBackToDashboard}
+        onLogout={handleLogout}
       />
     );
   }

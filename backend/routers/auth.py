@@ -1,9 +1,9 @@
-﻿import hashlib
+﻿from typing import Any
+import hashlib
 import os
 import re
 import secrets
 import smtplib
-import sqlite3
 import uuid
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -23,6 +23,16 @@ def _utc_now() -> datetime:
 
 def _iso(dt: datetime) -> str:
     return dt.replace(microsecond=0).isoformat()
+
+
+def _as_datetime(value) -> datetime:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+    if isinstance(value, str):
+        return datetime.fromisoformat(value)
+    raise HTTPException(status_code=500, detail="Invalid datetime value in database")
 
 
 def _normalize_email(email: str) -> str:
@@ -74,12 +84,12 @@ def _send_otp_email(email: str, otp_code: str) -> str:
 
 
 @router.post("/request-otp")
-def request_otp(body: RequestOtpBody, conn: sqlite3.Connection = Depends(get_db)) -> dict:
+def request_otp(body: RequestOtpBody, conn: Any = Depends(get_db)) -> dict:
     email = _normalize_email(body.email)
     if "@" not in email:
         raise HTTPException(status_code=400, detail="Invalid email address")
 
-    existing_user = conn.execute("SELECT id FROM auth_users WHERE email = ?", (email,)).fetchone()
+    existing_user = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     if existing_user:
         raise HTTPException(status_code=409, detail="Email is already registered")
 
@@ -107,7 +117,7 @@ def request_otp(body: RequestOtpBody, conn: sqlite3.Connection = Depends(get_db)
 
 
 @router.post("/verify-otp")
-def verify_otp(body: VerifyOtpBody, conn: sqlite3.Connection = Depends(get_db)) -> dict:
+def verify_otp(body: VerifyOtpBody, conn: Any = Depends(get_db)) -> dict:
     email = _normalize_email(body.email)
     otp = body.otp.strip()
 
@@ -118,7 +128,7 @@ def verify_otp(body: VerifyOtpBody, conn: sqlite3.Connection = Depends(get_db)) 
     if row["consumed_at"]:
         raise HTTPException(status_code=400, detail="OTP already used")
 
-    expires_at = datetime.fromisoformat(row["expires_at"])
+    expires_at = _as_datetime(row["expires_at"])
     if _utc_now() > expires_at:
         raise HTTPException(status_code=400, detail="OTP has expired")
 
@@ -141,7 +151,7 @@ def verify_otp(body: VerifyOtpBody, conn: sqlite3.Connection = Depends(get_db)) 
 
 
 @router.post("/register")
-def register(body: RegisterBody, conn: sqlite3.Connection = Depends(get_db)) -> dict:
+def register(body: RegisterBody, conn: Any = Depends(get_db)) -> dict:
     email = _normalize_email(body.email)
 
     if "@" not in email:
@@ -149,7 +159,7 @@ def register(body: RegisterBody, conn: sqlite3.Connection = Depends(get_db)) -> 
 
     _validate_password_complexity(body.password)
 
-    existing_user = conn.execute("SELECT id FROM auth_users WHERE email = ?", (email,)).fetchone()
+    existing_user = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
     if existing_user:
         raise HTTPException(status_code=409, detail="Email is already registered")
 
@@ -167,10 +177,10 @@ def register(body: RegisterBody, conn: sqlite3.Connection = Depends(get_db)) -> 
     now_iso = _iso(_utc_now())
     conn.execute(
         """
-        INSERT INTO auth_users (id, email, password_hash, email_verified_at)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO users (id, email, password_hash, email_verified_at, name)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (user_id, email, _hash_password(body.password), now_iso),
+        (user_id, email, _hash_password(body.password), now_iso, "Diner"),
     )
     conn.execute(
         "UPDATE email_otps SET consumed_at = ? WHERE email = ?",
@@ -189,12 +199,12 @@ def register(body: RegisterBody, conn: sqlite3.Connection = Depends(get_db)) -> 
 
 
 @router.post("/login")
-def login(body: LoginBody, conn: sqlite3.Connection = Depends(get_db)) -> dict:
+def login(body: LoginBody, conn: Any = Depends(get_db)) -> dict:
     email = _normalize_email(body.email)
     password_hash = _hash_password(body.password)
 
     row = conn.execute(
-        "SELECT id, email, email_verified_at, created_at, password_hash FROM auth_users WHERE email = ?",
+        "SELECT id, email, email_verified_at, created_at, password_hash FROM users WHERE email = ?",
         (email,),
     ).fetchone()
     if not row:
@@ -214,3 +224,4 @@ def login(body: LoginBody, conn: sqlite3.Connection = Depends(get_db)) -> dict:
             "createdAt": row["created_at"],
         },
     }
+

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
 
 from ..constants import NUTRIENT_KEYS, RDA
-from ..utils import parse_json
+from ..utils import parse_float, parse_json
 
 
 def _blank_nutrients() -> dict[str, float]:
     return {k: 0.0 for k in NUTRIENT_KEYS}
 
 
-def load_ingredient_cache(conn: sqlite3.Connection) -> dict[str, list[float]]:
+def load_ingredient_cache(conn: Any) -> dict[str, list[float]]:
     rows = conn.execute("SELECT * FROM ingredients").fetchall()
     cache: dict[str, list[float]] = {}
     for row in rows:
@@ -42,15 +41,15 @@ def get_nutrients_from_ingredients(
     return {k: round(v, 1) for k, v in nutrients.items()}
 
 
-def get_row_nutrients(row: sqlite3.Row | dict[str, Any], servings: float = 1.0) -> dict[str, float]:
+def get_row_nutrients(row: dict[str, Any], servings: float = 1.0) -> dict[str, float]:
     # Uses direct per-dish nutrients loaded from recipes_nlp_tagged.csv.
     s = float(servings)
 
     def _get(name: str) -> float:
-        if isinstance(row, sqlite3.Row):
+        if isinstance(row, dict):
             val = row[name] if name in row.keys() else 0
-            return float(val or 0)
-        return float(row.get(name, 0) or 0)
+            return parse_float(val, 0.0)
+        return parse_float(row.get(name, 0), 0.0)
 
     nutrients = {
         "calories": _get("calories") * s,
@@ -86,17 +85,17 @@ def get_dish_nutrients(
 
 
 def get_entry_nutrients(
-    entry: sqlite3.Row | dict[str, Any],
+    entry: dict[str, Any],
     ingredient_cache: dict[str, list[float]],
 ) -> dict[str, float]:
-    ingredients = entry["ingredients"] if isinstance(entry, sqlite3.Row) else entry.get("ingredients")
+    ingredients = entry["ingredients"] if isinstance(entry, dict) else entry.get("ingredients")
     custom_ingredients = (
-        entry["custom_ingredients"] if isinstance(entry, sqlite3.Row) else entry.get("custom_ingredients")
+        entry["custom_ingredients"] if isinstance(entry, dict) else entry.get("custom_ingredients")
     )
-    servings = entry["servings"] if isinstance(entry, sqlite3.Row) else entry.get("servings", 1)
+    servings = entry["servings"] if isinstance(entry, dict) else entry.get("servings", 1)
 
     has_direct = False
-    if isinstance(entry, sqlite3.Row):
+    if isinstance(entry, dict):
         keys = set(entry.keys())
         has_direct = all(key in keys for key in ["calories", "protein", "carbs", "fat", "fiber", "sodium", "cholesterol", "sugar"])
     else:
@@ -109,7 +108,7 @@ def get_entry_nutrients(
 
 
 def get_day_nutrients(
-    entries: list[sqlite3.Row | dict[str, Any]],
+    entries: list[dict[str, Any]],
     ingredient_cache: dict[str, list[float]],
 ) -> dict[str, float]:
     totals = _blank_nutrients()
@@ -121,7 +120,7 @@ def get_day_nutrients(
 
 
 def get_week_nutrients(
-    entries: list[sqlite3.Row | dict[str, Any]],
+    entries: list[dict[str, Any]],
     ingredient_cache: dict[str, list[float]],
 ) -> dict[str, float]:
     return get_day_nutrients(entries, ingredient_cache)
@@ -129,3 +128,5 @@ def get_week_nutrients(
 
 def week_rda() -> dict[str, float]:
     return {k: RDA[k] * 7 for k in NUTRIENT_KEYS}
+
+

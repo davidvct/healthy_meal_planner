@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 from typing import Any
 
 from ..constants import CONDITION_RULES, NUTRIENT_KEYS, RDA
@@ -30,13 +29,13 @@ def _condition_category_score(value: str | None) -> float:
 def get_warnings(
     nutrients: dict[str, float],
     conditions: list[str],
-    dish: sqlite3.Row | dict[str, Any] | None = None,
+    dish: dict[str, Any] | None = None,
 ) -> list[str]:
     warnings: list[str] = []
     for condition in conditions:
         category_col = _CONDITION_CATEGORY_COLUMN.get(condition)
         if dish and category_col:
-            value = dish[category_col] if isinstance(dish, sqlite3.Row) else dish.get(category_col)
+            value = dish[category_col] if isinstance(dish, dict) else dish.get(category_col)
             category_text = (value or "").strip().lower()
             if "avoid" in category_text or "caution" in category_text:
                 warnings.append(f"{condition}: {value}")
@@ -52,16 +51,17 @@ def get_warnings(
 
 
 def score_dish(
-    dish: sqlite3.Row | dict[str, Any],
+    dish: dict[str, Any],
     user_conditions: list[str],
-    day_entries: list[sqlite3.Row],
+    day_entries: list[dict[str, Any]],
     meal_type: str,
-    all_week_entries: list[sqlite3.Row],
+    all_week_entries: list[dict[str, Any]],
     ingredient_cache: dict[str, list[float]],
 ) -> dict[str, int]:
-    dish_id = dish["id"] if isinstance(dish, sqlite3.Row) else dish.get("id")
+    dish_id = str(dish["id"] if isinstance(dish, dict) else dish.get("id"))
+    dish_id_alt = f"r{dish_id}" if not dish_id.startswith("r") else dish_id[1:]
     meal_types = parse_json(
-        dish["meal_types"] if isinstance(dish, sqlite3.Row) else (dish.get("meal_types") or dish.get("mealTypes")),
+        dish["meal_types"] if isinstance(dish, dict) else (dish.get("meal_types") or dish.get("mealTypes")),
         [],
     )
 
@@ -72,7 +72,7 @@ def score_dish(
     for condition in user_conditions:
         category_col = _CONDITION_CATEGORY_COLUMN.get(condition)
         if category_col:
-            category_val = dish[category_col] if isinstance(dish, sqlite3.Row) else dish.get(category_col)
+            category_val = dish[category_col] if isinstance(dish, dict) else dish.get(category_col)
             health_score += _condition_category_score(category_val)
 
         rule = CONDITION_RULES.get(condition)
@@ -104,7 +104,13 @@ def score_dish(
     nutrient_score = max(0, min(30, nutrient_score))
 
     pref_score = 0.0
-    count = len([entry for entry in all_week_entries if entry["dish_id"] == dish_id])
+    count = len(
+        [
+            entry
+            for entry in all_week_entries
+            if str(entry["dish_id"]) in {dish_id, dish_id_alt}
+        ]
+    )
     pref_score += max(0, 5 - count * 2)
     pref_score += 5 if meal_type in meal_types else 1
 
@@ -118,7 +124,7 @@ def score_dish(
 
 
 def filter_dishes(
-    dishes: list[sqlite3.Row],
+    dishes: list[dict[str, Any]],
     user_profile: dict[str, Any],
     meal_type: str,
     ingredient_cache: dict[str, list[float]],
@@ -127,8 +133,8 @@ def filter_dishes(
     filter_diet: bool = True,
     filter_allergies: bool = True,
     filter_conditions: bool = True,
-) -> list[sqlite3.Row]:
-    filtered: list[sqlite3.Row] = []
+) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
 
     for dish in dishes:
         ingredients = parse_json(dish["ingredients"], {})
@@ -137,10 +143,19 @@ def filter_dishes(
         dish_allergies = parse_json(dish["allergies"], [])
 
         if filter_allergies and user_profile.get("allergies"):
-            allergies = {a.strip().lower() for a in user_profile.get("allergies", [])}
-            ingredient_hits = {ing.strip().lower() for ing in ingredients.keys()}
-            tagged_hits = {a.strip().lower() for a in dish_allergies}
-            if allergies.intersection(ingredient_hits) or allergies.intersection(tagged_hits):
+            allergies = [a.strip().lower() for a in user_profile.get("allergies", []) if str(a).strip()]
+            ingredient_hits = [ing.strip().lower() for ing in ingredients.keys()]
+            tagged_hits = [a.strip().lower() for a in dish_allergies]
+
+            def _allergy_match(allergy: str, value: str) -> bool:
+                return allergy in value or value in allergy
+
+            blocked = any(
+                _allergy_match(allergy, value)
+                for allergy in allergies
+                for value in [*ingredient_hits, *tagged_hits]
+            )
+            if blocked:
                 continue
 
         if filter_diet and user_profile.get("diet") != "none":
@@ -194,10 +209,12 @@ def filter_dishes(
 
 
 def get_entry_warnings(
-    entry: sqlite3.Row,
+    entry: dict[str, Any],
     dish_ingredients: str | dict[str, float],
     conditions: list[str],
     ingredient_cache: dict[str, list[float]],
 ) -> list[str]:
     nutrients = get_entry_nutrients(entry, ingredient_cache)
     return get_warnings(nutrients, conditions)
+
+

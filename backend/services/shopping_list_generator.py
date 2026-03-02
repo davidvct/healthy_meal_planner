@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from typing import Any
+
 from datetime import date, datetime, timedelta
-import sqlite3
 
 from ..constants import MEAL_CUTOFF
-from ..utils import get_current_week_start, parse_json
+from ..utils import get_current_week_start, parse_ingredients_map, parse_json
 
 
 def is_slot_expired(week_start: str, day_index: int, meal_type: str) -> bool:
@@ -23,7 +24,7 @@ def is_slot_expired(week_start: str, day_index: int, meal_type: str) -> bool:
 
 
 def get_shopping_list(
-    conn: sqlite3.Connection,
+    conn: Any,
     user_id: str,
     week_start: str | None,
     selections: list[dict[str, int | str]] | None,
@@ -35,9 +36,9 @@ def get_shopping_list(
 
     rows = conn.execute(
         """
-        SELECT mp.day_index, mp.meal_type, mp.servings, mp.custom_ingredients, d.ingredients
+        SELECT mp.day_index, mp.meal_type, mp.servings, mp.custom_ingredients, r.ingredients
         FROM meal_plans mp
-        JOIN dishes d ON d.id = mp.dish_id
+        JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
         WHERE mp.user_id = ? AND mp.week_start = ?
         """,
         (user_id, ws),
@@ -51,7 +52,7 @@ def get_shopping_list(
         if key not in selected_keys:
             continue
 
-        dish_ingredients = parse_json(row["ingredients"], {})
+        dish_ingredients = parse_ingredients_map(row["ingredients"])
         custom = parse_json(row["custom_ingredients"], None)
         ingredients = custom or {
             k: float(v) * float(row["servings"]) for k, v in dish_ingredients.items()
@@ -64,3 +65,6 @@ def get_shopping_list(
         {"name": ingredient, "grams": int(round(grams))}
         for ingredient, grams in sorted(totals.items(), key=lambda kv: kv[0])
     ]
+
+
+

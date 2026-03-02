@@ -1,4 +1,4 @@
-import sqlite3
+﻿from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/shopping-list", tags=["shopping-list"])
 def get_user_shopping_list(
     user_id: str,
     weekStart: str | None = None,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: Any = Depends(get_db),
 ) -> dict:
     if weekStart:
         raw_selections = conn.execute(
@@ -63,7 +63,7 @@ def get_user_shopping_list(
 def toggle_shopping_selection(
     user_id: str,
     body: ToggleShoppingSelectionBody,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: Any = Depends(get_db),
 ) -> dict:
     existing = conn.execute(
         """
@@ -98,3 +98,4 @@ def toggle_shopping_selection(
     ]
 
     return {"selections": selections}
+

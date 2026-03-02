@@ -159,6 +159,35 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
             />
           ))}
         </div>
+
+        {/* Footer actions */}
+        <div
+          style={{
+            position: "sticky",
+            bottom: 0,
+            marginTop: 16,
+            paddingTop: 10,
+            display: "flex",
+            justifyContent: "flex-end",
+            background: COLORS.bg,
+            borderTop: `1px solid ${COLORS.grayLight}`,
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              border: "none",
+              borderRadius: 10,
+              padding: "10px 14px",
+              background: COLORS.navy,
+              color: "#fff",
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );

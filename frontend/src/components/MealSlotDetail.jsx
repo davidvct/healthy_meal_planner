@@ -172,15 +172,42 @@ export default function MealSlotDetail({ dayIndex, mealType, entries, dayPlan, o
           </div>
         )}
 
-        {/* Add Dish button */}
-        <button onClick={onAddDish}
+        <div
           style={{
-            width: "100%", padding: 14, borderRadius: 14, border: "none", background: COLORS.accent, color: "#fff",
-            fontWeight: 700, fontSize: 15, cursor: "pointer", marginTop: 16,
-            boxShadow: "0 2px 8px rgba(212,113,59,0.3)",
-          }}>
-          + Add Dish
-        </button>
+            position: "sticky",
+            bottom: 0,
+            marginTop: 16,
+            paddingTop: 10,
+            display: "flex",
+            gap: 8,
+            background: COLORS.bg,
+            borderTop: `1px solid ${COLORS.grayLight}`,
+          }}
+        >
+          <button onClick={onAddDish}
+            style={{
+              flex: 1, padding: 14, borderRadius: 14, border: "none", background: COLORS.accent, color: "#fff",
+              fontWeight: 700, fontSize: 15, cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(212,113,59,0.3)",
+            }}>
+            + Add Dish
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "14px 16px",
+              borderRadius: 14,
+              border: "none",
+              background: COLORS.navy,
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: "pointer",
+            }}
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );

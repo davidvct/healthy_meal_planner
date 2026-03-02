@@ -1,9 +1,10 @@
+from typing import Any
 import json
-import sqlite3
 
 from fastapi import APIRouter, Depends
 
 from ..constants import CONDITION_RULES, NUTRIENT_KEYS, RDA
+from ..data import recommend_targets
 from ..db import get_db
 from ..schemas import AddMealPlanBody
 from ..services.nutrient_calculator import (
@@ -11,41 +12,90 @@ from ..services.nutrient_calculator import (
     get_week_nutrients,
     load_ingredient_cache,
 )
-from ..utils import get_current_week_start, parse_json
+from ..utils import get_current_week_start, parse_ingredients_map, parse_json
 
 router = APIRouter(prefix="/mealplan", tags=["mealplan"])
 
 
-def _user_rda(user: sqlite3.Row | None) -> dict[str, float]:
+def _user_rda(user: dict[str, Any] | None) -> dict[str, float]:
     rda = dict(RDA)
     if not user:
         return rda
 
-    if user["recommended_calories"]:
+    if user.get("recommended_calories"):
         rda["calories"] = float(user["recommended_calories"])
-    if user["recommended_protein"]:
+    if user.get("recommended_protein"):
         rda["protein"] = float(user["recommended_protein"])
-    if user["recommended_carbs"]:
+    if user.get("recommended_carbs"):
         rda["carbs"] = float(user["recommended_carbs"])
-    if user["recommended_fat"]:
+    if user.get("recommended_fat"):
         rda["fat"] = float(user["recommended_fat"])
 
     return rda
+
+
+def _load_profile_for_plan(conn: Any, user_id: str) -> dict[str, Any] | None:
+    uid = str(user_id or "")
+    if uid.startswith("fm:"):
+        member_id = uid[3:]
+        member = conn.execute("SELECT * FROM family_members WHERE id::text = ?", (member_id,)).fetchone()
+        if not member:
+            return None
+        diet = member.get("dietary_prefs") or "none"
+        targets = recommend_targets(member.get("age"), member.get("sex"), member.get("weight_kg"), diet)
+        return {
+            "conditions": member.get("conditions"),
+            "recommended_calories": targets["calories"],
+            "recommended_protein": targets["protein"],
+            "recommended_carbs": targets["carbs"],
+            "recommended_fat": targets["fat"],
+        }
+
+    return conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+
+
+def _derive_meal_types(category: str) -> list[str]:
+    c = (category or "").lower()
+    meal_types: list[str] = []
+    if "breakfast" in c:
+        meal_types.append("breakfast")
+    if any(x in c for x in ["snack", "dessert", "drink", "beverage", "appetizer"]):
+        meal_types.append("snack")
+    if "lunch" in c:
+        meal_types.append("lunch")
+    if "dinner" in c:
+        meal_types.append("dinner")
+    if any(x in c for x in ["main", "entree", "soup", "salad", "side"]):
+        meal_types.extend(["lunch", "dinner"])
+    if not meal_types:
+        meal_types = ["lunch", "dinner"]
+    return list(dict.fromkeys(meal_types))
+
+
+def _recipe_tags(row: dict[str, Any]) -> list[str]:
+    tags: list[str] = []
+    for col in ["cuisine", "category", "keywords"]:
+        tags.extend([x.strip().lower() for x in str(row.get(col) or "").split(",") if x.strip()])
+    if row.get("is_vegetarian"):
+        tags.append("vegetarian")
+    if row.get("is_vegan"):
+        tags.append("vegan")
+    return list(dict.fromkeys(tags))
 
 
 @router.get("/{user_id}")
 def get_meal_plan(
     user_id: str,
     weekStart: str | None = None,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: Any = Depends(get_db),
 ) -> dict:
     ws = weekStart or get_current_week_start()
 
     rows = conn.execute(
         """
-        SELECT mp.*, d.name AS dish_name, d.ingredients AS dish_ingredients, d.tags, d.meal_types, d.recipe_id
+        SELECT mp.*, r.id AS recipe_id, r.name AS recipe_name, r.ingredients AS recipe_ingredients, r.category, r.keywords, r.cuisine
         FROM meal_plans mp
-        JOIN dishes d ON d.id = mp.dish_id
+        JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
         WHERE mp.user_id = ? AND mp.week_start = ?
         ORDER BY mp.day_index, mp.meal_type, mp.entry_order
         """,
@@ -61,14 +111,14 @@ def get_meal_plan(
         plan[day_key][meal_type].append(
             {
                 "id": row["id"],
-                "dishId": row["dish_id"],
-                "dishName": row["dish_name"],
+                "dishId": str(row["recipe_id"]),
+                "dishName": row["recipe_name"],
                 "servings": row["servings"],
                 "customIngredients": parse_json(row["custom_ingredients"], None),
-                "dishIngredients": parse_json(row["dish_ingredients"], {}),
-                "tags": parse_json(row["tags"], []),
-                "mealTypes": parse_json(row["meal_types"], []),
-                "recipeId": row["recipe_id"],
+                "dishIngredients": parse_ingredients_map(row["recipe_ingredients"]),
+                "tags": _recipe_tags(row),
+                "mealTypes": _derive_meal_types(row.get("category") or ""),
+                "recipeId": str(row["recipe_id"]),
             }
         )
 
@@ -79,7 +129,7 @@ def get_meal_plan(
 def add_dish_to_plan(
     user_id: str,
     body: AddMealPlanBody,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: Any = Depends(get_db),
 ) -> dict[str, bool]:
     ws = body.weekStart or get_current_week_start()
 
@@ -113,7 +163,7 @@ def add_dish_to_plan(
 
 
 @router.delete("/{user_id}/remove/{entry_id}")
-def remove_dish_from_plan(entry_id: int, user_id: str, conn: sqlite3.Connection = Depends(get_db)) -> dict[str, bool]:
+def remove_dish_from_plan(entry_id: int, user_id: str, conn: Any = Depends(get_db)) -> dict[str, bool]:
     conn.execute("DELETE FROM meal_plans WHERE id = ? AND user_id = ?", (entry_id, user_id))
     conn.commit()
     return {"success": True}
@@ -123,18 +173,19 @@ def remove_dish_from_plan(entry_id: int, user_id: str, conn: sqlite3.Connection 
 def get_weekly_nutrients(
     user_id: str,
     weekStart: str | None = None,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: Any = Depends(get_db),
 ) -> dict:
     ws = weekStart or get_current_week_start()
 
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    conditions = parse_json(user["conditions"], []) if user else []
+    user = _load_profile_for_plan(conn, user_id)
+    conditions = parse_json(user.get("conditions") if user else None, [])
 
     entries = conn.execute(
         """
-        SELECT mp.*, d.ingredients, d.calories, d.protein, d.carbs, d.fat, d.fiber, d.sodium, d.cholesterol, d.sugar
+        SELECT mp.*, r.ingredients,
+               r.calories, r.protein, r.total_carbs AS carbs, r.fat, r.fiber, r.sodium, r.cholesterol, r.sugar
         FROM meal_plans mp
-        JOIN dishes d ON d.id = mp.dish_id
+        JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
         WHERE mp.user_id = ? AND mp.week_start = ?
         ORDER BY mp.day_index
         """,
@@ -178,15 +229,16 @@ def get_daily_nutrients(
     user_id: str,
     day_index: int,
     weekStart: str | None = None,
-    conn: sqlite3.Connection = Depends(get_db),
+    conn: Any = Depends(get_db),
 ) -> dict:
     ws = weekStart or get_current_week_start()
 
     entries = conn.execute(
         """
-        SELECT mp.*, d.ingredients, d.calories, d.protein, d.carbs, d.fat, d.fiber, d.sodium, d.cholesterol, d.sugar
+        SELECT mp.*, r.ingredients,
+               r.calories, r.protein, r.total_carbs AS carbs, r.fat, r.fiber, r.sodium, r.cholesterol, r.sugar
         FROM meal_plans mp
-        JOIN dishes d ON d.id = mp.dish_id
+        JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
         WHERE mp.user_id = ? AND mp.week_start = ? AND mp.day_index = ?
         """,
         (user_id, ws, day_index),
