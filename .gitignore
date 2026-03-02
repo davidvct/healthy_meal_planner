@@ -6,3 +6,4 @@ dist/
 .claude/
 .vscode/
 archive/
+*.mp4
