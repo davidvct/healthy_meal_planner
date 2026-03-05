@@ -82,7 +82,7 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
       onClick={onClose}>
       <div style={{
-        background: COLORS.bg, borderRadius: 24, width: "100%", maxWidth: 500, maxHeight: "85vh", overflow: "auto", padding: 24,
+        background: COLORS.bg, borderRadius: 24, width: "100%", maxWidth: 960, maxHeight: "85vh", overflow: "auto", padding: 24,
       }} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -132,12 +132,12 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
         </div>
 
         {/* Dish list */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
           {loading && (
-            <div style={{ textAlign: "center", padding: 30, color: COLORS.gray }}>Loading...</div>
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 30, color: COLORS.gray }}>Loading...</div>
           )}
           {!loading && scored.length === 0 && (
-            <div style={{ textAlign: "center", padding: 30, color: COLORS.gray }}>
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: 30, color: COLORS.gray }}>
               <div style={{ fontSize: 14, marginBottom: 8 }}>No dishes match your filters.</div>
               <div style={{ fontSize: 12 }}>Try toggling off some filters above to see more options.</div>
             </div>

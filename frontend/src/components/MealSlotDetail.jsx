@@ -52,7 +52,7 @@ export default function MealSlotDetail({ dayIndex, mealType, entries, dayPlan, o
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 1000, display: "flex", justifyContent: "center", alignItems: "center" }}
       onClick={onClose}>
       <div style={{
-        background: COLORS.bg, borderRadius: 24, width: "100%", maxWidth: 500, maxHeight: "85vh", overflow: "auto", padding: 24,
+        background: COLORS.bg, borderRadius: 24, width: "100%", maxWidth: 960, maxHeight: "85vh", overflow: "auto", padding: 24,
       }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -78,7 +78,7 @@ export default function MealSlotDetail({ dayIndex, mealType, entries, dayPlan, o
             <div style={{ fontSize: 12, marginTop: 4 }}>Tap the button below to add a dish.</div>
           </div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
             {entries.map((entry) => {
               const detail = dishDetails[entry.dishId];
               const nutrients = detail?.nutrients;
