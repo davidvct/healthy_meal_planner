@@ -1,0 +1,22 @@
+[debug] [2026-03-08T12:15:49.769Z] ----------------------------------------------------------------------
+[debug] [2026-03-08T12:15:49.773Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\jiaju\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js projects:addfirebase cs5224-project-489002 --debug
+[debug] [2026-03-08T12:15:49.773Z] CLI Version:   15.9.0
+[debug] [2026-03-08T12:15:49.773Z] Platform:      win32
+[debug] [2026-03-08T12:15:49.773Z] Node Version:  v22.22.0
+[debug] [2026-03-08T12:15:49.774Z] Time:          Sun Mar 08 2026 20:15:49 GMT+0800 (Singapore Standard Time)
+[debug] [2026-03-08T12:15:49.774Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-03-08T12:15:49.783Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-03-08T12:15:49.785Z] > authorizing via signed-in user (jiajunpoh1994@gmail.com)
+[debug] [2026-03-08T12:15:49.793Z] Checked if tokens are valid: true, expires at: 1772975679829
+[debug] [2026-03-08T12:15:49.793Z] Checked if tokens are valid: true, expires at: 1772975679829
+[debug] [2026-03-08T12:15:49.795Z] >>> [apiv2][query] POST https://firebase.googleapis.com/v1beta1/projects/cs5224-project-489002:addFirebase [none]
+[debug] [2026-03-08T12:15:50.511Z] <<< [apiv2][status] POST https://firebase.googleapis.com/v1beta1/projects/cs5224-project-489002:addFirebase 403
+[debug] [2026-03-08T12:15:50.512Z] <<< [apiv2][body] POST https://firebase.googleapis.com/v1beta1/projects/cs5224-project-489002:addFirebase {"error":{"code":403,"message":"The caller does not have permission","status":"PERMISSION_DENIED"}}
+[debug] [2026-03-08T12:15:50.514Z] Request to https://firebase.googleapis.com/v1beta1/projects/cs5224-project-489002:addFirebase had HTTP Error: 403, The caller does not have permission
+[debug] [2026-03-08T12:15:50.531Z] FirebaseError: Request to https://firebase.googleapis.com/v1beta1/projects/cs5224-project-489002:addFirebase had HTTP Error: 403, The caller does not have permission
+    at responseToError (C:\Users\jiaju\AppData\Roaming\npm\node_modules\firebase-tools\lib\responseToError.js:53:12)
+    at RetryOperation._fn (C:\Users\jiaju\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:333:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+[error] 
+[error] Error: Failed to add Firebase to Google Cloud Platform project. See firebase-debug.log for more info.

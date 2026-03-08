@@ -75,12 +75,15 @@ def _send_otp_email(email: str, otp_code: str) -> str:
         "If you did not request this, you can ignore this message."
     )
 
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as client:
-        client.starttls()
-        client.login(smtp_user, smtp_password)
-        client.send_message(message)
-
-    return "email"
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as client:
+            client.starttls()
+            client.login(smtp_user, smtp_password)
+            client.send_message(message)
+        return "email"
+    except Exception as exc:
+        print(f"[auth] SMTP send failed ({exc!r}). Falling back to console OTP for {email}: {otp_code}")
+        return "console"
 
 
 @router.post("/request-otp")

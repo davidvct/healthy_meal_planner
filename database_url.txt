@@ -1,0 +1,1 @@
+postgresql://postgres:Password123!@/meal_planner?host=/cloudsql/cs5224-project-489002:asia-southeast1:meal-planner
