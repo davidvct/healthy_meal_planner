@@ -1,11 +1,17 @@
 node_modules/
 dist/
+backend/datasets/
 *.db
 *.db-shm
 *.db-wal
 .claude/
 .vscode/
 archive/
+*.mp4
+brainstorm.md
+dev_phase.md
+user_flow.md
+user_flow_full.md
 
 *.pyc
 
