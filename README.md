@@ -70,13 +70,12 @@ project/
 └── planning.md                        # Recommendation scoring design
 ```
 
-## Local Development
+## Development Setup
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18+ (for frontend)
 - [uv](https://astral.sh/uv/) (Python package manager for backend)
-- [PostgreSQL 16](https://www.postgresql.org/) (local database)
 
 Install `uv` if not already installed:
 
@@ -84,45 +83,17 @@ Install `uv` if not already installed:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Datasets
+### Step 1 — Configure Environment
 
-Seed data is located at:
-
-```
-backend/datasets/
-├── Personalized_Diet_Recommendations.csv   # Main recipe + nutrition dataset
-├── recipes_nlp_tagged.csv                  # NLP-tagged recipe data
-├── SCHEMA CS5224.txt                        # Database schema reference
-└── Sample meal-plan-output.txt             # Sample output reference
-```
-
-The backend auto-seeds the database on first run from these files.
-
-### Step 1 — Start PostgreSQL
-
-```bash
-brew services start postgresql@16
-```
-
-Create the local database if it doesn't exist yet:
-
-```bash
-/opt/homebrew/opt/postgresql@16/bin/createdb mealwise
-```
-
-### Step 2 — Configure Environment
-
-Create a `.env` file in the project root:
+Create a `.env` file in the project root pointing to the Cloud SQL instance:
 
 ```
-DATABASE_URL=postgresql://<your-mac-username>@localhost:5432/mealwise
+DATABASE_URL=postgresql://postgres:<password>@34.142.226.72:5432/meal_planner
 ```
 
-Replace `<your-mac-username>` with your macOS username (e.g. `davidthien`).
+The full connection URL is in `database_url.txt`. Make sure your IP is allowlisted in the Cloud SQL instance's authorised networks (GCP Console → Cloud SQL → Connections).
 
-For Cloud SQL (production), the URL is in `database_url.txt`.
-
-### Step 3 — Start the Backend
+### Step 2 — Start the Backend
 
 From the project root, load the `.env` and start the FastAPI server:
 
@@ -131,9 +102,9 @@ set -a && source .env && set +a
 uv run uvicorn backend.main:app --reload
 ```
 
-The backend starts on **http://localhost:8000**. On first run it auto-migrates the schema and seeds recipes from the datasets.
+The backend starts on **http://localhost:8000** and connects directly to Cloud SQL on first run (auto-migrates schema and seeds recipes if needed).
 
-### Step 4 — Start the Frontend
+### Step 3 — Start the Frontend
 
 ```bash
 cd frontend
@@ -141,11 +112,11 @@ npm install
 npm run dev
 ```
 
-The frontend starts on **http://localhost:5173**. Vite proxies all `/api/*` requests to the backend.
+The frontend starts on **http://localhost:3000**. Vite proxies all `/api/*` requests to the local backend, which in turn talks to Cloud SQL.
 
 ### Open the App
 
-Visit **http://localhost:5173** in your browser.
+Visit **http://localhost:3000** in your browser.
 
 ## API Endpoints
 
@@ -170,8 +141,6 @@ Visit **http://localhost:5173** in your browser.
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Frontend | React 18 + Vite | UI rendering and dev server |
-| Backend | Express.js (Node.js) | REST API and business logic |
-| Database | SQLite (via better-sqlite3) | Local data storage, zero-config |
+| Backend | FastAPI (Python) | REST API and business logic |
+| Database | PostgreSQL 16 on Cloud SQL | Managed cloud database (GCP asia-southeast1) |
 | Charts | Recharts (optional, CDN) | Weekly nutrition bar chart |
-
-**Phase 3 migration:** SQLite will be swapped for PostgreSQL when deploying to cloud. See `dev_phase.md` for the full roadmap.
