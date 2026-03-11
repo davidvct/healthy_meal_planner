@@ -65,3 +65,13 @@ class RegisterBody(BaseModel):
 class LoginBody(BaseModel):
     email: str = Field(min_length=3)
     password: str = Field(min_length=1)
+
+
+class NutrientThresholdItem(BaseModel):
+    nutrientKey: str = Field(min_length=1)
+    dailyValue: float | None = None
+    perMealValue: float | None = None
+
+
+class SaveThresholdsBody(BaseModel):
+    thresholds: list[NutrientThresholdItem]

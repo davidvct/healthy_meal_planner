@@ -108,7 +108,7 @@ def _init_schema(conn: DBConnection) -> None:
           name TEXT NOT NULL,
           prep_time INTEGER NOT NULL,
           cook_time INTEGER NOT NULL,
-          steps TEXT NOT NULL
+          steps TEXT NOT NULL DEFAULT '[]'
         );
 
         CREATE TABLE IF NOT EXISTS caretakers (
@@ -175,6 +175,15 @@ def _init_schema(conn: DBConnection) -> None:
           day_index INTEGER NOT NULL,
           meal_type TEXT NOT NULL,
           UNIQUE(user_id, week_start, day_index, meal_type)
+        );
+
+        CREATE TABLE IF NOT EXISTS nutrient_thresholds (
+          id BIGSERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          nutrient_key TEXT NOT NULL,
+          daily_value DOUBLE PRECISION,
+          per_meal_value DOUBLE PRECISION,
+          UNIQUE(user_id, nutrient_key)
         );
 
         CREATE TABLE IF NOT EXISTS family_members (
@@ -409,6 +418,19 @@ def _migrate_schema(conn: DBConnection) -> None:
                 """
             )
 
+    if not _table_exists(conn, "nutrient_thresholds"):
+        _executescript(conn, """
+            CREATE TABLE IF NOT EXISTS nutrient_thresholds (
+              id BIGSERIAL PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              nutrient_key TEXT NOT NULL,
+              daily_value DOUBLE PRECISION,
+              per_meal_value DOUBLE PRECISION,
+              UNIQUE(user_id, nutrient_key)
+            )
+        """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_nutrient_thresholds_user ON nutrient_thresholds(user_id)")
+
     conn.execute("DROP INDEX IF EXISTS idx_meal_plans_user")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_meal_plans_user "
@@ -471,6 +493,10 @@ def _migrate_schema(conn: DBConnection) -> None:
     _add_column_if_missing(conn, "caretakers", "auth_user_id", "TEXT")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_caretakers_auth_user_id ON caretakers(auth_user_id)")
 
+    if _has_column(conn, "recipes", "steps"):
+        conn.execute("ALTER TABLE recipes ALTER COLUMN steps SET DEFAULT '[]'")
+        conn.execute("UPDATE recipes SET steps = '[]' WHERE steps IS NULL")
+
     _add_column_if_missing(conn, "recipes", "url", "TEXT")
     _add_column_if_missing(conn, "recipes", "description", "TEXT")
     _add_column_if_missing(conn, "recipes", "total_time", "TEXT")
@@ -489,6 +515,13 @@ def _migrate_schema(conn: DBConnection) -> None:
     _add_column_if_missing(conn, "recipes", "sugar", "TEXT")
     _add_column_if_missing(conn, "recipes", "cholesterol", "TEXT")
     _add_column_if_missing(conn, "recipes", "sodium", "TEXT")
+    _add_column_if_missing(conn, "recipes", "saturated_fat", "TEXT")
+    _add_column_if_missing(conn, "recipes", "trans_fat", "TEXT")
+    _add_column_if_missing(conn, "recipes", "net_carbs", "TEXT")
+    _add_column_if_missing(conn, "recipes", "vitamin_c", "TEXT")
+    _add_column_if_missing(conn, "recipes", "potassium", "TEXT")
+    _add_column_if_missing(conn, "recipes", "calcium", "TEXT")
+    _add_column_if_missing(conn, "recipes", "iron", "TEXT")
     _add_column_if_missing(conn, "recipes", "allergies", "TEXT")
     _add_column_if_missing(conn, "recipes", "dietary_habits", "TEXT")
     _add_column_if_missing(conn, "recipes", "hypertension_category", "TEXT")

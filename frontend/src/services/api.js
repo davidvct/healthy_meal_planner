@@ -156,3 +156,20 @@ export async function toggleShoppingSelection(userId, weekStart, dayIndex, mealT
     body: JSON.stringify({ weekStart, dayIndex, mealType }),
   });
 }
+
+// ---- Nutrient Thresholds ----
+
+export async function getAvailableNutrients() {
+  return request("/thresholds/nutrients");
+}
+
+export async function getThresholds(userId) {
+  return request(`/thresholds/${userId}`);
+}
+
+export async function saveThresholds(userId, thresholds) {
+  return request(`/thresholds/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify({ thresholds }),
+  });
+}

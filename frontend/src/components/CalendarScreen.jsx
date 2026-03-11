@@ -8,6 +8,7 @@ import ShoppingListPanel from "./ShoppingListPanel";
 import NutrientSummaryPanel from "./NutrientSummaryPanel";
 import RecipeViewModal from "./RecipeViewModal";
 import AutofillSettingsModal, { loadAutofillSettings } from "./AutofillSettingsModal";
+import ThresholdSettingsModal from "./ThresholdSettingsModal";
 import * as api from "../services/api";
 
 // Get the Monday of the week containing `date`
@@ -38,6 +39,7 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
   const [showNutrients, setShowNutrients] = useState(false);
   const [recipeView, setRecipeView] = useState(null);
   const [showAutofillSettings, setShowAutofillSettings] = useState(false);
+  const [showThresholds, setShowThresholds] = useState(false);
   const [autofilling, setAutofilling] = useState(false);
 
   // Week offset from current week (0 = this week, -1 = last week, +1 = next week)
@@ -246,6 +248,10 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
             style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             ⚙ Auto-fill Settings
           </button>
+          <button onClick={() => setShowThresholds(true)}
+            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.navy, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            🎯 Threshold
+          </button>
           <span style={{ fontSize: 12, color: COLORS.gray, display: "flex", alignItems: "center", marginLeft: 8 }}>
             {totalPlanned} dish{totalPlanned !== 1 ? "es" : ""} planned
           </span>
@@ -383,6 +389,7 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
       {showNutrients && <NutrientSummaryPanel userId={userId} weekStart={weekStart} onClose={() => setShowNutrients(false)} />}
       {recipeView && <RecipeViewModal entry={recipeView} onClose={() => setRecipeView(null)} />}
       {showAutofillSettings && <AutofillSettingsModal onClose={() => setShowAutofillSettings(false)} />}
+      {showThresholds && <ThresholdSettingsModal userId={userId} onClose={() => setShowThresholds(false)} />}
     </div>
   );
 }
