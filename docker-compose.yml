@@ -4,4 +4,4 @@ services:
     ports:
       - "80:80"
     env_file:
-      - app.local.properties
+      - application.properties

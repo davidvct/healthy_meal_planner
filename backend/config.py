@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_CONFIG_PATH = _PROJECT_ROOT / "app.local.properties"
+_CONFIG_PATH = _PROJECT_ROOT / "application.properties"
 
 
 def _parse_properties(text: str) -> dict[str, str]:

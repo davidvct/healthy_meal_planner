@@ -8,7 +8,7 @@ COPY pyproject.toml uv.lock /code/
 
 RUN uv sync --no-cache --no-dev
 
-COPY ./app.local.properties /code/app.local.properties
+COPY ./application.properties /code/application.properties
 COPY ./backend/ /code/backend/
 
 CMD ["uv", "run", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
