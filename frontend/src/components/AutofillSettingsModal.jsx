@@ -72,7 +72,7 @@ export default function AutofillSettingsModal({ onClose }) {
         </h3>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Max dishes per slot</label>
+          <label style={labelStyle}>Max dishes per meal</label>
           <input
             type="number"
             min={1}
@@ -84,7 +84,7 @@ export default function AutofillSettingsModal({ onClose }) {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Max calories per slot</label>
+          <label style={labelStyle}>Max calories per meal</label>
           <input
             type="number"
             min={0}
@@ -97,7 +97,7 @@ export default function AutofillSettingsModal({ onClose }) {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Max carbs per slot (g)</label>
+          <label style={labelStyle}>Max carbs per meal (g)</label>
           <input
             type="number"
             min={0}
@@ -110,7 +110,7 @@ export default function AutofillSettingsModal({ onClose }) {
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>Max fat per slot (g)</label>
+          <label style={labelStyle}>Max fat per meal (g)</label>
           <input
             type="number"
             min={0}
