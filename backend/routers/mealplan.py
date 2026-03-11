@@ -6,12 +6,16 @@ from fastapi import APIRouter, Depends
 from ..constants import CONDITION_RULES, NUTRIENT_KEYS, RDA
 from ..data import recommend_targets
 from ..db import get_db
-from ..schemas import AddMealPlanBody
+from ..schemas import AddMealPlanBody, AutofillBody
 from ..services.nutrient_calculator import (
     get_day_nutrients,
+    get_dish_nutrients,
+    get_row_nutrients,
     get_week_nutrients,
     load_ingredient_cache,
 )
+from ..services.recommendation_engine import filter_dishes, score_dish
+from .dishes import _load_user_profile, _recipe_to_dish_row
 from ..utils import get_current_week_start, parse_ingredients_map, parse_json
 
 router = APIRouter(prefix="/mealplan", tags=["mealplan"])
@@ -246,3 +250,173 @@ def get_daily_nutrients(
 
     ingredient_cache = load_ingredient_cache(conn)
     return get_day_nutrients(entries, ingredient_cache)
+
+
+AUTOFILL_MEAL_TYPES = ["breakfast", "lunch", "dinner"]
+MEAL_CUTOFF = {"breakfast": 10, "lunch": 14, "dinner": 20}
+
+
+def _is_slot_locked(week_start: str, day_index: int, meal_type: str) -> bool:
+    from datetime import datetime, date as date_cls, timedelta
+
+    now = datetime.now()
+    today = now.date()
+    ws_date = date_cls.fromisoformat(week_start)
+    slot_date = ws_date + timedelta(days=day_index)
+
+    if slot_date < today:
+        return True
+    if slot_date == today:
+        cutoff = MEAL_CUTOFF.get(meal_type, 24)
+        if now.hour >= cutoff:
+            return True
+    return False
+
+
+@router.post("/{user_id}/autofill")
+def autofill_plan(
+    user_id: str,
+    body: AutofillBody,
+    conn: Any = Depends(get_db),
+) -> dict:
+    ws = body.weekStart or get_current_week_start()
+    settings = body.settings
+
+    user_profile = _load_user_profile(conn, user_id)
+    if not user_profile:
+        return {"success": False, "added": 0, "error": "User not found"}
+
+    # Load all recipes once
+    recipe_rows = conn.execute("SELECT * FROM recipes").fetchall()
+    all_dishes = [_recipe_to_dish_row(r) for r in recipe_rows]
+    ingredient_cache = load_ingredient_cache(conn)
+
+    # Load existing meal plan entries for the week
+    existing = conn.execute(
+        """
+        SELECT mp.*, r.ingredients,
+               r.calories, r.protein, r.total_carbs AS carbs, r.fat, r.fiber, r.sodium, r.cholesterol, r.sugar
+        FROM meal_plans mp
+        JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
+        WHERE mp.user_id = ? AND mp.week_start = ?
+        ORDER BY mp.day_index, mp.meal_type, mp.entry_order
+        """,
+        (user_id, ws),
+    ).fetchall()
+
+    # Build a set of occupied slots and collect entries by day
+    occupied: dict[tuple[int, str], list[dict]] = {}
+    day_entries_map: dict[int, list[dict]] = {d: [] for d in range(7)}
+    all_week_dish_ids: list[dict] = [{"dish_id": e["dish_id"]} for e in existing]
+
+    for entry in existing:
+        key = (entry["day_index"], entry["meal_type"])
+        occupied.setdefault(key, []).append(entry)
+        day_entries_map[entry["day_index"]].append(entry)
+
+    added = 0
+
+    for day_index in range(7):
+        for meal_type in AUTOFILL_MEAL_TYPES:
+            slot_key = (day_index, meal_type)
+
+            # Skip locked (past) slots
+            if _is_slot_locked(ws, day_index, meal_type):
+                continue
+
+            # Skip non-empty slots
+            if occupied.get(slot_key):
+                continue
+
+            # Filter dishes for this meal type
+            filtered = filter_dishes(
+                all_dishes,
+                user_profile,
+                meal_type,
+                ingredient_cache,
+                filter_meal_type=True,
+                filter_diet=True,
+                filter_allergies=True,
+                filter_conditions=True,
+            )
+
+            # Score and sort
+            scored = []
+            for dish in filtered:
+                score = score_dish(
+                    dish,
+                    user_profile.get("conditions", []),
+                    day_entries_map[day_index],
+                    meal_type,
+                    all_week_dish_ids,
+                    ingredient_cache,
+                )
+                scored.append((dish, score))
+            scored.sort(key=lambda x: x[1]["total"], reverse=True)
+
+            # Track slot nutrients for constraint checking
+            slot_nutrients = {"calories": 0.0, "carbs": 0.0, "fat": 0.0}
+            slot_dish_count = 0
+
+            # Get current max entry_order for this slot
+            max_order_row = conn.execute(
+                """
+                SELECT COALESCE(MAX(entry_order), -1) as m
+                FROM meal_plans
+                WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?
+                """,
+                (user_id, ws, day_index, meal_type),
+            ).fetchone()
+            entry_order = max_order_row["m"] + 1
+
+            for dish, score in scored:
+                if slot_dish_count >= settings.maxDishesPerSlot:
+                    break
+
+                # Get dish nutrients
+                dish_nutrients = get_row_nutrients(dish)
+
+                # Check if adding this dish would exceed constraints
+                new_cal = slot_nutrients["calories"] + dish_nutrients.get("calories", 0)
+                new_carbs = slot_nutrients["carbs"] + dish_nutrients.get("carbs", 0)
+                new_fat = slot_nutrients["fat"] + dish_nutrients.get("fat", 0)
+
+                # If we already have dishes in this slot, check constraints before adding
+                if slot_dish_count > 0:
+                    if settings.maxCalories is not None and new_cal > settings.maxCalories:
+                        break
+                    if settings.maxCarbs is not None and new_carbs > settings.maxCarbs:
+                        break
+                    if settings.maxFat is not None and new_fat > settings.maxFat:
+                        break
+
+                # Insert the dish
+                dish_id = str(dish["id"])
+                conn.execute(
+                    """
+                    INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (user_id, ws, day_index, meal_type, dish_id, 1.0, None, entry_order),
+                )
+                entry_order += 1
+                added += 1
+                slot_dish_count += 1
+                slot_nutrients["calories"] = new_cal
+                slot_nutrients["carbs"] = new_carbs
+                slot_nutrients["fat"] = new_fat
+
+                # Update tracking for subsequent scoring
+                fake_entry = {"dish_id": dish_id}
+                all_week_dish_ids.append(fake_entry)
+
+                # Check constraints after adding
+                if settings.maxCalories is not None and slot_nutrients["calories"] >= settings.maxCalories:
+                    break
+                if settings.maxCarbs is not None and slot_nutrients["carbs"] >= settings.maxCarbs:
+                    break
+                if settings.maxFat is not None and slot_nutrients["fat"] >= settings.maxFat:
+                    break
+
+    conn.commit()
+    return {"success": True, "added": added}

@@ -122,6 +122,13 @@ export async function addDishToPlan(userId, { dayIndex, mealType, dishId, servin
   });
 }
 
+export async function autofillPlan(userId, weekStart, settings) {
+  return request(`/mealplan/${userId}/autofill`, {
+    method: "POST",
+    body: JSON.stringify({ weekStart, settings }),
+  });
+}
+
 export async function removeDishFromPlan(userId, entryId) {
   return request(`/mealplan/${userId}/remove/${entryId}`, { method: "DELETE" });
 }

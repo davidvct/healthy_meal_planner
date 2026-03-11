@@ -7,6 +7,7 @@ import MealSlotDetail from "./MealSlotDetail";
 import ShoppingListPanel from "./ShoppingListPanel";
 import NutrientSummaryPanel from "./NutrientSummaryPanel";
 import RecipeViewModal from "./RecipeViewModal";
+import AutofillSettingsModal, { loadAutofillSettings } from "./AutofillSettingsModal";
 import * as api from "../services/api";
 
 // Get the Monday of the week containing `date`
@@ -36,6 +37,8 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
   const [showShopping, setShowShopping] = useState(false);
   const [showNutrients, setShowNutrients] = useState(false);
   const [recipeView, setRecipeView] = useState(null);
+  const [showAutofillSettings, setShowAutofillSettings] = useState(false);
+  const [autofilling, setAutofilling] = useState(false);
 
   // Week offset from current week (0 = this week, -1 = last week, +1 = next week)
   const [weekOffset, setWeekOffset] = useState(0);
@@ -113,6 +116,25 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
       console.error("Failed to remove dish:", err);
     }
   }, [userId, reloadPlan]);
+
+  const handleAutofill = useCallback(async () => {
+    setAutofilling(true);
+    try {
+      const raw = loadAutofillSettings();
+      const settings = {
+        maxDishesPerSlot: raw.maxDishesPerSlot || 2,
+        maxCalories: raw.maxCalories ? parseFloat(raw.maxCalories) : null,
+        maxCarbs: raw.maxCarbs ? parseFloat(raw.maxCarbs) : null,
+        maxFat: raw.maxFat ? parseFloat(raw.maxFat) : null,
+      };
+      await api.autofillPlan(userId, weekStart, settings);
+      reloadPlan();
+    } catch (err) {
+      console.error("Auto-fill failed:", err);
+    } finally {
+      setAutofilling(false);
+    }
+  }, [userId, weekStart, reloadPlan]);
 
   const totalPlanned = (() => {
     let c = 0;
@@ -215,6 +237,14 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
           <button onClick={() => setShowShopping(true)}
             style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.navy, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             🛒 Shopping List
+          </button>
+          <button onClick={handleAutofill} disabled={autofilling}
+            style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: autofilling ? "wait" : "pointer", opacity: autofilling ? 0.7 : 1 }}>
+            {autofilling ? "Filling…" : "✨ Auto-fill"}
+          </button>
+          <button onClick={() => setShowAutofillSettings(true)}
+            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+            ⚙ Auto-fill Settings
           </button>
           <span style={{ fontSize: 12, color: COLORS.gray, display: "flex", alignItems: "center", marginLeft: 8 }}>
             {totalPlanned} dish{totalPlanned !== 1 ? "es" : ""} planned
@@ -352,6 +382,7 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
       {showShopping && <ShoppingListPanel userId={userId} weekStart={weekStart} mealPlan={mealPlan} weekDates={weekDates} isSlotLocked={isSlotLocked} onClose={() => setShowShopping(false)} />}
       {showNutrients && <NutrientSummaryPanel userId={userId} weekStart={weekStart} onClose={() => setShowNutrients(false)} />}
       {recipeView && <RecipeViewModal entry={recipeView} onClose={() => setRecipeView(null)} />}
+      {showAutofillSettings && <AutofillSettingsModal onClose={() => setShowAutofillSettings(false)} />}
     </div>
   );
 }

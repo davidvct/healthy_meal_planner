@@ -29,6 +29,18 @@ class AddMealPlanBody(BaseModel):
     weekStart: str | None = None
 
 
+class AutofillSettings(BaseModel):
+    maxDishesPerSlot: int = 2
+    maxCalories: float | None = None
+    maxCarbs: float | None = None
+    maxFat: float | None = None
+
+
+class AutofillBody(BaseModel):
+    weekStart: str | None = None
+    settings: AutofillSettings = Field(default_factory=AutofillSettings)
+
+
 class ToggleShoppingSelectionBody(BaseModel):
     weekStart: str
     dayIndex: int
