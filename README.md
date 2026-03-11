@@ -70,21 +70,70 @@ project/
 └── planning.md                        # Recommendation scoring design
 ```
 
-## Running Locally
+## Local Development
 
-Open **two terminals** from the project root:
+### Prerequisites
 
-### Terminal 1 — Start the Backend
+- [Node.js](https://nodejs.org/) v18+ (for frontend)
+- [uv](https://astral.sh/uv/) (Python package manager for backend)
+- [PostgreSQL 16](https://www.postgresql.org/) (local database)
+
+Install `uv` if not already installed:
 
 ```bash
-cd backend
-npm install
-npm run dev
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-The backend starts on **http://localhost:8080**. On first run, it automatically creates `mealwise.db` and seeds it with all dish, ingredient, and recipe data.
+### Datasets
 
-### Terminal 2 — Start the Frontend
+Seed data is located at:
+
+```
+backend/datasets/
+├── Personalized_Diet_Recommendations.csv   # Main recipe + nutrition dataset
+├── recipes_nlp_tagged.csv                  # NLP-tagged recipe data
+├── SCHEMA CS5224.txt                        # Database schema reference
+└── Sample meal-plan-output.txt             # Sample output reference
+```
+
+The backend auto-seeds the database on first run from these files.
+
+### Step 1 — Start PostgreSQL
+
+```bash
+brew services start postgresql@16
+```
+
+Create the local database if it doesn't exist yet:
+
+```bash
+/opt/homebrew/opt/postgresql@16/bin/createdb mealwise
+```
+
+### Step 2 — Configure Environment
+
+Create a `.env` file in the project root:
+
+```
+DATABASE_URL=postgresql://<your-mac-username>@localhost:5432/mealwise
+```
+
+Replace `<your-mac-username>` with your macOS username (e.g. `davidthien`).
+
+For Cloud SQL (production), the URL is in `database_url.txt`.
+
+### Step 3 — Start the Backend
+
+From the project root, load the `.env` and start the FastAPI server:
+
+```bash
+set -a && source .env && set +a
+uv run uvicorn backend.main:app --reload
+```
+
+The backend starts on **http://localhost:8000**. On first run it auto-migrates the schema and seeds recipes from the datasets.
+
+### Step 4 — Start the Frontend
 
 ```bash
 cd frontend
@@ -92,11 +141,11 @@ npm install
 npm run dev
 ```
 
-The frontend starts on **http://localhost:3000**. Vite's dev server automatically proxies all `/api/*` requests to the backend at `localhost:8080`.
+The frontend starts on **http://localhost:5173**. Vite proxies all `/api/*` requests to the backend.
 
 ### Open the App
 
-Visit **http://localhost:3000** in your browser.
+Visit **http://localhost:5173** in your browser.
 
 ## API Endpoints
 
