@@ -135,6 +135,79 @@ Visit **http://localhost:3000** in your browser.
 | `GET` | `/api/users/:id` | Get user profile |
 | `DELETE` | `/api/users/:id` | Delete user and their meal plans |
 | `GET` | `/api/health` | Backend health check |
+| `GET` | `/api/thresholds/nutrients` | List all available nutrients (from DB) with RDA defaults |
+| `GET` | `/api/thresholds/:userId` | Get saved nutrient thresholds for a user |
+| `PUT` | `/api/thresholds/:userId` | Save/replace nutrient thresholds for a user |
+
+### Nutrient Thresholds API
+
+Users can set per-day or per-meal nutrient limits. Other services can retrieve these thresholds to enforce dietary constraints.
+
+#### `GET /api/thresholds/nutrients`
+
+Returns the list of all nutrient types available in the database, with their display labels, units, and default RDA values.
+
+```json
+[
+  { "key": "calories", "label": "Calories", "unit": "kcal", "defaultDaily": 2000 },
+  { "key": "protein", "label": "Protein", "unit": "g", "defaultDaily": 50 },
+  { "key": "carbs", "label": "Carbs", "unit": "g", "defaultDaily": 275 },
+  { "key": "iron", "label": "Iron", "unit": "mg", "defaultDaily": 18 }
+]
+```
+
+#### `GET /api/thresholds/:userId`
+
+Returns the saved thresholds for a specific user. If no thresholds have been saved, returns an empty array `[]`.
+
+```json
+[
+  { "nutrientKey": "calories", "dailyValue": 2000, "perMealValue": 667 },
+  { "nutrientKey": "protein", "dailyValue": 50, "perMealValue": 17 },
+  { "nutrientKey": "carbs", "dailyValue": 275, "perMealValue": 92 }
+]
+```
+
+#### `PUT /api/thresholds/:userId`
+
+Saves (replaces) all nutrient thresholds for a user. Send the full list each time.
+
+**Request body:**
+
+```json
+{
+  "thresholds": [
+    { "nutrientKey": "calories", "dailyValue": 1800, "perMealValue": 600 },
+    { "nutrientKey": "protein", "dailyValue": 60, "perMealValue": 20 },
+    { "nutrientKey": "sodium", "dailyValue": 2000, "perMealValue": null }
+  ]
+}
+```
+
+**Response:** Returns the saved thresholds (same format as GET).
+
+#### Usage from other services
+
+To retrieve a user's thresholds from another backend service:
+
+```python
+from backend.db import get_db
+
+def get_user_thresholds(user_id: str, conn) -> dict:
+    """Returns {nutrient_key: {daily: float|None, per_meal: float|None}}"""
+    rows = conn.execute(
+        "SELECT nutrient_key, daily_value, per_meal_value "
+        "FROM nutrient_thresholds WHERE user_id = ?",
+        (user_id,),
+    ).fetchall()
+    return {
+        r["nutrient_key"]: {
+            "daily": r["daily_value"],
+            "per_meal": r["per_meal_value"],
+        }
+        for r in rows
+    }
+```
 
 ## Tech Stack
 

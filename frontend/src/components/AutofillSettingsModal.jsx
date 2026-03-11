@@ -17,12 +17,15 @@ function saveAutofillSettings(settings) {
 
 export default function AutofillSettingsModal({ onClose }) {
   const [settings, setSettings] = useState(loadAutofillSettings);
+  const [savedSettings, setSavedSettings] = useState(loadAutofillSettings);
+
+  const hasChanges = JSON.stringify(settings) !== JSON.stringify(savedSettings);
 
   const update = (key, value) => setSettings((s) => ({ ...s, [key]: value }));
 
   const handleSave = () => {
     saveAutofillSettings(settings);
-    onClose();
+    setSavedSettings({ ...settings });
   };
 
   const fieldStyle = {
@@ -67,9 +70,26 @@ export default function AutofillSettingsModal({ onClose }) {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 style={{ margin: "0 0 20px", color: COLORS.navy, fontSize: 18 }}>
-          Auto-fill Settings
-        </h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <h3 style={{ margin: 0, color: COLORS.navy, fontSize: 18 }}>
+            Auto-fill Settings
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 20,
+              color: COLORS.gray,
+              cursor: "pointer",
+              padding: "0 4px",
+              lineHeight: 1,
+            }}
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
 
         <div style={{ marginBottom: 16 }}>
           <label style={labelStyle}>Max dishes per meal</label>
@@ -125,16 +145,17 @@ export default function AutofillSettingsModal({ onClose }) {
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button
             onClick={handleSave}
+            disabled={!hasChanges}
             style={{
               flex: 1,
               padding: "12px",
               borderRadius: 12,
               border: "none",
-              background: COLORS.accent,
-              color: "#fff",
+              background: hasChanges ? COLORS.accent : COLORS.grayLight,
+              color: hasChanges ? "#fff" : COLORS.gray,
               fontWeight: 700,
               fontSize: 14,
-              cursor: "pointer",
+              cursor: hasChanges ? "pointer" : "default",
             }}
           >
             Save
