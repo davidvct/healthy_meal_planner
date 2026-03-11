@@ -1,6 +1,5 @@
 ﻿from typing import Any
 import hashlib
-import os
 import re
 import secrets
 import smtplib
@@ -10,6 +9,7 @@ from email.message import EmailMessage
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from ..config import get_int_setting, get_setting
 from ..db import get_db
 from ..security import create_access_token
 from ..schemas import LoginBody, RegisterBody, RequestOtpBody, VerifyOtpBody
@@ -55,11 +55,11 @@ def _validate_password_complexity(password: str) -> None:
 
 
 def _send_otp_email(email: str, otp_code: str) -> str:
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    smtp_from = os.getenv("SMTP_FROM", smtp_user or "no-reply@mealwise.local")
+    smtp_host = get_setting("SMTP_HOST")
+    smtp_port = get_int_setting("SMTP_PORT", 587)
+    smtp_user = get_setting("SMTP_USER")
+    smtp_password = get_setting("SMTP_PASSWORD")
+    smtp_from = get_setting("SMTP_FROM", smtp_user or "no-reply@mealwise.local")
 
     if not smtp_host or not smtp_user or not smtp_password:
         print(f"[auth] OTP for {email}: {otp_code}")

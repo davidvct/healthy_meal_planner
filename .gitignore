@@ -1,13 +1,18 @@
+# Frontend build artifacts
 node_modules/
 dist/
+
+# Python artifacts
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data
 *.db
 *.db-shm
 *.db-wal
-.claude/
-.vscode/
 archive/
-
-*.pyc
 
 # Local environment / secrets
 .env
@@ -15,6 +20,6 @@ archive/
 !.env.example
 .python.env
 
-# Local virtual environment
-.venv/
-venv/
+# Editor / agent folders
+.claude/
+.vscode/

@@ -4,14 +4,15 @@ import base64
 import hashlib
 import hmac
 import json
-import os
 import time
 from typing import Any
+
+from .config import get_int_setting, get_setting
 
 
 JWT_ALG = "HS256"
 JWT_TYP = "JWT"
-JWT_EXP_MINUTES = int(os.getenv("JWT_EXP_MINUTES", "1440"))
+JWT_EXP_MINUTES = get_int_setting("JWT_EXP_MINUTES", 1440)
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -24,7 +25,7 @@ def _b64url_decode(data: str) -> bytes:
 
 
 def _secret() -> bytes:
-    secret = os.getenv("JWT_SECRET", "dev-change-this-secret")
+    secret = get_setting("JWT_SECRET", "dev-change-this-secret") or "dev-change-this-secret"
     return secret.encode("utf-8")
 
 

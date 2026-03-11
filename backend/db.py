@@ -1,12 +1,12 @@
 ﻿from __future__ import annotations
 
 import json
-import os
 from typing import Any, Iterator
 
+from .config import get_setting
 from .data import load_seed_data
 
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+DATABASE_URL = get_setting("DATABASE_URL", "") or ""
 
 
 class DBConnection:
