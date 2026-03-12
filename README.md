@@ -116,6 +116,83 @@ Visit **http://localhost:3000** in your browser.
 | `DELETE` | `/api/users/:id` | Delete user and their meal plans |
 | `GET` | `/api/health` | Backend health check |
 
+## Testing the API
+
+You can test the FastAPI backend locally with Postman instead of using the solver CLI.
+
+### 1. Start the backend
+
+From the project root:
+
+```bash
+.venv/bin/uvicorn backend.main:app --reload
+```
+
+The API will be available at **http://127.0.0.1:8000**.
+
+### 2. Get a JWT token
+
+Most `/api/*` routes require a bearer token. First call the login endpoint:
+
+- Method: `POST`
+- URL: `http://127.0.0.1:8000/api/auth/login`
+- Header: `Content-Type: application/json`
+- Body:
+
+```json
+{
+  "email": "your-email@example.com",
+  "password": "YourPassword123!"
+}
+```
+
+Copy the `token` value from the response.
+
+### 3. Call the meal plan generator
+
+- Method: `POST`
+- URL: `http://127.0.0.1:8000/api/mealplan/{user_id}/generate`
+- Headers:
+
+```text
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+```
+
+- Example URL:
+
+```text
+http://127.0.0.1:8000/api/mealplan/5e4e9c29-99bd-4fc2-8232-0ebdf44345b8/generate
+```
+
+- Body:
+
+```json
+{
+  "weekStart": "2026-03-09",
+  "days": 3,
+  "maxSolutions": 1
+}
+```
+
+### 4. Expected response
+
+The endpoint writes the generated plan into the `meal_plans` table for the given `user_id` and `weekStart`, then returns JSON with the saved rows plus solver debug information.
+
+Response fields include:
+
+- `saved_meal_plans_rows`
+- `selected_plan`
+- `targets`
+- `profile`
+
+### 5. Health check
+
+To confirm the backend is up:
+
+- Method: `GET`
+- URL: `http://127.0.0.1:8000/api/health`
+
 ## Tech Stack
 
 | Layer | Technology | Purpose |

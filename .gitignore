@@ -23,3 +23,6 @@ archive/
 # Editor / agent folders
 .claude/
 .vscode/
+
+# OS files
+.DS_Store
