@@ -7,6 +7,7 @@ from ..constants import CONDITION_RULES, NUTRIENT_KEYS, RDA
 from ..data import recommend_targets
 from ..db import get_db
 from ..schemas import AddMealPlanBody, AutofillBody
+from ..security import require_paid_tier
 from ..services.nutrient_calculator import (
     get_day_nutrients,
     get_dish_nutrients,
@@ -277,6 +278,7 @@ def _is_slot_locked(week_start: str, day_index: int, meal_type: str) -> bool:
 def autofill_plan(
     user_id: str,
     body: AutofillBody,
+    _: str = Depends(require_paid_tier),
     conn: Any = Depends(get_db),
 ) -> dict:
     ws = body.weekStart or get_current_week_start()

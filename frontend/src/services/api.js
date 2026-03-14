@@ -67,6 +67,13 @@ export async function getDiners(caretakerId) {
   return request(`/caretakers/${caretakerId}/diners`);
 }
 
+export async function updateTier(caretakerId, tier) {
+  return request(`/caretakers/${caretakerId}/tier`, {
+    method: "PUT",
+    body: JSON.stringify({ tier }),
+  });
+}
+
 // ---- Users (Diners) ----
 
 export async function createOrUpdateProfile({ userId, name, age, sex, weightKg, caretakerId, conditions, diet, allergies }) {

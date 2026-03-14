@@ -2,10 +2,11 @@ from typing import Any
 import json
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from ..constants import NUTRIENT_KEYS
 from ..db import get_db
+from ..security import get_user_tier
 from ..services.nutrient_calculator import (
     get_day_nutrients,
     get_dish_nutrients,
@@ -176,6 +177,7 @@ def get_all_dishes(conn: Any = Depends(get_db)) -> list[dict]:
 @router.get("/recommend/{user_id}")
 def recommend_dishes(
     user_id: str,
+    request: Request,
     day: int = Query(default=0),
     mealType: str = Query(default="lunch"),
     filterMealType: str = Query(default="true"),
@@ -259,7 +261,11 @@ def recommend_dishes(
     scored.sort(key=lambda item: item["score"]["total"], reverse=True)
     day_nutrients = get_day_nutrients(day_entries, ingredient_cache)
 
-    return {"scored": scored, "dayNutrients": day_nutrients}
+    tier = get_user_tier(request)
+    if tier != "paid":
+        scored = scored[:5]
+
+    return {"scored": scored, "dayNutrients": day_nutrients, "tier": tier}
 
 
 @router.get("/{dish_id}")

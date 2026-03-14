@@ -9,6 +9,7 @@ import NutrientSummaryPanel from "./NutrientSummaryPanel";
 import RecipeViewModal from "./RecipeViewModal";
 import AutofillSettingsModal, { loadAutofillSettings } from "./AutofillSettingsModal";
 import ThresholdSettingsModal from "./ThresholdSettingsModal";
+import UpgradePromptModal from "./UpgradePromptModal";
 import * as api from "../services/api";
 
 // Get the Monday of the week containing `date`
@@ -26,7 +27,7 @@ const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 // Meal cutoff hours: breakfast 10am, lunch 2pm, dinner 8pm
 const MEAL_CUTOFF = { breakfast: 10, lunch: 14, dinner: 20 };
 
-export default function CalendarScreen({ userProfile, userId, diners, onSwitchDiner, onEditProfile, onBackToDashboard, onLogout }) {
+export default function CalendarScreen({ userProfile, userId, diners, userTier, caretakerId, onSwitchDiner, onEditProfile, onBackToDashboard }) {
   const [showDinerDropdown, setShowDinerDropdown] = useState(false);
   const [mealPlan, setMealPlan] = useState(() => {
     const plan = {};
@@ -41,6 +42,7 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
   const [showAutofillSettings, setShowAutofillSettings] = useState(false);
   const [showThresholds, setShowThresholds] = useState(false);
   const [autofilling, setAutofilling] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState(null);
 
   // Week offset from current week (0 = this week, -1 = last week, +1 = next week)
   const [weekOffset, setWeekOffset] = useState(0);
@@ -193,21 +195,6 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
               style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               ⚙ Edit
             </button>
-            <button
-              onClick={onLogout}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: `1px solid ${COLORS.warn}`,
-                background: "#fff",
-                color: COLORS.warn,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Logout
-            </button>
           </div>
         </div>
 
@@ -240,17 +227,17 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
             style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.navy, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             🛒 Shopping List
           </button>
-          <button onClick={handleAutofill} disabled={autofilling}
-            style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: autofilling ? "wait" : "pointer", opacity: autofilling ? 0.7 : 1 }}>
-            {autofilling ? "Filling…" : "✨ Auto-fill"}
+          <button onClick={userTier === "paid" ? handleAutofill : () => setUpgradeFeature("Auto-fill")} disabled={autofilling}
+            style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: autofilling ? "wait" : "pointer", opacity: userTier !== "paid" ? 0.6 : autofilling ? 0.7 : 1 }}>
+            {userTier !== "paid" && "\uD83D\uDD12 "}{autofilling ? "Filling\u2026" : "Auto-fill"}
           </button>
-          <button onClick={() => setShowAutofillSettings(true)}
-            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            ⚙ Auto-fill Settings
+          <button onClick={userTier === "paid" ? () => setShowAutofillSettings(true) : () => setUpgradeFeature("Auto-fill Settings")}
+            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: userTier !== "paid" ? 0.6 : 1 }}>
+            {userTier !== "paid" ? "\uD83D\uDD12" : "\u2699"} Auto-fill Settings
           </button>
-          <button onClick={() => setShowThresholds(true)}
-            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.navy, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            🎯 Threshold
+          <button onClick={userTier === "paid" ? () => setShowThresholds(true) : () => setUpgradeFeature("Nutrient Thresholds")}
+            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.navy, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: userTier !== "paid" ? 0.6 : 1 }}>
+            {userTier !== "paid" ? "\uD83D\uDD12" : "\uD83C\uDFAF"} Threshold
           </button>
           <span style={{ fontSize: 12, color: COLORS.gray, display: "flex", alignItems: "center", marginLeft: 8 }}>
             {totalPlanned} dish{totalPlanned !== 1 ? "es" : ""} planned
@@ -381,6 +368,7 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
           userProfile={userProfile}
           userId={userId}
           weekStart={weekStart}
+          userTier={userTier}
           onAdd={handleAdd}
           onClose={() => setAddModal(null)}
         />
@@ -390,6 +378,8 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
       {recipeView && <RecipeViewModal entry={recipeView} onClose={() => setRecipeView(null)} />}
       {showAutofillSettings && <AutofillSettingsModal onClose={() => setShowAutofillSettings(false)} />}
       {showThresholds && <ThresholdSettingsModal userId={userId} onClose={() => setShowThresholds(false)} />}
+      {upgradeFeature && <UpgradePromptModal featureName={upgradeFeature} onClose={() => setUpgradeFeature(null)} />}
+
     </div>
   );
 }

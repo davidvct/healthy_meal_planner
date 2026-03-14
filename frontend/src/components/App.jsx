@@ -35,6 +35,7 @@ export default function App() {
   const [editingDiner, setEditingDiner] = useState(null); // diner being edited, or null for new
   const [view, setView] = useState(caretaker ? VIEWS.DASHBOARD : VIEWS.SETUP);
   const [diners, setDiners] = useState([]);
+  const [userTier, setUserTier] = useState("free");
 
   // Persist caretaker to localStorage
   useEffect(() => {
@@ -66,6 +67,7 @@ export default function App() {
         const ct = await api.getCaretakerByAuth(authUser.authUserId);
         if (cancelled) return;
         setCaretaker(ct);
+        setUserTier(ct.tier || "free");
         setView(VIEWS.DASHBOARD);
       } catch (err) {
         if (cancelled) return;
@@ -195,30 +197,77 @@ export default function App() {
     );
   }
 
+  const handleTierToggle = async () => {
+    const newTier = userTier === "paid" ? "free" : "paid";
+    try {
+      await api.updateTier(caretaker.caretakerId, newTier);
+      setUserTier(newTier);
+    } catch (err) {
+      console.error("Failed to toggle tier:", err);
+    }
+  };
+
+  const globalTopBar = (
+    <div style={{
+      display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8,
+      padding: "10px 20px", background: "#fff", borderBottom: "1px solid #e8e8e8",
+      position: "sticky", top: 0, zIndex: 200,
+    }}>
+      <button
+        onClick={handleTierToggle}
+        style={{
+          padding: "6px 12px",
+          borderRadius: 8,
+          border: `1px solid ${userTier === "paid" ? "#22c55e" : "#6C63FF"}`,
+          background: "#fff",
+          color: userTier === "paid" ? "#22c55e" : "#6C63FF",
+          fontSize: 11,
+          fontWeight: 700,
+          cursor: "pointer",
+        }}
+      >
+        {userTier === "paid" ? "Paid Plan" : "Free Plan"} (Demo Toggle)
+      </button>
+      <button
+        onClick={handleLogout}
+        style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #e0e0e0", background: "#fff", color: "#888", fontSize: 13, cursor: "pointer" }}
+      >
+        Logout
+      </button>
+    </div>
+  );
+
   if (view === VIEWS.DASHBOARD) {
     if (!caretaker) return null;
     return (
-      <DinerDashboard
-        caretakerId={caretaker.caretakerId}
-        caretakerName={caretaker.name}
-        onSelectDiner={handleSelectDiner}
-        onAddDiner={handleAddDiner}
-        onLogout={handleLogout}
-      />
+      <>
+        {globalTopBar}
+        <DinerDashboard
+          caretakerId={caretaker.caretakerId}
+          caretakerName={caretaker.name}
+          userTier={userTier}
+          onSelectDiner={handleSelectDiner}
+          onAddDiner={handleAddDiner}
+        />
+      </>
     );
   }
 
   if (view === VIEWS.CALENDAR && activeDiner) {
     return (
-      <CalendarScreen
-        userProfile={activeDiner}
-        userId={activeDiner.userId}
-        diners={diners}
-        onSwitchDiner={handleSwitchDiner}
-        onEditProfile={() => handleEditDiner(activeDiner)}
-        onBackToDashboard={handleBackToDashboard}
-        onLogout={handleLogout}
-      />
+      <>
+        {globalTopBar}
+        <CalendarScreen
+          userProfile={activeDiner}
+          userId={activeDiner.userId}
+          diners={diners}
+          userTier={userTier}
+          caretakerId={caretaker.caretakerId}
+          onSwitchDiner={handleSwitchDiner}
+          onEditProfile={() => handleEditDiner(activeDiner)}
+          onBackToDashboard={handleBackToDashboard}
+        />
+      </>
     );
   }
 

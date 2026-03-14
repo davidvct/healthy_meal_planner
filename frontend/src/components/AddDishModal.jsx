@@ -7,10 +7,11 @@ import DishCard from "./DishCard";
 import DishDetail from "./DishDetail";
 import * as api from "../services/api";
 
-export default function AddDishModal({ dayIndex, mealType, userProfile, userId, weekStart, onAdd, onClose }) {
+export default function AddDishModal({ dayIndex, mealType, userProfile, userId, weekStart, userTier, onAdd, onClose }) {
   const [search, setSearch] = useState("");
   const [detailDish, setDetailDish] = useState(null);
   const [scored, setScored] = useState([]);
+  const [responseTier, setResponseTier] = useState(null);
   const [dayNutrients, setDayNutrients] = useState(Object.fromEntries(NUTRIENT_KEYS.map(k => [k, 0])));
   const [loading, setLoading] = useState(true);
   const [selectedDishId, setSelectedDishId] = useState(null);
@@ -37,6 +38,7 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
     }).then(data => {
       setScored(data.scored);
       if (data.dayNutrients) setDayNutrients(data.dayNutrients);
+      if (data.tier) setResponseTier(data.tier);
     }).catch(err => {
       console.error("Failed to fetch recommendations:", err);
       setScored([]);
@@ -130,6 +132,15 @@ export default function AddDishModal({ dayIndex, mealType, userProfile, userId, 
         <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.gray, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>
           Recommended for you
         </div>
+
+        {responseTier === "free" && scored.length === 5 && (
+          <div style={{
+            padding: "8px 14px", borderRadius: 10, background: COLORS.accentLight, color: COLORS.accent,
+            fontSize: 12, fontWeight: 600, marginBottom: 12, textAlign: "center",
+          }}>
+            Showing top 5 recommendations. Upgrade to paid plan for unlimited results.
+          </div>
+        )}
 
         {/* Dish list */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>

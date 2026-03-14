@@ -323,6 +323,8 @@ def _migrate_schema(conn: DBConnection) -> None:
     _add_column_if_missing(conn, "shopping_selections", "day_index", "INTEGER NOT NULL DEFAULT 0")
     _add_column_if_missing(conn, "shopping_selections", "meal_type", "TEXT NOT NULL DEFAULT 'lunch'")
 
+    _add_column_if_missing(conn, "caretakers", "subscription_tier", "TEXT NOT NULL DEFAULT 'free'")
+
     if _table_exists(conn, "family_members"):
         fm_user_id_type = _column_type(conn, "family_members", "user_id")
         if fm_user_id_type in {"integer", "bigint", "smallint"}:

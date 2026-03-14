@@ -8,6 +8,8 @@ import os
 import time
 from typing import Any
 
+from fastapi import Depends, HTTPException, Request
+
 
 JWT_ALG = "HS256"
 JWT_TYP = "JWT"
@@ -28,7 +30,7 @@ def _secret() -> bytes:
     return secret.encode("utf-8")
 
 
-def create_access_token(auth_user_id: str, email: str, expires_minutes: int | None = None) -> str:
+def create_access_token(auth_user_id: str, email: str, tier: str = "free", expires_minutes: int | None = None) -> str:
     now = int(time.time())
     exp_delta = (expires_minutes if expires_minutes is not None else JWT_EXP_MINUTES) * 60
 
@@ -36,6 +38,7 @@ def create_access_token(auth_user_id: str, email: str, expires_minutes: int | No
     payload = {
         "sub": auth_user_id,
         "email": email,
+        "tier": tier,
         "iat": now,
         "exp": now + exp_delta,
     }
@@ -82,3 +85,36 @@ def verify_access_token(token: str) -> dict[str, Any]:
         raise ValueError("Token subject missing")
 
     return payload
+
+
+def get_user_tier(request: Request) -> str:
+    """Return the subscription tier for the authenticated user.
+
+    Queries the DB on every call so the tier is never stale.
+    Uses a lazy import to avoid circular dependency with db.py.
+    """
+    auth = getattr(request.state, "auth", None)
+    if not auth:
+        return "free"
+    from .db import _connect  # lazy import
+
+    conn = _connect()
+    try:
+        row = conn.execute(
+            "SELECT subscription_tier FROM caretakers WHERE auth_user_id = ?",
+            (auth["sub"],),
+        ).fetchone()
+        return row["subscription_tier"] if row else "free"
+    finally:
+        conn.close()
+
+
+def require_paid_tier(request: Request) -> str:
+    """FastAPI dependency that raises 403 if the user is on the free tier."""
+    tier = get_user_tier(request)
+    if tier != "paid":
+        raise HTTPException(
+            status_code=403,
+            detail="This feature requires a paid subscription",
+        )
+    return tier

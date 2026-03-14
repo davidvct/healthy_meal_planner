@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from ..data import recommend_targets
 from ..db import get_db
 from ..schemas import UserProfileBody
+from ..security import get_user_tier
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -128,6 +129,17 @@ def create_or_update_profile(
                 ),
             )
         else:
+            tier = get_user_tier(request)
+            if tier != "paid":
+                count_row = conn.execute(
+                    "SELECT COUNT(*) AS c FROM family_members WHERE caretaker_id = ?",
+                    (body.caretakerId,),
+                ).fetchone()
+                if count_row and int(count_row["c"]) >= 1:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Free plan allows 1 diner only. Upgrade to add more.",
+                    )
             order_row = conn.execute(
                 "SELECT COALESCE(MAX(sort_order), 0) AS m FROM family_members WHERE user_id = ?",
                 (auth_user_id,),

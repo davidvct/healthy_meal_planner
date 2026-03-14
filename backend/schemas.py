@@ -75,3 +75,7 @@ class NutrientThresholdItem(BaseModel):
 
 class SaveThresholdsBody(BaseModel):
     thresholds: list[NutrientThresholdItem]
+
+
+class UpdateTierBody(BaseModel):
+    tier: str = Field(pattern=r"^(free|paid)$")

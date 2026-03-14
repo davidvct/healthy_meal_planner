@@ -216,10 +216,17 @@ def login(body: LoginBody, conn: Any = Depends(get_db)) -> dict:
     if row["password_hash"] != password_hash:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = create_access_token(auth_user_id=row["id"], email=row["email"])
+    ct_row = conn.execute(
+        "SELECT subscription_tier FROM caretakers WHERE auth_user_id = ?",
+        (row["id"],),
+    ).fetchone()
+    tier = ct_row["subscription_tier"] if ct_row else "free"
+
+    token = create_access_token(auth_user_id=row["id"], email=row["email"], tier=tier)
     return {
         "success": True,
         "token": token,
+        "tier": tier,
         "user": {
             "authUserId": row["id"],
             "email": row["email"],

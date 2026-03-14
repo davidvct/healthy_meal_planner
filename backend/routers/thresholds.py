@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from ..constants import NUTRIENT_COLUMNS, NUTRIENT_COL_TO_KEY, RDA
 from ..db import get_db
 from ..schemas import SaveThresholdsBody
+from ..security import require_paid_tier
 
 router = APIRouter(prefix="/thresholds", tags=["thresholds"])
 
@@ -55,7 +56,7 @@ def get_thresholds(user_id: str, conn: Any = Depends(get_db)) -> list[dict]:
 
 @router.put("/{user_id}")
 def save_thresholds(
-    user_id: str, body: SaveThresholdsBody, conn: Any = Depends(get_db)
+    user_id: str, body: SaveThresholdsBody, _: str = Depends(require_paid_tier), conn: Any = Depends(get_db)
 ) -> list[dict]:
     conn.execute("DELETE FROM nutrient_thresholds WHERE user_id = ?", (user_id,))
     for item in body.thresholds:
