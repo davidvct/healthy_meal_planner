@@ -108,7 +108,7 @@ def _init_schema(conn: DBConnection) -> None:
           name TEXT NOT NULL,
           prep_time INTEGER NOT NULL,
           cook_time INTEGER NOT NULL,
-          steps TEXT NOT NULL
+          steps TEXT 
         );
 
         CREATE TABLE IF NOT EXISTS caretakers (
