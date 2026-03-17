@@ -5,9 +5,8 @@ from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
-
-from .db import init_db
-from .routers import (
+from src.db import init_db
+from src.routers import (
     auth,
     caretakers,
     dishes,
@@ -17,7 +16,7 @@ from .routers import (
     thresholds,
     users,
 )
-from .security import verify_access_token
+from src.security import verify_access_token
 
 
 @asynccontextmanager

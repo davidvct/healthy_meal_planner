@@ -1,10 +1,9 @@
 [project]
-name = "healthy-meal-planner"
+name = "mealvitals"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [    "fastapi>=0.133.0",
+dependencies = [
+    "fastapi>=0.133.0",
     "ortools",
     "psycopg[binary]>=3.2.3",
     "pydantic-settings>=2.13.1",

@@ -3,5 +3,17 @@ services:
     build: .
     ports:
       - "80:80"
-    env_file:
-      - application.properties
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./example/example.db
+
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://postgres:Password123!@/meal_planner?host=/cloudsql/cs5224-project-489002:asia-southeast1:meal-planner
+    volumes:
+      - backend-data:/app/data
+
+volumes:
+  backend-data:
