@@ -2,12 +2,10 @@ import { useState, useEffect } from 'react';
 import * as api from '../services/api';
 
 const MEAL_STYLES = {
-  breakfast: { border: '#D97706', iconBg: '#FEF3C7', labelColor: '#D97706', emoji: '🥣' },
-  lunch:     { border: '#059669', iconBg: '#D1FAE5', labelColor: '#059669', emoji: '🍽️' },
-  dinner:    { border: '#069B8E', iconBg: '#E8F8F6', labelColor: '#069B8E', emoji: '🌙' },
+  breakfast: { thumbCls: 'fv-b', pillColor: '#D97706', label: 'Breakfast', emoji: '🥣' },
+  lunch:     { thumbCls: 'fv-l', pillColor: '#059669', label: 'Lunch',     emoji: '🍽️' },
+  dinner:    { thumbCls: 'fv-d', pillColor: '#069B8E', label: 'Dinner',    emoji: '🌙' },
 };
-
-const MEAL_LABEL = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
 
 const DIETARY_TAG_LABELS = {
   vegetarian:   'Vegetarian',
@@ -44,13 +42,13 @@ function getHealthTags(dishDetail) {
   const tags = [];
 
   const LABELS = {
-    diabetes:     { safe: 'Diabetes-safe', watch: 'Watch sugar',       alert: 'High sugar' },
-    hypertension: { safe: 'Low sodium',    watch: 'Watch sodium',      alert: 'High sodium' },
+    diabetes:     { safe: 'Diabetes-safe', watch: 'Watch sugar',         alert: 'High sugar' },
+    hypertension: { safe: 'Low sodium',    watch: 'Watch sodium',        alert: 'High sodium' },
     cholesterol:  { safe: 'Low cholesterol', watch: 'Watch cholesterol', alert: 'High cholesterol' },
   };
 
   const checks = [
-    { val: (dishDetail.diabetes_category   || dishDetail.diabetesCategory   || '').toLowerCase(), map: LABELS.diabetes },
+    { val: (dishDetail.diabetes_category    || dishDetail.diabetesCategory    || '').toLowerCase(), map: LABELS.diabetes },
     { val: (dishDetail.hypertension_category || dishDetail.hypertensionCategory || '').toLowerCase(), map: LABELS.hypertension },
     { val: (dishDetail.cholesterol_category  || dishDetail.cholesterolCategory  || '').toLowerCase(), map: LABELS.cholesterol },
   ];
@@ -61,7 +59,21 @@ function getHealthTags(dishDetail) {
   return tags;
 }
 
-export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail, userId }) {
+function deriveHealthClass(healthTags) {
+  if (healthTags.some(t => t.type === 'alert')) return 'mc-alert';
+  if (healthTags.some(t => t.type === 'watch')) return 'mc-warn';
+  if (healthTags.length > 0) return 'mc-safe';
+  return '';
+}
+
+function tagClass(type) {
+  if (type === 'safe') return 'tg-green';
+  if (type === 'watch') return 'tg-amber';
+  if (type === 'alert') return 'tg-red';
+  return 'tg-muted';
+}
+
+export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail, userId, healthClass: healthClassProp }) {
   const [expanded, setExpanded] = useState(false);
   const [fav, setFav] = useState(false);
 
@@ -80,7 +92,7 @@ export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail
       if (next) await api.addFavourite(userId, dishId);
       else await api.removeFavourite(userId, dishId);
     } catch {
-      setFav(!next); // revert on error
+      setFav(!next);
     }
   };
 
@@ -93,8 +105,17 @@ export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail
   const sodium  = Math.round(entry.sodium  ?? 0);
   const sugar   = Math.round(entry.sugar   ?? 0);
 
-  const healthTags = getHealthTags(dishDetail);
+  const healthTags  = getHealthTags(dishDetail);
   const dietaryTags = getDietaryTags(entry, dishDetail);
+  const healthClass = healthClassProp || deriveHealthClass(healthTags);
+
+  const macroData = [
+    { l: 'Protein', v: `${protein}g` },
+    { l: 'Carbs',   v: `${carbs}g` },
+    { l: 'Fat',     v: `${fat}g` },
+    { l: 'Sodium',  v: `${sodium}mg` },
+    { l: 'Sugar',   v: `${sugar}g` },
+  ];
 
   const ingredientKeys = (() => {
     const fromDetail = dishDetail?.ingredients;
@@ -115,78 +136,75 @@ export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail
   const steps = dishDetail?.recipe?.steps || [];
 
   return (
-    <div className="mc2" style={{ borderLeft: `4px solid ${style.border}` }}>
+    <div className={`mc${healthClass ? ` ${healthClass}` : ''}${expanded ? ' exp' : ''}`}>
 
-      {/* Header */}
-      <div className="mc2-hdr">
-        <div className="mc2-icon" style={{ background: style.iconBg }}>
-          {style.emoji}
-        </div>
+      <div className="mc-zone-wrap">
 
-        <div className="mc2-info">
-          <div className="mc2-meal-type" style={{ color: style.labelColor }}>
-            {MEAL_LABEL[mealType] || mealType}
+        {/* Left zone: thumb + info + actions */}
+        <div className="mc-zone-left">
+          <div className={`mc-thumb ${style.thumbCls}`}>
+            <span className="mc-icon">{style.emoji}</span>
           </div>
-          <div className="mc2-name-row">
-            <div className="mc2-name">{entry.dishName || entry.name || 'Dish'}</div>
-            {kcal > 0 && <span className="mc2-kcal">{kcal} kcal</span>}
-          </div>
-          {(healthTags.length > 0 || dietaryTags.length > 0) && (
-            <div className="mc2-tags">
-              {healthTags.map(t => (
-                <span key={t.label} className={`mc2-tag-${t.type === 'safe' ? 'safe' : t.type === 'watch' ? 'watch' : 'alert'}`}>
-                  {t.label}
-                </span>
-              ))}
-              {dietaryTags.map(label => (
-                <span key={label} className="mc2-tag-diet">{label}</span>
-              ))}
+
+          <div className="mc-info">
+            <div className="mc-pill-c" style={{ color: style.pillColor }}>
+              {style.label}
             </div>
-          )}
-        </div>
-
-        <div className="mc2-actions">
-          <button
-            className="mc2-swap"
-            onClick={e => { e.stopPropagation(); onSwap && onSwap(entry); }}
-            disabled={swapping}
-          >
-            {swapping ? '…' : '⇄ swap'}
-          </button>
-          <button
-            className={`mc2-fav${fav ? ' on' : ''}`}
-            title={fav ? 'Remove from favourites' : 'Add to favourites'}
-            onClick={handleFav}
-          >
-            {fav ? '♥' : '♡'}
-          </button>
-        </div>
-      </div>
-
-      {/* Macros — always visible */}
-      <div className="mc2-macros">
-        {[
-          { label: 'Protein', value: protein, unit: 'g' },
-          { label: 'Carbs',   value: carbs,   unit: 'g' },
-          { label: 'Fat',     value: fat,      unit: 'g' },
-          { label: 'Sodium',  value: sodium,  unit: 'mg' },
-          { label: 'Sugar',   value: sugar,   unit: 'g' },
-        ].map(m => (
-          <div key={m.label} className="mc2-macro">
-            <div className="mc2-macro-val">{m.value}{m.unit}</div>
-            <div className="mc2-macro-lbl">{m.label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+              <div className="mc-name-c">{entry.dishName || entry.name || 'Dish'}</div>
+              {kcal > 0 && <span className="mc-kcal-badge">{kcal} kcal</span>}
+            </div>
+            {(healthTags.length > 0 || dietaryTags.length > 0) && (
+              <div className="mc-tags">
+                {healthTags.map(t => (
+                  <span key={t.label} className={`tag ${tagClass(t.type)}`}>{t.label}</span>
+                ))}
+                {dietaryTags.map(label => (
+                  <span key={label} className="tag tg-teal">{label}</span>
+                ))}
+              </div>
+            )}
           </div>
-        ))}
-      </div>
 
-      {/* Show/hide details toggle */}
-      <div className="mc2-footer" onClick={() => setExpanded(e => !e)}>
-        {expanded ? '− Hide details' : '+ Show details'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <button
+              className="mc-swap-inline"
+              disabled={swapping}
+              onClick={e => { e.stopPropagation(); onSwap && onSwap(entry); }}
+            >
+              {swapping ? '…' : '⇄'} swap
+            </button>
+            <button
+              className={`mc-fav-btn${fav ? ' on' : ''}`}
+              data-tip={fav ? 'Remove from favourites' : 'Add to favourites'}
+              onClick={handleFav}
+            >
+              {fav ? '♥' : '♡'}
+            </button>
+          </div>
+        </div>
+
+        {/* Right zone: macro pills + show details toggle */}
+        <div className="mc-zone-right">
+          <div className="mc-macro-pills">
+            {macroData.map(x => (
+              <div key={x.l} className="mc-macro-pill">
+                <div className="mc-macro-pill-v">{x.v}</div>
+                <div className="mc-macro-pill-l">{x.l}</div>
+              </div>
+            ))}
+          </div>
+          <div className="mc-foot" />
+          <div className="mc-more" onClick={() => setExpanded(e => !e)}>
+            {expanded ? '− Hide details' : '+ Show details'}
+          </div>
+        </div>
+
       </div>
 
       {/* Expanded: ingredients + steps */}
       {expanded && (
-        <div className="mc2-detail">
+        <div className="mc-detail">
           <div>
             <div className="mcd-hd">Ingredients</div>
             {ingredientKeys.length > 0 ? (
@@ -222,9 +240,9 @@ export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail
               </div>
             )}
           </div>
-
         </div>
       )}
+
     </div>
   );
 }

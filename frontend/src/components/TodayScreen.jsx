@@ -135,7 +135,13 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse })
               className="sugg-hcard sugg-hmore"
               onClick={() => onBrowse({ userId, dayIndex, mealType, label: MEAL_LABELS[mealType] })}
             >
-              Browse all →
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: .4 }}>
+                <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3" />
+                <path d="M11 11l2.5 2.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+              </svg>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.3, marginTop: 4 }}>
+                Browse<br />all →
+              </div>
             </div>
           </>
         )}
@@ -177,6 +183,10 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
   const [nutExpanded, setNutExpanded] = useState(true);
   const [recommendedTargets, setRecommendedTargets] = useState(null);
   const [dishDetails, setDishDetails] = useState({});
+  const [repeatBannerDismissed, setRepeatBannerDismissed] = useState(false);
+  const [lastWeekHasMeals, setLastWeekHasMeals] = useState(false);
+  const [prevWeekMealCount, setPrevWeekMealCount] = useState(0);
+  const [copyingPlan, setCopyingPlan] = useState(false);
 
   const monday   = getMonday(addDays(new Date(), weekOffset * 7));
   const weekStart = toWeekStart(monday);
@@ -244,6 +254,54 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
       if (p?.recommendedTargets) setRecommendedTargets(p.recommendedTargets);
     }).catch(() => {});
   }, [userId]);
+
+  // Check if previous week (weekOffset-1) has meals — used by repeat banner and ewc-wrap
+  useEffect(() => {
+    if (!userId) { setLastWeekHasMeals(false); setPrevWeekMealCount(0); return; }
+    const prevMonday = getMonday(addDays(new Date(), (weekOffset - 1) * 7));
+    const prevWeekStart = toWeekStart(prevMonday);
+    api.getMealPlan(userId, prevWeekStart).then(plan => {
+      const allEntries = Object.values(plan || {}).flatMap(day =>
+        Object.values(day).flatMap(entries => Array.isArray(entries) ? entries : [])
+      );
+      setLastWeekHasMeals(allEntries.length > 0);
+      setPrevWeekMealCount(allEntries.length);
+    }).catch(() => { setLastWeekHasMeals(false); setPrevWeekMealCount(0); });
+  }, [userId, weekOffset]);
+
+  const handleCopyPlan = async () => {
+    setCopyingPlan(true);
+    try {
+      const lastMonday = getMonday(addDays(new Date(), (weekOffset - 1) * 7));
+      const lastWeekStart = toWeekStart(lastMonday);
+      const lastPlan = await api.getMealPlan(userId, lastWeekStart);
+      const adds = [];
+      Object.entries(lastPlan || {}).forEach(([dayIdx, meals]) => {
+        Object.entries(meals).forEach(([mealType, entries]) => {
+          (entries || []).forEach(entry => {
+            if (entry.dishId) {
+              adds.push(api.addDishToPlan(userId, {
+                dayIndex: Number(dayIdx),
+                mealType,
+                dishId: entry.dishId,
+                servings: entry.servings || 1,
+                weekStart,
+              }));
+            }
+          });
+        });
+      });
+      await Promise.allSettled(adds);
+      setRepeatBannerDismissed(true);
+      const plan = await loadPlan();
+      if (plan) loadDishDetails(plan);
+      await loadNutrients();
+    } catch (err) {
+      console.error('Failed to copy plan:', err);
+    } finally {
+      setCopyingPlan(false);
+    }
+  };
 
   const handleRemove = async (entry) => {
     try {
@@ -320,6 +378,32 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
       {/* Scrollable body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px 16px', minHeight: 0 }}>
 
+        {/* Repeat last week banner — current week, empty, prev week has meals */}
+        {!repeatBannerDismissed && lastWeekHasMeals && daysWithMeals === 0 && weekOffset === 0 && (
+          <div className="repeat-banner">
+            <div className="rb-ic">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M2.5 7.5C2.5 5 4.5 3 7 3h2M11 2v3H8" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M10.5 5.5C10.5 8 8.5 10 6 10H4M2 11V8h3" stroke="var(--teal)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            <div className="rb-body">
+              <div className="rb-title">Repeat last week's meals?</div>
+              <div className="rb-sub">
+                {prevWeekMealCount > 0
+                  ? `Copy ${prevWeekMealCount} meal${prevWeekMealCount === 1 ? '' : 's'} from last week to this week. You can edit any meal after.`
+                  : 'Copy last week\'s meals to this week. You can edit any meal after.'}
+              </div>
+              <div className="rb-actions">
+                <button className="rb-copy" onClick={handleCopyPlan} disabled={copyingPlan}>
+                  {copyingPlan ? 'Copying…' : 'Copy meals →'}
+                </button>
+                <button className="rb-skip" onClick={() => setRepeatBannerDismissed(true)}>Skip</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Getting started banner */}
         {!bannerDismissed && (
           <div className="today-guide-banner">
@@ -372,40 +456,111 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
                 Loading plan…
               </div>
             )}
-            <div className="meal-cards">
-              {MEAL_TYPES.map(mt => {
-                const entries  = dayMeals[mt] || [];
-                const swapKey  = `${activeDayIndex}-${mt}`;
 
-                if (entries.length > 0) {
-                  return entries.map(entry => (
-                    <MealCard
-                      key={entry.id}
-                      entry={entry}
+            {/* Empty week split card — shown when navigating to a week with no meals */}
+            {!loadingPlan && daysWithMeals === 0 && weekOffset !== 0 && (() => {
+              const prevMonday = getMonday(addDays(new Date(), (weekOffset - 1) * 7));
+              const prevLabel = `${prevMonday.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })} – ${addDays(prevMonday, 6).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}`;
+              const DOT_COLORS = ['#FCD34D', '#6EE7B7', '#93C5FD'];
+              return (
+                <div className="ewc-wrap">
+                  {/* Left: copy last week */}
+                  <div className="ewc-half">
+                    <div className="ewc-badge ewc-badge-teal">
+                      Last week{prevLabel ? ` · ${prevLabel}` : ''}
+                    </div>
+                    <div className="ewc-title">Copy last week's meals</div>
+                    <div className="ewc-desc">
+                      {lastWeekHasMeals ? `${prevWeekMealCount} meal${prevWeekMealCount === 1 ? '' : 's'} planned` : 'No meals last week'}
+                    </div>
+                    <div className="ewc-meals">
+                      {lastWeekHasMeals
+                        ? DOT_COLORS.map((c, i) => (
+                            <div key={i} className="ewc-row">
+                              <div className="ewc-dot" style={{ background: c }} />
+                              <span className="ewc-meal">Meals from last week</span>
+                            </div>
+                          )).slice(0, 1).concat(
+                            prevWeekMealCount > 1
+                              ? [<div key="more" className="ewc-more">+ {prevWeekMealCount - 1} more meals</div>]
+                              : []
+                          )
+                        : <div className="ewc-empty-note">No meals found in the previous week</div>
+                      }
+                    </div>
+                    <button
+                      className="ewc-btn ewc-btn-teal"
+                      disabled={!lastWeekHasMeals || copyingPlan}
+                      onClick={handleCopyPlan}
+                    >
+                      {copyingPlan ? 'Copying…' : lastWeekHasMeals ? `Copy ${prevWeekMealCount} meals →` : 'No meals to copy'}
+                    </button>
+                  </div>
+
+                  <div className="ewc-divider" />
+
+                  {/* Right: plan with AI */}
+                  <div className="ewc-half">
+                    <div className="ewc-badge ewc-badge-navy">AI planner</div>
+                    <div className="ewc-title">Plan the full week for {activeDiner?.name || 'you'}</div>
+                    <div className="ewc-desc">Fills all 7 days with constraint-safe meals</div>
+                    <div className="ewc-meals">
+                      {(activeDiner?.conditions?.length > 0) && (
+                        <div className="ewc-row">
+                          <div className="ewc-dot" style={{ background: '#5DCAA5' }} />
+                          <span className="ewc-meal">Conditions: {activeDiner.conditions.join(', ')}</span>
+                        </div>
+                      )}
+                      <div className="ewc-row">
+                        <div className="ewc-dot" style={{ background: '#5DCAA5' }} />
+                        <span className="ewc-meal">Personalised to your health profile</span>
+                      </div>
+                    </div>
+                    <button className="ewc-btn ewc-btn-navy" disabled>
+                      Plan with AI ✨ <span style={{ fontSize: 9, opacity: .7 }}>(coming soon)</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {!(daysWithMeals === 0 && weekOffset !== 0) && (
+              <div className="meal-cards">
+                {MEAL_TYPES.map(mt => {
+                  const entries  = dayMeals[mt] || [];
+                  const swapKey  = `${activeDayIndex}-${mt}`;
+
+                  if (entries.length > 0) {
+                    return entries.map(entry => (
+                      <MealCard
+                        key={entry.id}
+                        entry={entry}
+                        mealType={mt}
+                        onRemove={handleRemove}
+                        onSwap={e => handleSwap(e, mt)}
+                        onBrowse={() => onBrowse({ userId, dayIndex: activeDayIndex, mealType: mt, label: MEAL_LABELS[mt], weekStart })}
+                        swapping={swappingKey === swapKey}
+                        dishDetail={dishDetails[entry.dishId]}
+                        healthClass={getDishHealthClass(dishDetails[entry.dishId], activeDiner?.conditions)}
+                        userId={userId}
+                      />
+                    ));
+                  }
+
+                  return (
+                    <EmptySlot
+                      key={mt}
                       mealType={mt}
-                      onRemove={handleRemove}
-                      onSwap={e => handleSwap(e, mt)}
-                      swapping={swappingKey === swapKey}
-                      dishDetail={dishDetails[entry.dishId]}
-                      healthClass={getDishHealthClass(dishDetails[entry.dishId], activeDiner?.conditions)}
+                      dayIndex={activeDayIndex}
+                      weekStart={weekStart}
                       userId={userId}
+                      onAdded={() => { loadPlan(); loadNutrients(); }}
+                      onBrowse={onBrowse}
                     />
-                  ));
-                }
-
-                return (
-                  <EmptySlot
-                    key={mt}
-                    mealType={mt}
-                    dayIndex={activeDayIndex}
-                    weekStart={weekStart}
-                    userId={userId}
-                    onAdded={() => { loadPlan(); loadNutrients(); }}
-                    onBrowse={onBrowse}
-                  />
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Nutrition panel column */}
@@ -414,6 +569,8 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
               <NutritionPanel
                 nutrients={dayNutrients}
                 conditions={activeDiner?.conditions}
+                diet={activeDiner?.dietaryPreferences || activeDiner?.diet}
+                dinerName={activeDiner?.name}
                 mealCount={mealCount}
                 recommendedTargets={recommendedTargets}
               />

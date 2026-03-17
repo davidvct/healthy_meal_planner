@@ -234,12 +234,14 @@ def delete_user(user_id: str, conn: Any = Depends(get_db)) -> dict[str, bool]:
         member_pk = _normalize_member_user_id(user_id)
         conn.execute("DELETE FROM shopping_selections WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM meal_plans WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM favourites WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM family_members WHERE id::text = ?", (member_pk,))
         conn.commit()
         return {"success": True}
 
     conn.execute("DELETE FROM shopping_selections WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM meal_plans WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM favourites WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     return {"success": True}

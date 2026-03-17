@@ -2,30 +2,9 @@
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const SLOTS = [
-  {
-    key: 'breakfast', label: 'B',
-    bg:      'linear-gradient(135deg,#FEF3C7,#FDE68A,#FCD34D)',
-    bgEmpty: 'linear-gradient(135deg,rgba(254,243,199,.45),rgba(252,211,77,.18))',
-    icColor: '#D97706',
-    textFilled: '#78350F',
-    textEmpty:  '#B45309',
-  },
-  {
-    key: 'lunch', label: 'L',
-    bg:      'linear-gradient(135deg,#D1FAE5,#A7F3D0,#6EE7B7)',
-    bgEmpty: 'linear-gradient(135deg,rgba(209,250,229,.45),rgba(110,231,183,.18))',
-    icColor: '#059669',
-    textFilled: '#064E3B',
-    textEmpty:  '#047857',
-  },
-  {
-    key: 'dinner', label: 'D',
-    bg:      'linear-gradient(135deg,#DBEAFE,#BFDBFE,#93C5FD)',
-    bgEmpty: 'linear-gradient(135deg,rgba(219,234,254,.45),rgba(147,197,253,.18))',
-    icColor: '#3B82F6',
-    textFilled: '#1E3A8A',
-    textEmpty:  '#1D4ED8',
-  },
+  { key: 'breakfast', label: 'B', cls: 'ds-b' },
+  { key: 'lunch',     label: 'L', cls: 'ds-l' },
+  { key: 'dinner',    label: 'D', cls: 'ds-d' },
 ];
 
 function weekLabel(weekDates) {
@@ -92,17 +71,16 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
               {/* Slot rows */}
               <div className="ds-card-body">
                 {SLOTS.map(sl => {
-                  const entries = dayMeals[sl.key] || [];
-                  const filled = entries.length > 0;
+                  const entries   = dayMeals[sl.key] || [];
+                  const filled    = entries.length > 0;
                   const firstName = filled ? entries[0].dishName : null;
                   return (
                     <div
                       key={sl.key}
-                      className={`ds-slot${filled ? ' ds-filled' : ''}`}
-                      style={{ background: filled ? sl.bg : sl.bgEmpty }}
+                      className={`ds-slot ${sl.cls}${filled ? ' ds-filled' : ''}`}
                     >
-                      <div className="ds-slot-ic" style={{ color: sl.icColor }}>{sl.label}</div>
-                      <div className="ds-slot-name" style={{ color: filled ? sl.textFilled : sl.textEmpty }}>
+                      <div className="ds-slot-ic">{sl.label}</div>
+                      <div className="ds-slot-name">
                         {filled ? shortName(firstName, 12) : 'Not planned'}
                       </div>
                     </div>
