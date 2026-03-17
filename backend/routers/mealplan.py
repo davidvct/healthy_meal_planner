@@ -12,7 +12,7 @@ from ..services.nutrient_calculator import (
     get_week_nutrients,
     load_ingredient_cache,
 )
-from ..utils import get_current_week_start, parse_ingredients_map, parse_json
+from ..utils import get_current_week_start, parse_float, parse_ingredients_map, parse_json
 
 router = APIRouter(prefix="/mealplan", tags=["mealplan"])
 
@@ -93,7 +93,10 @@ def get_meal_plan(
 
     rows = conn.execute(
         """
-        SELECT mp.*, r.id AS recipe_id, r.name AS recipe_name, r.ingredients AS recipe_ingredients, r.category, r.keywords, r.cuisine
+        SELECT mp.*, r.id AS recipe_id, r.name AS recipe_name, r.ingredients AS recipe_ingredients,
+               r.category, r.keywords, r.cuisine,
+               r.calories, r.protein, r.total_carbs AS carbs, r.fat,
+               r.fiber, r.sodium, r.cholesterol, r.sugar
         FROM meal_plans mp
         JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
         WHERE mp.user_id = ? AND mp.week_start = ?
@@ -119,6 +122,14 @@ def get_meal_plan(
                 "tags": _recipe_tags(row),
                 "mealTypes": _derive_meal_types(row.get("category") or ""),
                 "recipeId": str(row["recipe_id"]),
+                "kcal": parse_float(row.get("calories"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "protein": parse_float(row.get("protein"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "carbs": parse_float(row.get("carbs"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "fat": parse_float(row.get("fat"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "sodium": parse_float(row.get("sodium"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "fiber": parse_float(row.get("fiber"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "cholesterol": parse_float(row.get("cholesterol"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "sugar": parse_float(row.get("sugar"), 0.0) * parse_float(row.get("servings"), 1.0),
             }
         )
 

@@ -70,6 +70,7 @@ def init_db() -> None:
         _init_schema(conn)
         _migrate_schema(conn)
         _seed_from_dataset(conn)
+        _backfill_recipe_nutrients(conn)
         conn.commit()
     finally:
         conn.close()
@@ -573,14 +574,14 @@ def _seed_from_dataset(conn: DBConnection) -> None:
                 "",
                 "",
                 "",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
+                str(r.get("calories") or 0),
+                str(r.get("protein") or 0),
+                str(r.get("fat") or 0),
+                str(r.get("totalCarbs") or 0),
+                str(r.get("fiber") or 0),
+                str(r.get("sugar") or 0),
+                str(r.get("cholesterol") or 0),
+                str(r.get("sodium") or 0),
                 False,
                 False,
                 False,
@@ -599,3 +600,45 @@ def _seed_from_dataset(conn: DBConnection) -> None:
     )
 
     _write_meta(conn, "dataset_version", data_version)
+
+
+def _backfill_recipe_nutrients(conn: DBConnection) -> None:
+    """Update existing recipes that were seeded with 0-value nutrients."""
+    if _read_meta(conn, "nutrients_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE calories IS NULL OR calories = '0' OR calories = ''"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "nutrients_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        numeric_id = recipe_id.removeprefix("r")
+        conn.execute(
+            """
+            UPDATE recipes
+            SET calories = ?, protein = ?, fat = ?, total_carbs = ?,
+                fiber = ?, sugar = ?, cholesterol = ?, sodium = ?
+            WHERE id::text = ?
+            """,
+            (
+                str(r.get("calories") or 0),
+                str(r.get("protein") or 0),
+                str(r.get("fat") or 0),
+                str(r.get("totalCarbs") or 0),
+                str(r.get("fiber") or 0),
+                str(r.get("sugar") or 0),
+                str(r.get("cholesterol") or 0),
+                str(r.get("sodium") or 0),
+                numeric_id,
+            ),
+        )
+
+    _write_meta(conn, "nutrients_backfilled", "1")
