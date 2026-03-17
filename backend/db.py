@@ -71,6 +71,7 @@ def init_db() -> None:
         _migrate_schema(conn)
         _seed_from_dataset(conn)
         _backfill_recipe_nutrients(conn)
+        _backfill_recipe_ingredients(conn)
         conn.commit()
     finally:
         conn.close()
@@ -569,7 +570,7 @@ def _seed_from_dataset(conn: DBConnection) -> None:
                 str(r["cookTime"]),
                 "",
                 "",
-                "",
+                json.dumps(r.get("ingredients") or {}),
                 json.dumps(r["steps"]),
                 "",
                 "",
@@ -642,3 +643,30 @@ def _backfill_recipe_nutrients(conn: DBConnection) -> None:
         )
 
     _write_meta(conn, "nutrients_backfilled", "1")
+
+
+def _backfill_recipe_ingredients(conn: DBConnection) -> None:
+    """Update existing recipes that were seeded with empty ingredients."""
+    if _read_meta(conn, "ingredients_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE ingredients IS NULL OR ingredients = '' OR ingredients = '{}'"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "ingredients_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        numeric_id = recipe_id.removeprefix("r")
+        conn.execute(
+            "UPDATE recipes SET ingredients = ? WHERE id::text = ?",
+            (json.dumps(r.get("ingredients") or {}), numeric_id),
+        )
+
+    _write_meta(conn, "ingredients_backfilled", "1")

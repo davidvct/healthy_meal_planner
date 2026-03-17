@@ -106,36 +106,42 @@ export default function MealCard({ entry, mealType, onRemove, onSwap, swapping, 
             )}
           </div>
 
-          {(ingredientKeys.length > 0 || steps.length > 0) && (
-            <div className="mc-detail">
-              {ingredientKeys.length > 0 && (
-                <div>
-                  <div className="mcd-hd">Ingredients</div>
-                  <div className="ings">
-                    {ingredientKeys.map(k => (
-                      <div key={k} className="ing">
-                        <div className="idot" />
-                        {k}
-                      </div>
-                    ))}
-                  </div>
+          <div className="mc-detail">
+            <div>
+              <div className="mcd-hd">Ingredients</div>
+              {ingredientKeys.length > 0 ? (
+                <div className="ings">
+                  {ingredientKeys.map(k => (
+                    <div key={k} className="ing">
+                      <div className="idot" />
+                      {k}
+                    </div>
+                  ))}
                 </div>
-              )}
-              {steps.length > 0 && (
-                <div>
-                  <div className="mcd-hd">Preparation</div>
-                  <div className="steps">
-                    {steps.slice(0, 5).map((s, i) => (
-                      <div key={i} className="step">
-                        <div className="step-n">{i + 1}</div>
-                        <div className="step-t">{s}</div>
-                      </div>
-                    ))}
-                  </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--text3)', padding: '4px 0' }}>
+                  {dishDetail ? 'No ingredients listed' : 'Loading…'}
                 </div>
               )}
             </div>
-          )}
+            <div>
+              <div className="mcd-hd">Preparation</div>
+              {steps.length > 0 ? (
+                <div className="steps">
+                  {steps.slice(0, 5).map((s, i) => (
+                    <div key={i} className="step">
+                      <div className="step-n">{i + 1}</div>
+                      <div className="step-t">{s}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: 'var(--text3)', padding: '4px 0' }}>
+                  {dishDetail ? 'No preparation steps listed' : 'Loading…'}
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="mc-pmw-bar">
             <button

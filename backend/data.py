@@ -433,6 +433,7 @@ def load_seed_data() -> dict[str, Any]:
                 "prepTime": int(_parse_float(row.get("prep_time"))),
                 "cookTime": int(_parse_float(row.get("cook_time"))),
                 "steps": _parse_steps(row.get("instructions", "")),
+                "ingredients": ingredients,
                 "calories": _parse_float(row.get("calories")),
                 "protein": _parse_float(row.get("protein")),
                 "fat": _parse_float(row.get("fat")),
