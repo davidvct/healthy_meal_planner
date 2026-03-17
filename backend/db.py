@@ -72,6 +72,8 @@ def init_db() -> None:
         _seed_from_dataset(conn)
         _backfill_recipe_nutrients(conn)
         _backfill_recipe_ingredients(conn)
+        _backfill_recipe_diet_flags(conn)
+        _backfill_strip_ingredient_bullets(conn)
         conn.commit()
     finally:
         conn.close()
@@ -498,6 +500,8 @@ def _migrate_schema(conn: DBConnection) -> None:
     _add_column_if_missing(conn, "recipes", "cholesterol_category", "TEXT")
     _add_column_if_missing(conn, "recipes", "is_vegetarian", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_vegan", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(conn, "recipes", "is_gluten_free", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(conn, "recipes", "is_dairy_free", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_low_carb", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_high_protein", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_spicy", "BOOLEAN NOT NULL DEFAULT FALSE")
@@ -670,3 +674,94 @@ def _backfill_recipe_ingredients(conn: DBConnection) -> None:
         )
 
     _write_meta(conn, "ingredients_backfilled", "1")
+
+
+def _backfill_recipe_diet_flags(conn: DBConnection) -> None:
+    """Update boolean diet-flag columns that were seeded as all-False."""
+    if _read_meta(conn, "diet_flags_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE is_vegetarian = FALSE AND is_vegan = FALSE AND is_low_carb = FALSE"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "diet_flags_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    FLAG_KEYS = {"vegetarian", "vegan", "gluten_free", "dairy_free", "low_carb", "high_protein", "spicy", "sweet", "salty"}
+
+    for dish in seed_data["dishes"]:
+        recipe_id = dish.get("recipeId", "")
+        numeric_id = recipe_id.removeprefix("r")
+        if not numeric_id:
+            continue
+        tags = set(dish.get("tags", []))
+        flags = {k: (k in tags) for k in FLAG_KEYS}
+        conn.execute(
+            """
+            UPDATE recipes SET
+                is_vegetarian = ?,
+                is_vegan = ?,
+                is_gluten_free = ?,
+                is_dairy_free = ?,
+                is_low_carb = ?,
+                is_high_protein = ?,
+                is_spicy = ?,
+                is_sweet = ?,
+                is_salty = ?
+            WHERE id::text = ?
+            """,
+            (
+                flags["vegetarian"],
+                flags["vegan"],
+                flags["gluten_free"],
+                flags["dairy_free"],
+                flags["low_carb"],
+                flags["high_protein"],
+                flags["spicy"],
+                flags["sweet"],
+                flags["salty"],
+                numeric_id,
+            ),
+        )
+
+    _write_meta(conn, "diet_flags_backfilled", "1")
+
+
+def _backfill_strip_ingredient_bullets(conn: DBConnection) -> None:
+    """Strip leading bullet-point characters from ingredient JSON keys."""
+    if _read_meta(conn, "ingredient_bullets_stripped"):
+        return
+
+    import re as _re
+    _BULLET_RE = _re.compile(r'^[\-\*\u2022\u00B7\u2023\u25BA\u25AA\u25E6\s]+')
+
+    rows = conn.execute(
+        "SELECT id, ingredients FROM recipes WHERE ingredients IS NOT NULL AND ingredients != '' AND ingredients != '{}'"
+    ).fetchall()
+
+    for row in rows:
+        try:
+            ing = json.loads(row["ingredients"])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(ing, dict):
+            continue
+        if not any(_BULLET_RE.match(k) for k in ing if k):
+            continue
+        cleaned: dict = {}
+        for k, v in ing.items():
+            clean_key = _BULLET_RE.sub("", k).strip()
+            if clean_key:
+                cleaned[clean_key] = cleaned.get(clean_key, 0) + v
+        conn.execute(
+            "UPDATE recipes SET ingredients = ? WHERE id::text = ?",
+            (json.dumps(cleaned), str(row["id"])),
+        )
+
+    _write_meta(conn, "ingredient_bullets_stripped", "1")

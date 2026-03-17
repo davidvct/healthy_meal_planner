@@ -162,7 +162,7 @@ def _parse_ingredients(ingredients_text: str) -> dict[str, float]:
 
     result: dict[str, float] = {}
     for line in raw_lines:
-        item = line.lstrip("-* ").strip()
+        item = re.sub(r'^[\-\*•·‣►▪◦\s]+', '', line).strip()
         if not item:
             continue
 
