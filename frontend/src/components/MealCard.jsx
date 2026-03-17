@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import * as api from '../services/api';
 
 const MEAL_STYLES = {
   breakfast: { border: '#D97706', iconBg: '#FEF3C7', labelColor: '#D97706', emoji: '🥣' },
@@ -60,9 +61,28 @@ function getHealthTags(dishDetail) {
   return tags;
 }
 
-export default function MealCard({ entry, mealType, onRemove, onSwap, swapping, dishDetail }) {
+export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail, userId }) {
   const [expanded, setExpanded] = useState(false);
   const [fav, setFav] = useState(false);
+
+  const dishId = entry.dishId || entry.id;
+
+  useEffect(() => {
+    if (!userId || !dishId) return;
+    api.getFavourites(userId).then(ids => setFav(ids.includes(dishId))).catch(() => {});
+  }, [userId, dishId]);
+
+  const handleFav = async (e) => {
+    e.stopPropagation();
+    const next = !fav;
+    setFav(next);
+    try {
+      if (next) await api.addFavourite(userId, dishId);
+      else await api.removeFavourite(userId, dishId);
+    } catch {
+      setFav(!next); // revert on error
+    }
+  };
 
   const style = MEAL_STYLES[mealType] || MEAL_STYLES.lunch;
 
@@ -135,7 +155,8 @@ export default function MealCard({ entry, mealType, onRemove, onSwap, swapping, 
           </button>
           <button
             className={`mc2-fav${fav ? ' on' : ''}`}
-            onClick={e => { e.stopPropagation(); setFav(v => !v); }}
+            title={fav ? 'Remove from favourites' : 'Add to favourites'}
+            onClick={handleFav}
           >
             {fav ? '♥' : '♡'}
           </button>
@@ -202,14 +223,6 @@ export default function MealCard({ entry, mealType, onRemove, onSwap, swapping, 
             )}
           </div>
 
-          <div className="mc2-remove-bar">
-            <button
-              className="mc2-remove"
-              onClick={e => { e.stopPropagation(); onRemove && onRemove(entry); }}
-            >
-              ✕ Remove
-            </button>
-          </div>
         </div>
       )}
     </div>

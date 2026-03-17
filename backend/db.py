@@ -172,6 +172,14 @@ def _init_schema(conn: DBConnection) -> None:
           entry_order INTEGER NOT NULL DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS favourites (
+          id BIGSERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          dish_id TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(user_id, dish_id)
+        );
+
         CREATE TABLE IF NOT EXISTS shopping_selections (
           id BIGSERIAL PRIMARY KEY,
           user_id TEXT NOT NULL,

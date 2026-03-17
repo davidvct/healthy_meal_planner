@@ -388,6 +388,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
                       swapping={swappingKey === swapKey}
                       dishDetail={dishDetails[entry.dishId]}
                       healthClass={getDishHealthClass(dishDetails[entry.dishId], activeDiner?.conditions)}
+                      userId={userId}
                     />
                   ));
                 }

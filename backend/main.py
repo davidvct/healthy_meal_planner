@@ -7,7 +7,7 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from .db import init_db
-from .routers import auth, caretakers, dishes, health, mealplan, shopping_list, users
+from .routers import auth, caretakers, dishes, favourites, health, mealplan, shopping_list, users
 from .security import verify_access_token
 
 
@@ -53,6 +53,7 @@ async def require_jwt_for_api(request: Request, call_next):
     return await call_next(request)
 
 app.include_router(dishes.router, prefix="/api")
+app.include_router(favourites.router, prefix="/api")
 app.include_router(mealplan.router, prefix="/api")
 app.include_router(shopping_list.router, prefix="/api")
 app.include_router(users.router, prefix="/api")

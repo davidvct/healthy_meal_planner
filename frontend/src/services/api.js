@@ -136,6 +136,20 @@ export async function getDayNutrients(userId, dayIndex, weekStart) {
   return request(`/mealplan/${userId}/nutrients/day/${dayIndex}${params}`);
 }
 
+// ---- Favourites ----
+
+export async function getFavourites(userId) {
+  return request(`/favourites/${userId}`);
+}
+
+export async function addFavourite(userId, dishId) {
+  return request(`/favourites/${userId}/${dishId}`, { method: "POST" });
+}
+
+export async function removeFavourite(userId, dishId) {
+  return request(`/favourites/${userId}/${dishId}`, { method: "DELETE" });
+}
+
 // ---- Shopping List ----
 
 export async function getShoppingList(userId, weekStart) {
