@@ -131,6 +131,14 @@ class SolverConfig:
 
 
 @dataclass(frozen=True)
+class FixedMealAssignment:
+    day_index: int
+    meal_type: str
+    recipe_id: str
+    servings: float = 1.0
+
+
+@dataclass(frozen=True)
 class PlannedRecipe:
     recipe_id: str
     name: str

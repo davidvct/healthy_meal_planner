@@ -7,6 +7,7 @@ from ortools.sat.python import cp_model
 from ..utils import parse_float
 from .inputs import load_solver_inputs_from_db
 from .models import (
+    FixedMealAssignment,
     MAX_RECIPES_PER_MEAL,
     MAX_SERVINGS_PER_RECIPE,
     MEALS,
@@ -69,6 +70,84 @@ def _create_decision_variables(model: Any, candidates: dict[str, list[SolverReci
                 servings[key] = model.NewIntVar(0, MAX_SERVINGS_PER_RECIPE, f"servings_{suffix}")
 
     return x, servings
+
+
+def _normalize_fixed_assignments(
+    fixed_assignments: list[FixedMealAssignment] | tuple[FixedMealAssignment, ...] | None,
+    *,
+    candidates: dict[str, list[SolverRecipe]],
+    num_days: int,
+) -> dict[tuple[int, str], FixedMealAssignment]:
+    normalized: dict[tuple[int, str], FixedMealAssignment] = {}
+    if not fixed_assignments:
+        return normalized
+
+    candidate_ids = {
+        meal: {recipe.recipe_id for recipe in recipes}
+        for meal, recipes in candidates.items()
+    }
+
+    for assignment in fixed_assignments:
+        day_index = int(assignment.day_index)
+        meal_type = str(assignment.meal_type)
+        recipe_id = str(assignment.recipe_id).removeprefix("r")
+        key = (day_index, meal_type)
+
+        if day_index < 0 or day_index >= num_days:
+            raise ValueError(f"Fixed assignment day_index out of range: {day_index}")
+        if meal_type not in MEALS:
+            raise ValueError(f"Unsupported fixed assignment meal_type: {meal_type}")
+        if key in normalized:
+            raise ValueError(f"Duplicate fixed assignment for day {day_index}, meal {meal_type}")
+        if recipe_id not in candidate_ids[meal_type]:
+            raise ValueError(
+                f"Fixed assignment recipe {recipe_id} is not a candidate for day {day_index}, meal {meal_type}"
+            )
+
+        serving_count = int(round(float(assignment.servings)))
+        if serving_count < 0 or serving_count > MAX_SERVINGS_PER_RECIPE:
+            raise ValueError(
+                f"Fixed assignment servings must be between 0 and {MAX_SERVINGS_PER_RECIPE}: {assignment.servings}"
+            )
+
+        normalized[key] = FixedMealAssignment(
+            day_index=day_index,
+            meal_type=meal_type,
+            recipe_id=recipe_id,
+            servings=float(serving_count),
+        )
+
+    return normalized
+
+
+def _apply_fixed_assignments(
+    model: Any,
+    candidates: dict[str, list[SolverRecipe]],
+    x: dict[tuple[int, str, str], Any],
+    servings: dict[tuple[int, str, str], Any],
+    fixed_assignments: dict[tuple[int, str], FixedMealAssignment],
+    config: SolverConfig,
+) -> None:
+    if not fixed_assignments:
+        return
+
+    for day in range(config.num_days):
+        for meal in MEALS:
+            assignment = fixed_assignments.get((day, meal))
+            if assignment is None:
+                continue
+
+            fixed_recipe_id = assignment.recipe_id
+            fixed_servings = int(round(assignment.servings))
+
+            for recipe in candidates[meal]:
+                key = (day, meal, recipe.recipe_id)
+                if recipe.recipe_id == fixed_recipe_id:
+                    model.Add(x[key] == 1)
+                    model.Add(servings[key] == fixed_servings)
+                else:
+                    model.Add(x[key] == 0)
+                    model.Add(servings[key] == 0)
 
 
 def _add_serving_and_meal_count_constraints(
@@ -306,6 +385,7 @@ def solve_meal_plan(
     targets: dict[str, float],
     recipes: list[SolverRecipe],
     config: SolverConfig | None = None,
+    fixed_assignments: list[FixedMealAssignment] | tuple[FixedMealAssignment, ...] | None = None,
 ) -> list[PlanResult]:
     config = config or SolverConfig()
     cp_model = _import_cp_model()
@@ -316,8 +396,21 @@ def solve_meal_plan(
         raise ValueError(f"Missing or invalid solver targets: {missing_targets}")
 
     candidates = build_candidate_pools(recipes)
+    normalized_fixed_assignments = _normalize_fixed_assignments(
+        fixed_assignments,
+        candidates=candidates,
+        num_days=config.num_days,
+    )
     model = cp_model.CpModel()
     x, servings = _create_decision_variables(model, candidates, config.num_days)
+    _apply_fixed_assignments(
+        model,
+        candidates,
+        x,
+        servings,
+        normalized_fixed_assignments,
+        config,
+    )
 
     _add_serving_and_meal_count_constraints(model, candidates, x, servings, config)
     _add_side_dish_limit_constraints(model, candidates, x, config)
@@ -477,6 +570,7 @@ def generate_meal_plan_from_inputs(
     *,
     week_start: str | None = None,
     config: SolverConfig | None = None,
+    fixed_assignments: list[FixedMealAssignment] | tuple[FixedMealAssignment, ...] | None = None,
 ) -> MealGenerationResult:
     # The first plan remains the selected one; additional plans are retained as
     # alternates for inspection/debugging.
@@ -486,6 +580,7 @@ def generate_meal_plan_from_inputs(
             targets=inputs.targets,
             recipes=list(inputs.recipes),
             config=config,
+            fixed_assignments=fixed_assignments,
         )
     )
     selected_plan = plans[0]
@@ -506,9 +601,15 @@ def generate_meal_plan_for_week(
     patient_id: str,
     week_start: str | None = None,
     config: SolverConfig | None = None,
+    fixed_assignments: list[FixedMealAssignment] | tuple[FixedMealAssignment, ...] | None = None,
 ) -> MealGenerationResult:
     inputs = load_solver_inputs_from_db(conn, patient_id)
-    return generate_meal_plan_from_inputs(inputs, week_start=week_start, config=config)
+    return generate_meal_plan_from_inputs(
+        inputs,
+        week_start=week_start,
+        config=config,
+        fixed_assignments=fixed_assignments,
+    )
 
 
 def summarize_plan(result: PlanResult) -> str:
