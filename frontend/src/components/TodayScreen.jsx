@@ -303,7 +303,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
 
       {/* Day strip (includes date header) */}
-      <div style={{ flexShrink: 0, padding: '12px 16px 0' }}>
+      <div style={{ flexShrink: 0, padding: '12px 16px 0 16px' }}>
         <DayStrip
           weekDates={weekDates}
           activeDayIndex={activeDayIndex}
@@ -337,7 +337,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
         )}
 
         {/* "Meals for today" header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+        <div className="today-section-hd">
           <div className="today-section-title">Meals for today</div>
           <div className="meal-progress-bar">
             <div className="mpb-dots">
