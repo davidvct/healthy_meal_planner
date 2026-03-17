@@ -67,6 +67,13 @@ export async function getDiners(caretakerId) {
   return request(`/caretakers/${caretakerId}/diners`);
 }
 
+export async function updateTier(caretakerId, tier) {
+  return request(`/caretakers/${caretakerId}/tier`, {
+    method: "PUT",
+    body: JSON.stringify({ tier }),
+  });
+}
+
 // ---- Users (Diners) ----
 
 export async function createOrUpdateProfile({ userId, name, age, sex, weightKg, caretakerId, conditions, diet, allergies }) {
@@ -122,6 +129,13 @@ export async function addDishToPlan(userId, { dayIndex, mealType, dishId, servin
   });
 }
 
+export async function autofillPlan(userId, weekStart, settings) {
+  return request(`/mealplan/${userId}/autofill`, {
+    method: "POST",
+    body: JSON.stringify({ weekStart, settings }),
+  });
+}
+
 export async function removeDishFromPlan(userId, entryId) {
   return request(`/mealplan/${userId}/remove/${entryId}`, { method: "DELETE" });
 }
@@ -147,5 +161,22 @@ export async function toggleShoppingSelection(userId, weekStart, dayIndex, mealT
   return request(`/shopping-list/${userId}/toggle-selection`, {
     method: "POST",
     body: JSON.stringify({ weekStart, dayIndex, mealType }),
+  });
+}
+
+// ---- Nutrient Thresholds ----
+
+export async function getAvailableNutrients() {
+  return request("/thresholds/nutrients");
+}
+
+export async function getThresholds(userId) {
+  return request(`/thresholds/${userId}`);
+}
+
+export async function saveThresholds(userId, thresholds) {
+  return request(`/thresholds/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify({ thresholds }),
   });
 }

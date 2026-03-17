@@ -126,6 +126,7 @@ The frontend runs at `http://localhost:3000` and proxies `/api/*` requests to th
 | `GET` | `/api/mealplan/{user_id}` | Read weekly meal plan |
 | `POST` | `/api/mealplan/{user_id}/add` | Add one meal plan entry |
 | `POST` | `/api/mealplan/{user_id}/generate` | Run solver and persist generated rows into `meal_plans` |
+| `POST` | `/api/mealplan/{user_id}/autofill` | Auto-fill empty slots (paid tier) |
 | `DELETE` | `/api/mealplan/{user_id}/remove/{entry_id}` | Delete one meal plan entry |
 | `GET` | `/api/mealplan/{user_id}/nutrients/week` | Weekly nutrients |
 | `GET` | `/api/mealplan/{user_id}/nutrients/day/{day_index}` | Daily nutrients |
@@ -134,6 +135,9 @@ The frontend runs at `http://localhost:3000` and proxies `/api/*` requests to th
 | `POST` | `/api/users/profile` | Create or update diner profile |
 | `GET` | `/api/users/{user_id}` | Get profile |
 | `DELETE` | `/api/users/{user_id}` | Delete profile |
+| `GET` | `/api/thresholds/nutrients` | List available nutrients with RDA defaults |
+| `GET` | `/api/thresholds/{user_id}` | Get saved nutrient thresholds for a user |
+| `PUT` | `/api/thresholds/{user_id}` | Save/replace nutrient thresholds for a user |
 | `GET` | `/api/health` | Health check |
 
 ## Testing the API
@@ -179,12 +183,6 @@ Authorization: Bearer <your_jwt_token>
 Content-Type: application/json
 ```
 
-- Example URL:
-
-```text
-http://127.0.0.1:8000/api/mealplan/5e4e9c29-99bd-4fc2-8232-0ebdf44345b8/generate
-```
-
 - Body:
 
 ```json
@@ -195,18 +193,7 @@ http://127.0.0.1:8000/api/mealplan/5e4e9c29-99bd-4fc2-8232-0ebdf44345b8/generate
 }
 ```
 
-### 4. Expected response
-
-The endpoint writes generated rows into the `meal_plans` table for the given `user_id` and `weekStart`, then returns JSON with both persisted rows and solver debug information.
-
-Response fields include:
-
-- `saved_meal_plans_rows`
-- `selected_plan`
-- `targets`
-- `profile`
-
-### 5. Health check
+### 4. Health check
 
 To confirm the backend is up:
 
@@ -218,6 +205,7 @@ To confirm the backend is up:
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
 | Frontend | React 18 + Vite | UI rendering |
-| Backend | FastAPI | REST API |
-| Database | PostgreSQL + psycopg | persistence |
-| Solver | OR-Tools | meal plan generation |
+| Backend | FastAPI (Python) | REST API and business logic |
+| Database | PostgreSQL 16 on Cloud SQL | Managed cloud database (GCP asia-southeast1) |
+| Solver | OR-Tools CP-SAT | Meal plan generation |
+| Charts | Recharts (optional, CDN) | Weekly nutrition bar chart |

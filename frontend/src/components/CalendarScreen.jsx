@@ -7,6 +7,9 @@ import MealSlotDetail from "./MealSlotDetail";
 import ShoppingListPanel from "./ShoppingListPanel";
 import NutrientSummaryPanel from "./NutrientSummaryPanel";
 import RecipeViewModal from "./RecipeViewModal";
+import AutofillSettingsModal, { loadAutofillSettings } from "./AutofillSettingsModal";
+import ThresholdSettingsModal from "./ThresholdSettingsModal";
+import UpgradePromptModal from "./UpgradePromptModal";
 import * as api from "../services/api";
 
 // Get the Monday of the week containing `date`
@@ -24,7 +27,7 @@ const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 // Meal cutoff hours: breakfast 10am, lunch 2pm, dinner 8pm
 const MEAL_CUTOFF = { breakfast: 10, lunch: 14, dinner: 20 };
 
-export default function CalendarScreen({ userProfile, userId, diners, onSwitchDiner, onEditProfile, onBackToDashboard, onLogout }) {
+export default function CalendarScreen({ userProfile, userId, diners, userTier, caretakerId, onSwitchDiner, onEditProfile, onBackToDashboard }) {
   const [showDinerDropdown, setShowDinerDropdown] = useState(false);
   const [mealPlan, setMealPlan] = useState(() => {
     const plan = {};
@@ -36,6 +39,10 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
   const [showShopping, setShowShopping] = useState(false);
   const [showNutrients, setShowNutrients] = useState(false);
   const [recipeView, setRecipeView] = useState(null);
+  const [showAutofillSettings, setShowAutofillSettings] = useState(false);
+  const [showThresholds, setShowThresholds] = useState(false);
+  const [autofilling, setAutofilling] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState(null);
 
   // Week offset from current week (0 = this week, -1 = last week, +1 = next week)
   const [weekOffset, setWeekOffset] = useState(0);
@@ -114,6 +121,25 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
     }
   }, [userId, reloadPlan]);
 
+  const handleAutofill = useCallback(async () => {
+    setAutofilling(true);
+    try {
+      const raw = loadAutofillSettings();
+      const settings = {
+        maxDishesPerSlot: raw.maxDishesPerSlot || 2,
+        maxCalories: raw.maxCalories ? parseFloat(raw.maxCalories) : null,
+        maxCarbs: raw.maxCarbs ? parseFloat(raw.maxCarbs) : null,
+        maxFat: raw.maxFat ? parseFloat(raw.maxFat) : null,
+      };
+      await api.autofillPlan(userId, weekStart, settings);
+      reloadPlan();
+    } catch (err) {
+      console.error("Auto-fill failed:", err);
+    } finally {
+      setAutofilling(false);
+    }
+  }, [userId, weekStart, reloadPlan]);
+
   const totalPlanned = (() => {
     let c = 0;
     for (let d = 0; d < 7; d++) MEAL_TYPES.forEach(mt => { c += (mealPlan[d]?.[mt] || []).length; });
@@ -169,21 +195,6 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
               style={{ padding: "8px 14px", borderRadius: 10, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
               ⚙ Edit
             </button>
-            <button
-              onClick={onLogout}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 10,
-                border: `1px solid ${COLORS.warn}`,
-                background: "#fff",
-                color: COLORS.warn,
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Logout
-            </button>
           </div>
         </div>
 
@@ -215,6 +226,18 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
           <button onClick={() => setShowShopping(true)}
             style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.navy, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             🛒 Shopping List
+          </button>
+          <button onClick={userTier === "paid" ? handleAutofill : () => setUpgradeFeature("Auto-fill")} disabled={autofilling}
+            style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: autofilling ? "wait" : "pointer", opacity: userTier !== "paid" ? 0.6 : autofilling ? 0.7 : 1 }}>
+            {userTier !== "paid" && "\uD83D\uDD12 "}{autofilling ? "Filling\u2026" : "Auto-fill"}
+          </button>
+          <button onClick={userTier === "paid" ? () => setShowAutofillSettings(true) : () => setUpgradeFeature("Auto-fill Settings")}
+            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: userTier !== "paid" ? 0.6 : 1 }}>
+            {userTier !== "paid" ? "\uD83D\uDD12" : "\u2699"} Auto-fill Settings
+          </button>
+          <button onClick={userTier === "paid" ? () => setShowThresholds(true) : () => setUpgradeFeature("Nutrient Thresholds")}
+            style={{ padding: "10px 16px", borderRadius: 12, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.navy, fontWeight: 700, fontSize: 13, cursor: "pointer", opacity: userTier !== "paid" ? 0.6 : 1 }}>
+            {userTier !== "paid" ? "\uD83D\uDD12" : "\uD83C\uDFAF"} Threshold
           </button>
           <span style={{ fontSize: 12, color: COLORS.gray, display: "flex", alignItems: "center", marginLeft: 8 }}>
             {totalPlanned} dish{totalPlanned !== 1 ? "es" : ""} planned
@@ -345,6 +368,7 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
           userProfile={userProfile}
           userId={userId}
           weekStart={weekStart}
+          userTier={userTier}
           onAdd={handleAdd}
           onClose={() => setAddModal(null)}
         />
@@ -352,6 +376,10 @@ export default function CalendarScreen({ userProfile, userId, diners, onSwitchDi
       {showShopping && <ShoppingListPanel userId={userId} weekStart={weekStart} mealPlan={mealPlan} weekDates={weekDates} isSlotLocked={isSlotLocked} onClose={() => setShowShopping(false)} />}
       {showNutrients && <NutrientSummaryPanel userId={userId} weekStart={weekStart} onClose={() => setShowNutrients(false)} />}
       {recipeView && <RecipeViewModal entry={recipeView} onClose={() => setRecipeView(null)} />}
+      {showAutofillSettings && <AutofillSettingsModal onClose={() => setShowAutofillSettings(false)} />}
+      {showThresholds && <ThresholdSettingsModal userId={userId} onClose={() => setShowThresholds(false)} />}
+      {upgradeFeature && <UpgradePromptModal featureName={upgradeFeature} onClose={() => setUpgradeFeature(null)} />}
+
     </div>
   );
 }

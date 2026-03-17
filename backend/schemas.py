@@ -35,6 +35,18 @@ class GenerateMealPlanBody(BaseModel):
     maxSolutions: int = Field(default=1, ge=1, le=3)
 
 
+class AutofillSettings(BaseModel):
+    maxDishesPerSlot: int = 2
+    maxCalories: float | None = None
+    maxCarbs: float | None = None
+    maxFat: float | None = None
+
+
+class AutofillBody(BaseModel):
+    weekStart: str | None = None
+    settings: AutofillSettings = Field(default_factory=AutofillSettings)
+
+
 class ToggleShoppingSelectionBody(BaseModel):
     weekStart: str
     dayIndex: int
@@ -59,3 +71,17 @@ class RegisterBody(BaseModel):
 class LoginBody(BaseModel):
     email: str = Field(min_length=3)
     password: str = Field(min_length=1)
+
+
+class NutrientThresholdItem(BaseModel):
+    nutrientKey: str = Field(min_length=1)
+    dailyValue: float | None = None
+    perMealValue: float | None = None
+
+
+class SaveThresholdsBody(BaseModel):
+    thresholds: list[NutrientThresholdItem]
+
+
+class UpdateTierBody(BaseModel):
+    tier: str = Field(pattern=r"^(free|paid)$")

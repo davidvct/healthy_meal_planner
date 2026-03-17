@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { COLORS } from "../constants/colors";
+import UpgradePromptModal from "./UpgradePromptModal";
 import * as api from "../services/api";
 
-export default function DinerDashboard({ caretakerId, caretakerName, onSelectDiner, onAddDiner, onLogout }) {
+export default function DinerDashboard({ caretakerId, caretakerName, userTier, onSelectDiner, onAddDiner }) {
   const [diners, setDiners] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   const loadDiners = async () => {
     try {
@@ -50,12 +52,6 @@ export default function DinerDashboard({ caretakerId, caretakerName, onSelectDin
             <span style={{ fontSize: 24, fontWeight: 800, color: COLORS.accent }}>🥘 MealWise</span>
             <p style={{ color: COLORS.gray, fontSize: 13, marginTop: 4 }}>Hi, {caretakerName}</p>
           </div>
-          <button
-            onClick={onLogout}
-            style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${COLORS.grayLight}`, background: COLORS.card, color: COLORS.gray, fontSize: 13, cursor: "pointer" }}
-          >
-            Logout
-          </button>
         </div>
 
         <h2 style={{ fontSize: 20, fontWeight: 700, color: COLORS.navy, marginBottom: 16 }}>Your Diners</h2>
@@ -115,7 +111,7 @@ export default function DinerDashboard({ caretakerId, caretakerName, onSelectDin
 
         {/* Add Diner Button */}
         <button
-          onClick={onAddDiner}
+          onClick={userTier !== "paid" && diners.length >= 1 ? () => setShowUpgrade(true) : onAddDiner}
           style={{
             marginTop: 20,
             width: "100%",
@@ -128,11 +124,15 @@ export default function DinerDashboard({ caretakerId, caretakerName, onSelectDin
             fontWeight: 700,
             cursor: "pointer",
             transition: "all 0.2s",
+            opacity: userTier !== "paid" && diners.length >= 1 ? 0.6 : 1,
           }}
         >
-          + Add Diner
+          {userTier !== "paid" && diners.length >= 1 ? "\uD83D\uDD12 " : "+ "}Add Diner
         </button>
+
       </div>
+
+      {showUpgrade && <UpgradePromptModal featureName="Multiple Diners" onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }

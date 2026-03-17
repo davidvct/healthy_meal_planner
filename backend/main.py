@@ -7,7 +7,7 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from .db import init_db
-from .routers import auth, caretakers, dishes, health, mealplan, shopping_list, users
+from .routers import auth, caretakers, dishes, health, mealplan, shopping_list, thresholds, users
 from .security import verify_access_token
 
 
@@ -59,6 +59,7 @@ app.include_router(users.router, prefix="/api")
 app.include_router(caretakers.router, prefix="/api")
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
+app.include_router(thresholds.router, prefix="/api")
 
 
 @app.exception_handler(FastAPIHTTPException)

@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import get_db
-from ..schemas import CreateCaretakerBody
+from ..schemas import CreateCaretakerBody, UpdateTierBody
 
 router = APIRouter(prefix="/caretakers", tags=["caretakers"])
 
@@ -44,7 +44,20 @@ def get_caretaker_by_auth(auth_user_id: str, conn: Any = Depends(get_db)) -> dic
     row = conn.execute("SELECT * FROM caretakers WHERE auth_user_id = ?", (auth_user_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Caretaker not found")
-    return {"caretakerId": row["id"], "name": row["name"]}
+    return {"caretakerId": row["id"], "name": row["name"], "tier": row.get("subscription_tier") or "free"}
+
+
+@router.put("/{caretaker_id}/tier")
+def update_tier(caretaker_id: str, body: UpdateTierBody, conn: Any = Depends(get_db)) -> dict:
+    row = conn.execute("SELECT id FROM caretakers WHERE id = ?", (caretaker_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Caretaker not found")
+    conn.execute(
+        "UPDATE caretakers SET subscription_tier = ? WHERE id = ?",
+        (body.tier, caretaker_id),
+    )
+    conn.commit()
+    return {"caretakerId": caretaker_id, "tier": body.tier}
 
 
 @router.get("/{caretaker_id}")
@@ -52,7 +65,7 @@ def get_caretaker(caretaker_id: str, conn: Any = Depends(get_db)) -> dict[str, s
     row = conn.execute("SELECT * FROM caretakers WHERE id = ?", (caretaker_id,)).fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Caretaker not found")
-    return {"caretakerId": row["id"], "name": row["name"]}
+    return {"caretakerId": row["id"], "name": row["name"], "tier": row.get("subscription_tier") or "free"}
 
 
 @router.get("/{caretaker_id}/diners")
