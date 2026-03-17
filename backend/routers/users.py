@@ -128,6 +128,13 @@ def create_or_update_profile(
                 ),
             )
         else:
+            count_row = conn.execute(
+                "SELECT COUNT(*) AS c FROM family_members WHERE user_id = ?",
+                (auth_user_id,),
+            ).fetchone()
+            if (count_row["c"] if count_row else 0) >= 5:
+                raise HTTPException(status_code=400, detail="Maximum of 5 diners allowed per caretaker")
+
             order_row = conn.execute(
                 "SELECT COALESCE(MAX(sort_order), 0) AS m FROM family_members WHERE user_id = ?",
                 (auth_user_id,),
