@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import DayStrip from './DayStrip';
 import MealCard from './MealCard';
 import NutritionPanel from './NutritionPanel';
@@ -38,7 +38,7 @@ function todayDayIndex(monday) {
   return diff >= 0 && diff < 7 ? diff : null;
 }
 
-function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse }) {
+function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse, rejectedIds }) {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState(null);
@@ -61,7 +61,7 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse })
         const dishes = scored.map(s => ({
           ...(s.dish ?? s),
           kcal: s.nutrients?.calories ?? s.dish?.kcal ?? 0,
-        }));
+        })).filter(d => !rejectedIds?.has(d.id));
         if (!cancelled) setSuggestions(dishes.slice(0, 4));
       } catch {
         if (!cancelled) setSuggestions([]);
@@ -71,7 +71,7 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse })
     };
     load();
     return () => { cancelled = true; };
-  }, [userId, mealType, dayIndex, weekStart]);
+  }, [userId, mealType, dayIndex, weekStart, rejectedIds]);
 
   const handleAdd = async (dish) => {
     const dishId = dish.id;
@@ -187,6 +187,9 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
   const [lastWeekHasMeals, setLastWeekHasMeals] = useState(false);
   const [prevWeekMealCount, setPrevWeekMealCount] = useState(0);
   const [copyingPlan, setCopyingPlan] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [rejectedDishIds, setRejectedDishIds] = useState(new Set());
+  const toastTimerRef = useRef(null);
 
   const monday   = getMonday(addDays(new Date(), weekOffset * 7));
   const weekStart = toWeekStart(monday);
@@ -303,6 +306,45 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
     }
   };
 
+  const showToast = useCallback((msg, undo = null) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ msg, undo });
+    if (!undo) {
+      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+    }
+  }, []);
+
+  const handleSwap = async (entry, mealType) => {
+    const dishId  = entry.dishId || entry.id;
+    const entryId = entry.id;
+    const key     = `${activeDayIndex}-${mealType}`;
+    setSwappingKey(key);
+    setRejectedDishIds(prev => new Set([...prev, dishId]));
+    try {
+      await api.removeDishFromPlan(userId, entryId);
+      const plan = await loadPlan();
+      if (plan) loadDishDetails(plan);
+      await loadNutrients();
+      showToast('⇄ Meal swapped', async () => {
+        setRejectedDishIds(prev => { const n = new Set(prev); n.delete(dishId); return n; });
+        try {
+          await api.addDishToPlan(userId, { dayIndex: activeDayIndex, mealType, dishId, servings: entry.servings || 1, weekStart });
+          const p = await loadPlan();
+          if (p) loadDishDetails(p);
+          await loadNutrients();
+          showToast('↩ Meal restored');
+        } catch (err) {
+          console.error('Undo failed:', err);
+        }
+      });
+    } catch (err) {
+      console.error('Swap failed:', err);
+      setRejectedDishIds(prev => { const n = new Set(prev); n.delete(dishId); return n; });
+    } finally {
+      setSwappingKey(null);
+    }
+  };
+
   const handleRemove = async (entry) => {
     try {
       await api.removeDishFromPlan(userId, entry.id);
@@ -310,40 +352,6 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
       await loadNutrients();
     } catch (err) {
       console.error('Failed to remove dish:', err);
-    }
-  };
-
-  const handleSwap = async (entry, mealType) => {
-    const key = `${activeDayIndex}-${mealType}`;
-    setSwappingKey(key);
-    try {
-      const res = await api.getRecommendedDishes(userId, {
-        day: activeDayIndex,
-        mealType,
-        filterMealType: true,
-        filterDiet: true,
-        filterAllergies: true,
-        filterConditions: true,
-        weekStart,
-      });
-      const scored = res.scored || res.dishes || (Array.isArray(res) ? res : []);
-      const dishes = scored.map(s => ({ ...(s.dish ?? s), id: s.dish?.id ?? s.id }));
-      const candidate = dishes.find(d => d.id !== entry.id);
-      if (!candidate) return;
-      await api.removeDishFromPlan(userId, entry.id);
-      await api.addDishToPlan(userId, {
-        dayIndex: activeDayIndex,
-        mealType,
-        dishId: candidate.id,
-        servings: 1,
-        weekStart,
-      });
-      await loadPlan();
-      await loadNutrients();
-    } catch (err) {
-      console.error('Swap failed:', err);
-    } finally {
-      setSwappingKey(null);
     }
   };
 
@@ -358,7 +366,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
   ).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', position: 'relative' }}>
 
       {/* Day strip (includes date header) */}
       <div style={{ flexShrink: 0, padding: '12px 16px 0 16px' }}>
@@ -554,8 +562,9 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
                       dayIndex={activeDayIndex}
                       weekStart={weekStart}
                       userId={userId}
-                      onAdded={() => { loadPlan(); loadNutrients(); }}
-                      onBrowse={onBrowse}
+                      onAdded={() => { setToast(null); loadPlan(); loadNutrients(); }}
+                      onBrowse={ctx => { setToast(null); onBrowse(ctx); }}
+                      rejectedIds={rejectedDishIds}
                     />
                   );
                 })}
@@ -579,6 +588,19 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
 
         </div>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="toast">
+          <span>{toast.msg}</span>
+          {toast.undo && (
+            <button
+              style={{ background: 'none', border: '1px solid rgba(255,255,255,.4)', color: '#fff', borderRadius: 6, padding: '3px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}
+              onClick={() => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); setToast(null); toast.undo(); }}
+            >Undo</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

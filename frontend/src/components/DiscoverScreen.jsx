@@ -91,9 +91,11 @@ export default function DiscoverScreen({ slotCtx, userId, activeDiner, onBack, o
   // Pre-apply diner's diet/allergen preferences when screen opens
   useEffect(() => {
     if (!activeDiner) return;
-    const diet = (activeDiner.dietaryPreferences || activeDiner.diet || 'any')
-      .toLowerCase().replace(/\s+/g, '_').replace('no_restriction', 'any');
-    setDietFilter(DIET_FILTERS.some(d => d.id === diet) ? diet : 'any');
+    const raw = (activeDiner.dietaryPreferences || activeDiner.diet || 'any')
+      .toLowerCase().replace(/\s+/g, '_')
+      .replace('no_restriction', 'any')
+      .replace('none', 'any');
+    setDietFilter(DIET_FILTERS.some(d => d.id === raw) ? raw : 'any');
     const allergens = (activeDiner.allergens || []).map(a => a.toLowerCase());
     setAllergenFilters(new Set(allergens.filter(a => ALLERGEN_OPTIONS.some(o => o.id === a))));
   }, [activeDiner?.id]);
@@ -258,9 +260,9 @@ export default function DiscoverScreen({ slotCtx, userId, activeDiner, onBack, o
               {favOnly && (
                 <span className="disc-active-pill disc-ap-diet">❤️ Favourites</span>
               )}
-              {dietFilter !== 'any' && (
+              {dietFilter !== 'any' && DIET_FILTERS.find(d => d.id === dietFilter) && (
                 <span className="disc-active-pill disc-ap-diet">
-                  {DIET_FILTERS.find(d => d.id === dietFilter)?.label}
+                  {DIET_FILTERS.find(d => d.id === dietFilter).label}
                 </span>
               )}
               {[...allergenFilters].map(a => (

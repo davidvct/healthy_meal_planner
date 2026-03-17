@@ -99,7 +99,7 @@ export default function NutritionPanel({ nutrients, conditions, diet, dinerName,
   const condEntries = condList.map(c => CONDITION_MAP[c]).filter(Boolean);
 
   // Diet pill (if not "any" / empty)
-  const dietKey = (diet || '').toLowerCase().replace(/[\s-]/g, '_').replace('no_restriction', '');
+  const dietKey = (diet || '').toLowerCase().replace(/[\s-]/g, '_').replace('no_restriction', '').replace('none', '');
   const showDietPill = dietKey && dietKey !== 'any' && dietKey !== '';
   const dietRule = DIET_RULES[dietKey] || '';
 
