@@ -77,8 +77,8 @@ def _normalize_fixed_assignments(
     *,
     candidates: dict[str, list[SolverRecipe]],
     num_days: int,
-) -> dict[tuple[int, str], FixedMealAssignment]:
-    normalized: dict[tuple[int, str], FixedMealAssignment] = {}
+) -> dict[tuple[int, str], list[FixedMealAssignment]]:
+    normalized: dict[tuple[int, str], list[FixedMealAssignment]] = {}
     if not fixed_assignments:
         return normalized
 
@@ -97,8 +97,6 @@ def _normalize_fixed_assignments(
             raise ValueError(f"Fixed assignment day_index out of range: {day_index}")
         if meal_type not in MEALS:
             raise ValueError(f"Unsupported fixed assignment meal_type: {meal_type}")
-        if key in normalized:
-            raise ValueError(f"Duplicate fixed assignment for day {day_index}, meal {meal_type}")
         if recipe_id not in candidate_ids[meal_type]:
             raise ValueError(
                 f"Fixed assignment recipe {recipe_id} is not a candidate for day {day_index}, meal {meal_type}"
@@ -110,12 +108,16 @@ def _normalize_fixed_assignments(
                 f"Fixed assignment servings must be between 0 and {MAX_SERVINGS_PER_RECIPE}: {assignment.servings}"
             )
 
-        normalized[key] = FixedMealAssignment(
+        slot_assignments = normalized.setdefault(key, [])
+        if any(existing.recipe_id == recipe_id for existing in slot_assignments):
+            raise ValueError(f"Duplicate fixed assignment recipe {recipe_id} for day {day_index}, meal {meal_type}")
+
+        slot_assignments.append(FixedMealAssignment(
             day_index=day_index,
             meal_type=meal_type,
             recipe_id=recipe_id,
             servings=float(serving_count),
-        )
+        ))
 
     return normalized
 
@@ -125,7 +127,7 @@ def _apply_fixed_assignments(
     candidates: dict[str, list[SolverRecipe]],
     x: dict[tuple[int, str, str], Any],
     servings: dict[tuple[int, str, str], Any],
-    fixed_assignments: dict[tuple[int, str], FixedMealAssignment],
+    fixed_assignments: dict[tuple[int, str], list[FixedMealAssignment]],
     config: SolverConfig,
 ) -> None:
     if not fixed_assignments:
@@ -133,18 +135,21 @@ def _apply_fixed_assignments(
 
     for day in range(config.num_days):
         for meal in MEALS:
-            assignment = fixed_assignments.get((day, meal))
-            if assignment is None:
+            assignments = fixed_assignments.get((day, meal))
+            if not assignments:
                 continue
 
-            fixed_recipe_id = assignment.recipe_id
-            fixed_servings = int(round(assignment.servings))
+            fixed_recipe_ids = {assignment.recipe_id for assignment in assignments}
+            fixed_servings_by_recipe = {
+                assignment.recipe_id: int(round(assignment.servings))
+                for assignment in assignments
+            }
 
             for recipe in candidates[meal]:
                 key = (day, meal, recipe.recipe_id)
-                if recipe.recipe_id == fixed_recipe_id:
+                if recipe.recipe_id in fixed_recipe_ids:
                     model.Add(x[key] == 1)
-                    model.Add(servings[key] == fixed_servings)
+                    model.Add(servings[key] == fixed_servings_by_recipe[recipe.recipe_id])
                 else:
                     model.Add(x[key] == 0)
                     model.Add(servings[key] == 0)
@@ -156,12 +161,14 @@ def _add_serving_and_meal_count_constraints(
     x: dict[tuple[int, str, str], Any],
     servings: dict[tuple[int, str, str], Any],
     config: SolverConfig,
+    fixed_assignments: dict[tuple[int, str], list[FixedMealAssignment]] | None = None,
 ) -> None:
     # Every meal must have at least one recipe, but selection count and serving
     # bounds still vary by recipe type.
     for day in range(config.num_days):
         for meal in MEALS:
             meal_recipes = candidates[meal]
+            main_course_recipe_ids = [recipe.recipe_id for recipe in meal_recipes if recipe.is_main_course]
             for recipe in meal_recipes:
                 key = (day, meal, recipe.recipe_id)
                 min_servings = MIN_SERVINGS_PER_SELECTED
@@ -169,11 +176,26 @@ def _add_serving_and_meal_count_constraints(
                 if meal in ("lunch", "dinner") and recipe.is_main_course:
                     min_servings = config.main_course_min_servings
                     max_servings = config.main_course_max_servings
+                fixed_assignment_map = {
+                    assignment.recipe_id: assignment
+                    for assignment in (fixed_assignments or {}).get((day, meal), [])
+                }
+                fixed_assignment = fixed_assignment_map.get(recipe.recipe_id)
+                if fixed_assignment:
+                    fixed_servings = int(round(fixed_assignment.servings))
+                    min_servings = fixed_servings
+                    max_servings = fixed_servings
                 model.Add(servings[key] <= max_servings * x[key])
                 model.Add(servings[key] >= min_servings * x[key])
 
-            model.Add(sum(x[(day, meal, recipe.recipe_id)] for recipe in meal_recipes) <= MAX_RECIPES_PER_MEAL)
-            model.Add(sum(x[(day, meal, recipe.recipe_id)] for recipe in meal_recipes) >= 1)
+            fixed_count = len((fixed_assignments or {}).get((day, meal), []))
+            if fixed_count > 0:
+                model.Add(sum(x[(day, meal, recipe.recipe_id)] for recipe in meal_recipes) == fixed_count)
+            else:
+                model.Add(sum(x[(day, meal, recipe.recipe_id)] for recipe in meal_recipes) <= config.max_recipes_per_meal)
+                model.Add(sum(x[(day, meal, recipe.recipe_id)] for recipe in meal_recipes) >= 1)
+                if meal in ("lunch", "dinner"):
+                    model.Add(sum(x[(day, meal, recipe_id)] for recipe_id in main_course_recipe_ids) >= 1)
 
 
 def _add_side_dish_limit_constraints(
@@ -181,12 +203,15 @@ def _add_side_dish_limit_constraints(
     candidates: dict[str, list[SolverRecipe]],
     x: dict[tuple[int, str, str], Any],
     config: SolverConfig,
+    fixed_assignments: dict[tuple[int, str], list[FixedMealAssignment]] | None = None,
 ) -> None:
     for meal in ("lunch", "dinner"):
         side_recipe_ids = [recipe.recipe_id for recipe in candidates[meal] if recipe.is_side_dish]
         if not side_recipe_ids:
             continue
         for day in range(config.num_days):
+            if (fixed_assignments or {}).get((day, meal)):
+                continue
             model.Add(sum(x[(day, meal, recipe_id)] for recipe_id in side_recipe_ids) <= 1)
 
 
@@ -195,6 +220,7 @@ def _add_meal_calorie_ordering_constraints(
     candidates: dict[str, list[SolverRecipe]],
     servings: dict[tuple[int, str, str], Any],
     config: SolverConfig,
+    fixed_assignments: dict[tuple[int, str], list[FixedMealAssignment]] | None = None,
 ) -> dict[int, dict[str, Any]]:
     # This encodes the product rule that lunch should be the heaviest meal and
     # breakfast the lightest.
@@ -214,31 +240,60 @@ def _add_meal_calorie_ordering_constraints(
             day_vars[meal] = total
             meal_calories_vars[day][meal] = total
 
-        model.Add(day_vars["breakfast"] <= day_vars["dinner"])
-        model.Add(day_vars["dinner"] <= day_vars["lunch"])
+        if not any((fixed_assignments or {}).get((day, meal)) for meal in MEALS):
+            model.Add(day_vars["breakfast"] <= day_vars["dinner"])
+            model.Add(day_vars["dinner"] <= day_vars["lunch"])
 
     return meal_calories_vars
 
 
-def _add_no_repeat_constraints(
+def _add_no_repeat_penalty(
     model: Any,
     x: dict[tuple[int, str, str], Any],
     candidates: dict[str, list[SolverRecipe]],
     config: SolverConfig,
-) -> None:
-    # Sliding windows prevent the same recipe from dominating adjacent days.
+) -> list[Any]:
+    # Penalize reusing the same recipe in short sliding windows instead of
+    # making repetition a hard infeasibility.
     breakfast_ids = [recipe.recipe_id for recipe in candidates["breakfast"]]
     lunch_dinner_ids = list(dict.fromkeys(recipe.recipe_id for recipe in candidates["lunch"]))
+    repeat_penalty_terms: list[Any] = []
 
     for recipe_id in breakfast_ids:
         for start_day in range(config.num_days):
-            window_days = range(start_day, min(config.num_days, start_day + 3))
-            model.Add(sum(x[(day, "breakfast", recipe_id)] for day in window_days) <= 1)
+            window_days = tuple(range(start_day, min(config.num_days, start_day + 3)))
+            use_count = sum(x[(day, "breakfast", recipe_id)] for day in window_days)
+            excess = model.NewIntVar(0, len(window_days), f"repeat_breakfast_excess_{recipe_id}_{start_day}")
+            model.Add(use_count - 1 <= excess)
+            repeat_penalty_terms.append(excess)
 
     for recipe_id in lunch_dinner_ids:
         for start_day in range(config.num_days):
-            window_days = range(start_day, min(config.num_days, start_day + 3))
-            model.Add(sum(x[(day, meal, recipe_id)] for day in window_days for meal in ("lunch", "dinner")) <= 1)
+            window_days = tuple(range(start_day, min(config.num_days, start_day + 3)))
+            use_count = sum(x[(day, meal, recipe_id)] for day in window_days for meal in ("lunch", "dinner"))
+            excess = model.NewIntVar(0, len(window_days) * 2, f"repeat_lunch_dinner_excess_{recipe_id}_{start_day}")
+            model.Add(use_count - 1 <= excess)
+            repeat_penalty_terms.append(excess)
+
+    all_recipe_ids = list(
+        dict.fromkeys(
+            recipe.recipe_id
+            for meal in MEALS
+            for recipe in candidates[meal]
+        )
+    )
+    for recipe_id in all_recipe_ids:
+        for day in range(config.num_days):
+            day_use_count = sum(
+                x[(day, meal, recipe_id)]
+                for meal in MEALS
+                if (day, meal, recipe_id) in x
+            )
+            excess = model.NewIntVar(0, len(MEALS), f"repeat_same_day_excess_{recipe_id}_{day}")
+            model.Add(day_use_count - 1 <= excess)
+            repeat_penalty_terms.append(excess)
+
+    return repeat_penalty_terms
 
 
 def _add_nutrient_constraints(
@@ -247,6 +302,7 @@ def _add_nutrient_constraints(
     servings: dict[tuple[int, str, str], Any],
     targets: dict[str, float],
     config: SolverConfig,
+    fixed_assignments: dict[tuple[int, str], list[FixedMealAssignment]] | None = None,
 ) -> tuple[dict[str, Any], dict[int, dict[str, Any]], list[Any]]:
     # Daily totals are hard upper bounds; multi-day totals are optimized toward
     # the target rather than forced to match exactly.
@@ -260,6 +316,11 @@ def _add_nutrient_constraints(
         "carbs": lambda recipe: recipe.carbs,
         "fat": lambda recipe: recipe.fat,
     }
+    recipe_lookup = {
+        (meal, recipe.recipe_id): recipe
+        for meal in MEALS
+        for recipe in candidates[meal]
+    }
 
     for nutrient, getter in nutrient_getters.items():
         daily_target = to_int(targets[nutrient])
@@ -267,15 +328,42 @@ def _add_nutrient_constraints(
 
         for day in range(config.num_days):
             day_terms: list[Any] = []
+            flexible_terms: list[Any] = []
+            fixed_day_total = 0
+            meal_flexible_terms: dict[str, list[Any]] = {meal: [] for meal in MEALS}
             for meal in MEALS:
+                fixed_recipe_ids = {
+                    assignment.recipe_id
+                    for assignment in (fixed_assignments or {}).get((day, meal), [])
+                }
+                for assignment in (fixed_assignments or {}).get((day, meal), []):
+                    recipe = recipe_lookup[(meal, assignment.recipe_id)]
+                    fixed_day_total += to_int(getter(recipe)) * int(round(assignment.servings))
                 for recipe in candidates[meal]:
                     term = to_int(getter(recipe)) * servings[(day, meal, recipe.recipe_id)]
                     expr_terms.append(term)
                     day_terms.append(term)
+                    if recipe.recipe_id not in fixed_recipe_ids:
+                        flexible_terms.append(term)
+                        meal_flexible_terms[meal].append(term)
 
             day_total = model.NewIntVar(0, 10**9, f"day{day}_total_{nutrient}")
             model.Add(day_total == sum(day_terms))
-            model.Add(day_total <= daily_target)
+            remaining_capacity = daily_target - fixed_day_total
+            if remaining_capacity >= 0:
+                model.Add(sum(flexible_terms) <= remaining_capacity)
+
+            per_meal_cap = config.per_meal_nutrient_caps.get(nutrient)
+            if per_meal_cap is not None:
+                per_meal_cap_int = to_int(per_meal_cap)
+                for meal in MEALS:
+                    fixed_meal_total = 0
+                    for assignment in (fixed_assignments or {}).get((day, meal), []):
+                        recipe = recipe_lookup[(meal, assignment.recipe_id)]
+                        fixed_meal_total += to_int(getter(recipe)) * int(round(assignment.servings))
+                    remaining_meal_capacity = per_meal_cap_int - fixed_meal_total
+                    if remaining_meal_capacity >= 0:
+                        model.Add(sum(meal_flexible_terms[meal]) <= remaining_meal_capacity)
             daily_totals_vars[day][nutrient] = day_total
 
         total = model.NewIntVar(0, 10**9, f"total_{nutrient}")
@@ -412,12 +500,25 @@ def solve_meal_plan(
         config,
     )
 
-    _add_serving_and_meal_count_constraints(model, candidates, x, servings, config)
-    _add_side_dish_limit_constraints(model, candidates, x, config)
-    meal_calories_vars = _add_meal_calorie_ordering_constraints(model, candidates, servings, config)
-    _add_no_repeat_constraints(model, x, candidates, config)
+    _add_serving_and_meal_count_constraints(
+        model,
+        candidates,
+        x,
+        servings,
+        config,
+        normalized_fixed_assignments,
+    )
+    _add_side_dish_limit_constraints(model, candidates, x, config, normalized_fixed_assignments)
+    meal_calories_vars = _add_meal_calorie_ordering_constraints(
+        model,
+        candidates,
+        servings,
+        config,
+        normalized_fixed_assignments,
+    )
+    no_repeat_penalty_terms = _add_no_repeat_penalty(model, x, candidates, config)
     totals, daily_totals_vars, deviation_terms = _add_nutrient_constraints(
-        model, candidates, servings, targets, config
+        model, candidates, servings, targets, config, normalized_fixed_assignments
     )
     repeat_penalty = _add_variety_constraints(model, candidates, x, config)
     daily_satiety_by_meal_vars, daily_satiety_total_vars, satiety_ratio_deviation_terms, total_satiety_all_days_terms = _add_satiety_constraints(
@@ -431,7 +532,8 @@ def solve_meal_plan(
         sum(deviation_terms) * 1000
         + sum(meal_ratio_deviation_terms) * 10
         + sum(satiety_ratio_deviation_terms) * 2
-        + repeat_penalty
+        + sum(no_repeat_penalty_terms) * 100000
+        + repeat_penalty * 25000
         - sum(total_satiety_all_days_terms)
     )
     model.Minimize(objective_expr)
@@ -571,13 +673,15 @@ def generate_meal_plan_from_inputs(
     week_start: str | None = None,
     config: SolverConfig | None = None,
     fixed_assignments: list[FixedMealAssignment] | tuple[FixedMealAssignment, ...] | None = None,
+    targets_override: dict[str, float] | None = None,
 ) -> MealGenerationResult:
     # The first plan remains the selected one; additional plans are retained as
     # alternates for inspection/debugging.
+    solver_targets = dict(targets_override or inputs.targets)
     plans = tuple(
         solve_meal_plan(
             patient_id=inputs.patient_id,
-            targets=inputs.targets,
+            targets=solver_targets,
             recipes=list(inputs.recipes),
             config=config,
             fixed_assignments=fixed_assignments,
@@ -585,10 +689,18 @@ def generate_meal_plan_from_inputs(
     )
     selected_plan = plans[0]
     entries = plan_result_to_entries(selected_plan, week_start=week_start)
+    result_inputs = SolverInputBundle(
+        patient_id=inputs.patient_id,
+        profile=inputs.profile,
+        targets=solver_targets,
+        recipes=inputs.recipes,
+        candidates=inputs.candidates,
+        diagnostics=inputs.diagnostics,
+    )
     return MealGenerationResult(
         patient_id=inputs.patient_id,
         week_start=week_start,
-        inputs=inputs,
+        inputs=result_inputs,
         plans=plans,
         selected_plan=selected_plan,
         entries=entries,
@@ -602,6 +714,7 @@ def generate_meal_plan_for_week(
     week_start: str | None = None,
     config: SolverConfig | None = None,
     fixed_assignments: list[FixedMealAssignment] | tuple[FixedMealAssignment, ...] | None = None,
+    targets_override: dict[str, float] | None = None,
 ) -> MealGenerationResult:
     inputs = load_solver_inputs_from_db(conn, patient_id)
     return generate_meal_plan_from_inputs(
@@ -609,6 +722,7 @@ def generate_meal_plan_for_week(
         week_start=week_start,
         config=config,
         fixed_assignments=fixed_assignments,
+        targets_override=targets_override,
     )
 
 

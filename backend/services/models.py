@@ -67,6 +67,42 @@ def _contains_any(text: str, tokens: tuple[str, ...]) -> bool:
     return any(token in text for token in tokens)
 
 
+def is_condiment_like_record(record: dict[str, Any]) -> bool:
+    text_parts = [
+        str(record.get("name") or ""),
+        str(record.get("category") or ""),
+        str(record.get("keywords") or ""),
+        str(record.get("tags") or ""),
+    ]
+    text = " ".join(text_parts).strip().lower()
+    if not text:
+        return False
+
+    condiment_tokens = (
+        "sauce",
+        "dressing",
+        "dip",
+        "condiment",
+        "marinade",
+        "spread",
+        "salsa",
+        "gravy",
+        "chutney",
+        "relish",
+        "vinaigrette",
+        "glaze",
+        "frosting",
+        "icing",
+        "jam",
+        "jelly",
+        "pesto",
+        "mayonnaise",
+        "ketchup",
+        "mustard",
+    )
+    return _contains_any(text, condiment_tokens)
+
+
 def _parse_str_list(value: Any) -> tuple[str, ...]:
     parsed = parse_json(value, None)
     if isinstance(parsed, list):
@@ -108,6 +144,8 @@ class SolverConfig:
     main_course_min_servings: int = DEFAULT_MAIN_COURSE_MIN_SERVINGS
     main_course_max_servings: int = DEFAULT_MAIN_COURSE_MAX_SERVINGS
     time_limit_seconds: int = DEFAULT_SOLVER_TIME_LIMIT_SECONDS
+    max_recipes_per_meal: int = MAX_RECIPES_PER_MEAL
+    per_meal_nutrient_caps: dict[str, float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # Keep validation close to the config object so callers fail fast before
@@ -126,6 +164,8 @@ class SolverConfig:
             raise ValueError("main_course_min_servings must be <= main_course_max_servings")
         if self.main_course_max_servings > MAX_SERVINGS_PER_RECIPE:
             raise ValueError("main_course_max_servings cannot exceed MAX_SERVINGS_PER_RECIPE")
+        if self.max_recipes_per_meal < 1:
+            raise ValueError("max_recipes_per_meal must be >= 1")
         _validate_ratio_triplet(self.meal_calorie_ratio, "meal_calorie_ratio")
         _validate_ratio_triplet(self.meal_satiety_ratio, "meal_satiety_ratio")
 

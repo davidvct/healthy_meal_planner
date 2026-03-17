@@ -35,6 +35,12 @@ class GenerateMealPlanBody(BaseModel):
     maxSolutions: int = Field(default=1, ge=1, le=3)
 
 
+class NutrientThresholdItem(BaseModel):
+    nutrientKey: str = Field(min_length=1)
+    dailyValue: float | None = None
+    perMealValue: float | None = None
+
+
 class AutofillSettings(BaseModel):
     maxDishesPerSlot: int = 2
     maxCalories: float | None = None
@@ -45,6 +51,25 @@ class AutofillSettings(BaseModel):
 class AutofillBody(BaseModel):
     weekStart: str | None = None
     settings: AutofillSettings = Field(default_factory=AutofillSettings)
+    thresholds: list[NutrientThresholdItem] = Field(default_factory=list)
+    allowConstraintRelaxation: bool = False
+
+
+class AutofillConstraintViolation(BaseModel):
+    code: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+    dayIndex: int
+    mealType: str | None = None
+    recipeIds: list[str] = Field(default_factory=list)
+    actual: float | None = None
+    limit: float | None = None
+
+
+class AutofillValidationResponse(BaseModel):
+    success: bool = True
+    canProceed: bool
+    violations: list[AutofillConstraintViolation] = Field(default_factory=list)
 
 
 class ToggleShoppingSelectionBody(BaseModel):
@@ -71,12 +96,6 @@ class RegisterBody(BaseModel):
 class LoginBody(BaseModel):
     email: str = Field(min_length=3)
     password: str = Field(min_length=1)
-
-
-class NutrientThresholdItem(BaseModel):
-    nutrientKey: str = Field(min_length=1)
-    dailyValue: float | None = None
-    perMealValue: float | None = None
 
 
 class SaveThresholdsBody(BaseModel):

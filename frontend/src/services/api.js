@@ -11,7 +11,15 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+    const detail = err.detail;
+    const message =
+      err.error ||
+      (typeof detail === "string" ? detail : detail?.error) ||
+      res.statusText;
+    const error = new Error(message);
+    error.status = res.status;
+    error.payload = err;
+    throw error;
   }
   return res.json();
 }
@@ -129,15 +137,27 @@ export async function addDishToPlan(userId, { dayIndex, mealType, dishId, servin
   });
 }
 
-export async function autofillPlan(userId, weekStart, settings) {
+export async function validateAutofillPlan(userId, weekStart, settings, thresholds) {
+  return request(`/mealplan/${userId}/autofill/validate`, {
+    method: "POST",
+    body: JSON.stringify({ weekStart, settings, thresholds }),
+  });
+}
+
+export async function autofillPlan(userId, weekStart, settings, thresholds, allowConstraintRelaxation = false) {
   return request(`/mealplan/${userId}/autofill`, {
     method: "POST",
-    body: JSON.stringify({ weekStart, settings }),
+    body: JSON.stringify({ weekStart, settings, thresholds, allowConstraintRelaxation }),
   });
 }
 
 export async function removeDishFromPlan(userId, entryId) {
   return request(`/mealplan/${userId}/remove/${entryId}`, { method: "DELETE" });
+}
+
+export async function clearWeekMealPlan(userId, weekStart) {
+  const params = weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : "";
+  return request(`/mealplan/${userId}/clear${params}`, { method: "DELETE" });
 }
 
 export async function getWeekNutrients(userId, weekStart) {

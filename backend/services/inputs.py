@@ -10,6 +10,7 @@ from .models import (
     SolverInputDiagnostics,
     SolverRecipe,
     _parse_str_list,
+    is_condiment_like_record,
     normalize_recipe,
 )
 from .nutrient_calculator import load_ingredient_cache
@@ -65,6 +66,7 @@ def _diet_label(row: dict[str, Any]) -> str:
 def _recipe_to_filterable_dish_row(recipe: dict[str, Any]) -> dict[str, Any]:
     recipe_id = str(recipe.get("id"))
     ingredients_map = parse_ingredients_map(recipe.get("ingredients"))
+    normalized = normalize_recipe(recipe)
 
     # The recommendation filter expects a richer dish shape than the raw recipe
     # table provides, so adapt DB rows into that contract here.
@@ -76,9 +78,9 @@ def _recipe_to_filterable_dish_row(recipe: dict[str, Any]) -> dict[str, Any]:
         "url": recipe.get("url") or "",
         "sourceUrl": recipe.get("url") or "",
         "category": recipe.get("category") or "",
-        "meal_types": list(MEALS),
-        "is_main_course": True,
-        "is_side_dish": False,
+        "meal_types": list(normalized.meal_types),
+        "is_main_course": normalized.is_main_course,
+        "is_side_dish": normalized.is_side_dish,
         "tags": _recipe_tags(recipe),
         "ingredients": ingredients_map,
         "allergies": _parse_csv_words(recipe.get("allergies")),
@@ -229,7 +231,9 @@ def load_solver_inputs_from_db(
         allowed_recipe_ids.update(str(dish["id"]) for dish in filtered)
 
     filtered_recipes = tuple(
-        normalize_recipe(dish) for dish in all_dishes if str(dish["id"]) in allowed_recipe_ids
+        normalize_recipe(dish)
+        for dish in all_dishes
+        if str(dish["id"]) in allowed_recipe_ids and not is_condiment_like_record(dish)
     )
     candidates: dict[str, tuple[SolverRecipe, ...]] = {meal: tuple() for meal in MEALS}
     if validate_candidates:
@@ -262,5 +266,5 @@ def build_seed_demo_inputs(
     # fixture set for quick constraint iteration.
     seed_data = load_seed_data()
     targets = recommend_targets(age, sex, weight_kg, diet)
-    recipes = [normalize_recipe(record) for record in seed_data["dishes"]]
+    recipes = [normalize_recipe(record) for record in seed_data["dishes"] if not is_condiment_like_record(record)]
     return targets, recipes

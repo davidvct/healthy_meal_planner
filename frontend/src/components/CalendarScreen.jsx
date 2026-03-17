@@ -27,6 +27,18 @@ const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
 // Meal cutoff hours: breakfast 10am, lunch 2pm, dinner 8pm
 const MEAL_CUTOFF = { breakfast: 10, lunch: 14, dinner: 20 };
 
+function formatAutofillViolations(violations) {
+  if (!violations?.length) return "";
+  return violations
+    .map((violation) => {
+      const slot = violation.mealType
+        ? `Day ${violation.dayIndex + 1} ${violation.mealType}`
+        : `Day ${violation.dayIndex + 1}`;
+      return `- ${slot}: ${violation.title}`;
+    })
+    .join("\n");
+}
+
 export default function CalendarScreen({ userProfile, userId, diners, userTier, caretakerId, onSwitchDiner, onEditProfile, onBackToDashboard }) {
   const [showDinerDropdown, setShowDinerDropdown] = useState(false);
   const [mealPlan, setMealPlan] = useState(() => {
@@ -42,6 +54,7 @@ export default function CalendarScreen({ userProfile, userId, diners, userTier, 
   const [showAutofillSettings, setShowAutofillSettings] = useState(false);
   const [showThresholds, setShowThresholds] = useState(false);
   const [autofilling, setAutofilling] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState(null);
 
   // Week offset from current week (0 = this week, -1 = last week, +1 = next week)
@@ -131,18 +144,96 @@ export default function CalendarScreen({ userProfile, userId, diners, userTier, 
         maxCarbs: raw.maxCarbs ? parseFloat(raw.maxCarbs) : null,
         maxFat: raw.maxFat ? parseFloat(raw.maxFat) : null,
       };
-      await api.autofillPlan(userId, weekStart, settings);
+      const [availableNutrients, savedThresholds] = await Promise.all([
+        api.getAvailableNutrients(),
+        api.getThresholds(userId),
+      ]);
+
+      const requiredKeys = ["calories", "protein", "carbs", "fat"];
+      const thresholdMap = new Map(
+        savedThresholds.map((item) => [item.nutrientKey, item])
+      );
+
+      for (const key of requiredKeys) {
+        const nutrient = availableNutrients.find((item) => item.key === key);
+        const dailyValue = nutrient?.defaultDaily ?? null;
+        const existing = thresholdMap.get(key);
+        const hasUsableValue = existing && (
+          (existing.dailyValue ?? null) !== null || (existing.perMealValue ?? null) !== null
+        );
+        if (hasUsableValue) continue;
+
+        thresholdMap.set(key, {
+          nutrientKey: key,
+          dailyValue,
+          perMealValue: dailyValue ? Math.round(dailyValue / 3) : null,
+        });
+      }
+
+      const thresholds = Array.from(thresholdMap.values());
+
+      console.log("[autofill] sending", { userId, weekStart, settings, thresholds });
+      const validation = await api.validateAutofillPlan(userId, weekStart, settings, thresholds);
+      let allowConstraintRelaxation = false;
+      if (validation.violations?.length) {
+        const warning = [
+          "Some existing meals violate hard constraints.",
+          "If you proceed, autofill will relax those constraints for existing meals only.",
+          "",
+          formatAutofillViolations(validation.violations),
+          "",
+          "Proceed anyway?",
+        ].join("\n");
+        if (!window.confirm(warning)) return;
+        allowConstraintRelaxation = true;
+      }
+
+      await api.autofillPlan(userId, weekStart, settings, thresholds, allowConstraintRelaxation);
       reloadPlan();
     } catch (err) {
       console.error("Auto-fill failed:", err);
+      const message = err?.message || "Auto-fill failed.";
+      if (message.includes("No feasible meal plan found.")) {
+        window.alert("No feasible meal plan was found for the selected week and current constraints.");
+      } else {
+        window.alert(message);
+      }
     } finally {
       setAutofilling(false);
     }
   }, [userId, weekStart, reloadPlan]);
 
+  const handleClearAll = useCallback(async () => {
+    const hasUnlockedEntries = DAYS.some((_, dayIndex) =>
+      MEAL_TYPES.some((mealType) => !isSlotLocked(dayIndex, mealType) && (mealPlan[dayIndex]?.[mealType] || []).length > 0)
+    );
+    if (!hasUnlockedEntries) return;
+    if (!window.confirm(`Clear all unblocked meals for the week of ${weekStart}?`)) return;
+
+    setClearing(true);
+    try {
+      await api.clearWeekMealPlan(userId, weekStart);
+      reloadPlan();
+    } catch (err) {
+      console.error("Clear all failed:", err);
+    } finally {
+      setClearing(false);
+    }
+  }, [isSlotLocked, mealPlan, reloadPlan, userId, weekStart]);
+
   const totalPlanned = (() => {
     let c = 0;
     for (let d = 0; d < 7; d++) MEAL_TYPES.forEach(mt => { c += (mealPlan[d]?.[mt] || []).length; });
+    return c;
+  })();
+
+  const clearableCount = (() => {
+    let c = 0;
+    for (let d = 0; d < 7; d++) {
+      MEAL_TYPES.forEach((mt) => {
+        if (!isSlotLocked(d, mt)) c += (mealPlan[d]?.[mt] || []).length;
+      });
+    }
     return c;
   })();
 
@@ -226,6 +317,10 @@ export default function CalendarScreen({ userProfile, userId, diners, userTier, 
           <button onClick={() => setShowShopping(true)}
             style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.navy, color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
             🛒 Shopping List
+          </button>
+          <button onClick={handleClearAll} disabled={clearing || clearableCount === 0}
+            style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: "#c65b3d", color: "#fff", fontWeight: 700, fontSize: 13, cursor: clearing || clearableCount === 0 ? "default" : "pointer", opacity: clearing || clearableCount === 0 ? 0.55 : 1 }}>
+            {clearing ? "Clearing…" : "Clear All"}
           </button>
           <button onClick={userTier === "paid" ? handleAutofill : () => setUpgradeFeature("Auto-fill")} disabled={autofilling}
             style={{ padding: "10px 16px", borderRadius: 12, border: "none", background: COLORS.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: autofilling ? "wait" : "pointer", opacity: userTier !== "paid" ? 0.6 : autofilling ? 0.7 : 1 }}>

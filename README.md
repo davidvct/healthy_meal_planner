@@ -7,6 +7,13 @@ MealWise is a health-aware weekly meal planning app for Singaporean elderly user
 - database: PostgreSQL via `psycopg`
 - solver: OR-Tools CP-SAT
 
+Solver-related UX notes:
+
+- auto-fill is solver-based and runs against the currently selected calendar week
+- the frontend sends both `Auto-fill Settings` and `Threshold` values to the backend
+- existing saved meals are treated as fixed assignments during auto-fill
+- fixed-assignment violations are validated first and can be acknowledged by the user before proceeding
+
 ## Prerequisites
 
 - Python 3.13+
@@ -96,7 +103,8 @@ The backend runs at `http://127.0.0.1:8000`.
 
 Configuration:
 
-- `.env` is read before `application.properties`
+- the backend reads real environment variables first, then falls back to `application.properties`
+- `.env` is not auto-loaded by the backend process
 - `DATABASE_URL` must be a PostgreSQL URL
 - on startup, the backend runs schema initialization/migrations via `backend.db.init_db()`
 
@@ -126,7 +134,9 @@ The frontend runs at `http://localhost:3000` and proxies `/api/*` requests to th
 | `GET` | `/api/mealplan/{user_id}` | Read weekly meal plan |
 | `POST` | `/api/mealplan/{user_id}/add` | Add one meal plan entry |
 | `POST` | `/api/mealplan/{user_id}/generate` | Run solver and persist generated rows into `meal_plans` |
+| `POST` | `/api/mealplan/{user_id}/autofill/validate` | Validate fixed assignments before auto-fill |
 | `POST` | `/api/mealplan/{user_id}/autofill` | Auto-fill empty slots (paid tier) |
+| `DELETE` | `/api/mealplan/{user_id}/clear` | Clear unblocked meals in a selected week |
 | `DELETE` | `/api/mealplan/{user_id}/remove/{entry_id}` | Delete one meal plan entry |
 | `GET` | `/api/mealplan/{user_id}/nutrients/week` | Weekly nutrients |
 | `GET` | `/api/mealplan/{user_id}/nutrients/day/{day_index}` | Daily nutrients |
@@ -193,7 +203,76 @@ Content-Type: application/json
 }
 ```
 
-### 4. Health check
+### 4. Validate and run auto-fill
+
+Auto-fill uses two separate frontend inputs:
+
+- `Auto-fill Settings`
+  - `maxDishesPerSlot`
+  - `maxCalories`
+  - `maxCarbs`
+  - `maxFat`
+- `Threshold`
+  - daily nutrient targets such as `calories`, `protein`, `carbs`, and `fat`
+
+Recommended request flow:
+
+1. Validate existing fixed meals for the selected week.
+
+- Method: `POST`
+- URL: `http://127.0.0.1:8000/api/mealplan/{user_id}/autofill/validate`
+- Headers:
+
+```text
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+```
+
+- Body:
+
+```json
+{
+  "weekStart": "2026-03-16",
+  "settings": {
+    "maxDishesPerSlot": 2,
+    "maxCalories": 500,
+    "maxCarbs": 200,
+    "maxFat": 30
+  },
+  "thresholds": [
+    { "nutrientKey": "calories", "dailyValue": 2400, "perMealValue": 800 },
+    { "nutrientKey": "protein", "dailyValue": 75, "perMealValue": 25 },
+    { "nutrientKey": "carbs", "dailyValue": 325, "perMealValue": 108 },
+    { "nutrientKey": "fat", "dailyValue": 90, "perMealValue": 30 }
+  ]
+}
+```
+
+If violations are found, the frontend shows a warning and lets the user decide whether to proceed.
+
+2. Run auto-fill.
+
+- Method: `POST`
+- URL: `http://127.0.0.1:8000/api/mealplan/{user_id}/autofill`
+
+Use the same body as validation, and add:
+
+```json
+{
+  "allowConstraintRelaxation": true
+}
+```
+
+only after the user explicitly acknowledges existing fixed-assignment violations.
+
+Behavior summary:
+
+- new solver-picked meals must satisfy the current settings and thresholds
+- existing fixed meals are blocking by default
+- existing fixed-meal violations can be relaxed after user confirmation
+- if no feasible solution is found, the frontend shows a popup and leaves the plan unchanged
+
+### 5. Health check
 
 To confirm the backend is up:
 

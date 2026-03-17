@@ -8,20 +8,23 @@ from fastapi.encoders import jsonable_encoder
 from ..constants import CONDITION_RULES, NUTRIENT_KEYS, RDA
 from ..data import recommend_targets
 from ..db import get_db
-from ..schemas import AddMealPlanBody, AutofillBody, GenerateMealPlanBody
+from ..schemas import (
+    AddMealPlanBody,
+    AutofillBody,
+    AutofillConstraintViolation,
+    AutofillValidationResponse,
+    GenerateMealPlanBody,
+)
 from ..security import require_paid_tier
 from ..services.core import generate_meal_plan_for_week
-from ..services.models import SolverConfig
+from ..services.models import FixedMealAssignment, SolverConfig, normalize_recipe
 from ..services.nutrient_calculator import (
     get_day_nutrients,
     get_dish_nutrients,
-    get_row_nutrients,
     get_week_nutrients,
     load_ingredient_cache,
 )
-from ..services.recommendation_engine import filter_dishes, score_dish
-from .dishes import _load_user_profile, _recipe_to_dish_row
-from ..utils import get_current_week_start, parse_ingredients_map, parse_json
+from ..utils import get_current_week_start, parse_float, parse_ingredients_map, parse_json
 
 router = APIRouter(prefix="/mealplan", tags=["mealplan"])
 
@@ -304,6 +307,39 @@ def remove_dish_from_plan(entry_id: int, user_id: str, conn: Any = Depends(get_d
     return {"success": True}
 
 
+@router.delete("/{user_id}/clear")
+def clear_week_meal_plan(
+    user_id: str,
+    weekStart: str | None = None,
+    conn: Any = Depends(get_db),
+) -> dict[str, int | bool]:
+    if not weekStart:
+        raise HTTPException(status_code=400, detail="weekStart is required")
+
+    rows = conn.execute(
+        """
+        SELECT id, day_index, meal_type
+        FROM meal_plans
+        WHERE user_id = ? AND week_start = ?
+        """,
+        (user_id, weekStart),
+    ).fetchall()
+
+    removable_ids = [
+        int(row["id"])
+        for row in rows
+        if not _is_slot_locked(weekStart, int(row["day_index"]), str(row["meal_type"]))
+    ]
+
+    removed = 0
+    for entry_id in removable_ids:
+        conn.execute("DELETE FROM meal_plans WHERE id = ? AND user_id = ?", (entry_id, user_id))
+        removed += 1
+
+    conn.commit()
+    return {"success": True, "removed": removed}
+
+
 @router.get("/{user_id}/nutrients/week")
 def get_weekly_nutrients(
     user_id: str,
@@ -404,6 +440,309 @@ def _is_slot_locked(week_start: str, day_index: int, meal_type: str) -> bool:
     return False
 
 
+def _build_autofill_fixed_assignments(
+    existing: list[dict[str, Any]],
+) -> tuple[list[FixedMealAssignment], dict[tuple[int, str], list[dict[str, Any]]]]:
+    occupied: dict[tuple[int, str], list[dict[str, Any]]] = {}
+    fixed_assignments: list[FixedMealAssignment] = []
+
+    for entry in existing:
+        key = (int(entry["day_index"]), str(entry["meal_type"]))
+        occupied.setdefault(key, []).append(entry)
+        fixed_assignments.append(
+            FixedMealAssignment(
+                day_index=int(entry["day_index"]),
+                meal_type=str(entry["meal_type"]),
+                recipe_id=str(entry["dish_id"]).removeprefix("r"),
+                servings=float(entry.get("servings") or 1.0),
+            )
+        )
+
+    return fixed_assignments, occupied
+
+
+def _autofill_violation(
+    *,
+    code: str,
+    title: str,
+    message: str,
+    day_index: int,
+    meal_type: str | None = None,
+    recipe_ids: list[str] | None = None,
+    actual: float | None = None,
+    limit: float | None = None,
+) -> AutofillConstraintViolation:
+    return AutofillConstraintViolation(
+        code=code,
+        title=title,
+        message=message,
+        dayIndex=day_index,
+        mealType=meal_type,
+        recipeIds=list(recipe_ids or []),
+        actual=actual,
+        limit=limit,
+    )
+
+
+def _validate_fixed_assignments_for_autofill(
+    existing: list[dict[str, Any]],
+    *,
+    settings: Any,
+    targets: dict[str, float],
+) -> list[AutofillConstraintViolation]:
+    violations: list[AutofillConstraintViolation] = []
+    slot_entries: dict[tuple[int, str], list[dict[str, Any]]] = {}
+    day_totals: dict[int, dict[str, float]] = {}
+
+    for entry in existing:
+        day_index = int(entry["day_index"])
+        meal_type = str(entry["meal_type"])
+        slot_entries.setdefault((day_index, meal_type), []).append(entry)
+        totals = day_totals.setdefault(day_index, {"calories": 0.0, "protein": 0.0, "carbs": 0.0, "fat": 0.0})
+        servings = parse_float(entry.get("servings"), 1.0)
+        for nutrient in totals:
+            totals[nutrient] += parse_float(entry.get(nutrient), 0.0) * servings
+
+    nutrient_caps = {
+        "calories": settings.maxCalories,
+        "carbs": settings.maxCarbs,
+        "fat": settings.maxFat,
+    }
+
+    for (day_index, meal_type), entries in sorted(slot_entries.items()):
+        dish_ids = [str(entry["dish_id"]).removeprefix("r") for entry in entries]
+        recipes = [
+            normalize_recipe(
+                {
+                    **dict(entry),
+                    "recipe_id": str(entry.get("dish_id") or entry.get("recipe_id") or entry.get("id") or ""),
+                }
+            )
+            for entry in entries
+        ]
+
+        if len(entries) > int(settings.maxDishesPerSlot):
+            violations.append(
+                _autofill_violation(
+                    code="too_many_recipes_in_slot",
+                    title="Too many dishes in one slot",
+                    message=(
+                        f"Day {day_index + 1} {meal_type} already has {len(entries)} dishes, "
+                        f"which exceeds the slot limit of {int(settings.maxDishesPerSlot)}."
+                    ),
+                    day_index=day_index,
+                    meal_type=meal_type,
+                    recipe_ids=dish_ids,
+                    actual=float(len(entries)),
+                    limit=float(settings.maxDishesPerSlot),
+                )
+            )
+
+        for recipe in recipes:
+            if meal_type not in recipe.meal_types:
+                violations.append(
+                    _autofill_violation(
+                        code="dish_not_allowed_for_meal",
+                        title="Dish does not match meal type",
+                        message=(
+                            f"Day {day_index + 1} {meal_type} contains '{recipe.name}', "
+                            f"which is not classified for {meal_type}."
+                        ),
+                        day_index=day_index,
+                        meal_type=meal_type,
+                        recipe_ids=[recipe.recipe_id],
+                    )
+                )
+
+        if meal_type in ("lunch", "dinner") and recipes and not any(recipe.is_main_course for recipe in recipes):
+            violations.append(
+                _autofill_violation(
+                    code="missing_main_course",
+                    title="Missing main course",
+                    message=f"Day {day_index + 1} {meal_type} does not include a main course.",
+                    day_index=day_index,
+                    meal_type=meal_type,
+                    recipe_ids=dish_ids,
+                )
+            )
+
+        for nutrient, cap in nutrient_caps.items():
+            if cap is None:
+                continue
+            actual = sum(
+                parse_float(entry.get(nutrient), 0.0) * parse_float(entry.get("servings"), 1.0)
+                for entry in entries
+            )
+            if actual > float(cap):
+                violations.append(
+                    _autofill_violation(
+                        code=f"meal_{nutrient}_cap_exceeded",
+                        title=f"{nutrient.capitalize()} cap exceeded for meal",
+                        message=(
+                            f"Day {day_index + 1} {meal_type} totals {actual:.1f} {nutrient}, "
+                            f"above the slot cap of {float(cap):.1f}."
+                        ),
+                        day_index=day_index,
+                        meal_type=meal_type,
+                        recipe_ids=dish_ids,
+                        actual=round(actual, 1),
+                        limit=float(cap),
+                    )
+                )
+
+    for day_index, totals in sorted(day_totals.items()):
+        for nutrient, target in targets.items():
+            actual = totals.get(nutrient)
+            if actual is None or actual <= float(target):
+                continue
+            violations.append(
+                _autofill_violation(
+                    code=f"daily_{nutrient}_cap_exceeded",
+                    title=f"Daily {nutrient} cap exceeded",
+                    message=(
+                        f"Day {day_index + 1} already totals {actual:.1f} {nutrient}, "
+                        f"above the daily target of {float(target):.1f}."
+                    ),
+                    day_index=day_index,
+                    recipe_ids=[],
+                    actual=round(actual, 1),
+                    limit=float(target),
+                )
+            )
+
+    return violations
+
+
+def _build_autofill_insert_rows(
+    *,
+    generated: Any,
+    user_id: str,
+    week_start: str,
+    occupied: dict[tuple[int, str], list[dict[str, Any]]],
+    settings: Any,
+) -> list[dict[str, Any]]:
+    item_rows: list[dict[str, Any]] = []
+
+    for day_index in range(generated.selected_plan.num_days):
+        for meal_type in AUTOFILL_MEAL_TYPES:
+            slot_key = (day_index, meal_type)
+            picks = list(generated.selected_plan.picks[day_index].get(meal_type, []))
+            print(
+                f"[autofill] solver_slot day={day_index} meal={meal_type} "
+                f"dish_ids={[pick.recipe_id for pick in picks]}"
+            )
+            if _is_slot_locked(week_start, day_index, meal_type):
+                continue
+            if occupied.get(slot_key):
+                continue
+            if settings.maxDishesPerSlot < 1:
+                continue
+
+            if not picks:
+                continue
+
+            for entry_order, pick in enumerate(picks[: settings.maxDishesPerSlot]):
+                item_rows.append(
+                    {
+                        "id": None,
+                        "meal_plan_id": None,
+                        "user_id": user_id,
+                        "week_start": week_start,
+                        "day_index": day_index,
+                        "meal_type": meal_type,
+                        "dish_id": pick.recipe_id,
+                        "servings": pick.servings,
+                        "custom_ingredients": None,
+                        "entry_order": entry_order,
+                    }
+                )
+
+    return item_rows
+
+
+def _targets_from_autofill_thresholds(body: AutofillBody) -> dict[str, float]:
+    targets: dict[str, float] = {}
+    for item in body.thresholds:
+        key = str(item.nutrientKey)
+        if item.dailyValue is not None:
+            targets[key] = float(item.dailyValue)
+        elif item.perMealValue is not None:
+            targets[key] = float(item.perMealValue) * 3.0
+
+    required = ("calories", "protein", "carbs", "fat")
+    missing = [key for key in required if targets.get(key, 0.0) <= 0]
+    if missing:
+        print(
+            "[autofill] threshold_parse_error "
+            f"thresholds={[{'nutrientKey': t.nutrientKey, 'dailyValue': t.dailyValue, 'perMealValue': t.perMealValue} for t in body.thresholds]} "
+            f"parsed_targets={targets} missing={missing}"
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Autofill thresholds are missing required targets: {missing}",
+        )
+    return targets
+
+
+def _log_visible_week_plan(
+    conn: Any,
+    *,
+    user_id: str,
+    week_start: str,
+) -> None:
+    rows = conn.execute(
+        """
+        SELECT day_index, meal_type, dish_id
+        FROM meal_plans
+        WHERE user_id = ? AND week_start = ?
+        ORDER BY day_index, meal_type, entry_order
+        """,
+        (user_id, week_start),
+    ).fetchall()
+
+    slots: dict[tuple[int, str], list[str]] = {}
+    for row in rows:
+        key = (int(row["day_index"]), str(row["meal_type"]))
+        slots.setdefault(key, []).append(str(row["dish_id"]))
+
+    for day_index in range(7):
+        for meal_type in AUTOFILL_MEAL_TYPES:
+            dish_ids = slots.get((day_index, meal_type), [])
+            print(f"[autofill] visible_slot day={day_index} meal={meal_type} dish_ids={dish_ids}")
+
+
+@router.post("/{user_id}/autofill/validate", response_model=AutofillValidationResponse)
+def validate_autofill_plan(
+    user_id: str,
+    body: AutofillBody,
+    _: str = Depends(require_paid_tier),
+    conn: Any = Depends(get_db),
+) -> AutofillValidationResponse:
+    if not body.weekStart:
+        raise HTTPException(status_code=400, detail="weekStart is required for autofill")
+    targets_override = _targets_from_autofill_thresholds(body)
+    existing = conn.execute(
+        """
+        SELECT mp.*, r.name, r.category, r.keywords, r.ingredients,
+               r.calories, r.protein, r.total_carbs AS carbs, r.fat, r.fiber, r.sodium, r.cholesterol, r.sugar
+        FROM meal_plans mp
+        JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
+        WHERE mp.user_id = ? AND mp.week_start = ?
+        ORDER BY mp.day_index, mp.meal_type, mp.entry_order
+        """,
+        (user_id, body.weekStart),
+    ).fetchall()
+    violations = _validate_fixed_assignments_for_autofill(
+        existing,
+        settings=body.settings,
+        targets=targets_override,
+    )
+    return AutofillValidationResponse(
+        canProceed=len(violations) == 0,
+        violations=violations,
+    )
+
+
 @router.post("/{user_id}/autofill")
 def autofill_plan(
     user_id: str,
@@ -411,22 +750,21 @@ def autofill_plan(
     _: str = Depends(require_paid_tier),
     conn: Any = Depends(get_db),
 ) -> dict:
-    ws = body.weekStart or get_current_week_start()
+    if not body.weekStart:
+        raise HTTPException(status_code=400, detail="weekStart is required for autofill")
+    ws = body.weekStart
     settings = body.settings
+    targets_override = _targets_from_autofill_thresholds(body)
+    print(f"[autofill] start user_id={user_id} week_start={ws}")
+    print(f"[autofill] parsed_targets={targets_override}")
 
-    user_profile = _load_user_profile(conn, user_id)
+    user_profile = _load_profile_for_plan(conn, user_id)
     if not user_profile:
         return {"success": False, "added": 0, "error": "User not found"}
 
-    # Load all recipes once
-    recipe_rows = conn.execute("SELECT * FROM recipes").fetchall()
-    all_dishes = [_recipe_to_dish_row(r) for r in recipe_rows]
-    ingredient_cache = load_ingredient_cache(conn)
-
-    # Load existing meal plan entries for the week
     existing = conn.execute(
         """
-        SELECT mp.*, r.ingredients,
+        SELECT mp.*, r.name, r.category, r.keywords, r.ingredients,
                r.calories, r.protein, r.total_carbs AS carbs, r.fat, r.fiber, r.sodium, r.cholesterol, r.sugar
         FROM meal_plans mp
         JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
@@ -436,119 +774,96 @@ def autofill_plan(
         (user_id, ws),
     ).fetchall()
 
-    # Build a set of occupied slots and collect entries by day
-    occupied: dict[tuple[int, str], list[dict]] = {}
-    day_entries_map: dict[int, list[dict]] = {d: [] for d in range(7)}
-    all_week_dish_ids: list[dict] = [{"dish_id": e["dish_id"]} for e in existing]
+    violations = _validate_fixed_assignments_for_autofill(
+        existing,
+        settings=settings,
+        targets=targets_override,
+    )
+    if violations and not body.allowConstraintRelaxation:
+        print(
+            f"[autofill] validation_blocked user_id={user_id} week_start={ws} "
+            f"violation_codes={[violation.code for violation in violations]}"
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "Existing meal plan violates hard constraints.",
+                "violations": jsonable_encoder(violations),
+            },
+        )
 
-    for entry in existing:
-        key = (entry["day_index"], entry["meal_type"])
-        occupied.setdefault(key, []).append(entry)
-        day_entries_map[entry["day_index"]].append(entry)
+    try:
+        fixed_assignments, occupied = _build_autofill_fixed_assignments(existing)
+        print(
+            f"[autofill] existing_slots={len(occupied)} fixed_assignments={len(fixed_assignments)} "
+            f"settings=maxDishesPerSlot:{settings.maxDishesPerSlot},maxCalories:{settings.maxCalories},"
+            f"maxCarbs:{settings.maxCarbs},maxFat:{settings.maxFat}"
+        )
+        generated = generate_meal_plan_for_week(
+            conn,
+            patient_id=user_id,
+            week_start=ws,
+            config=SolverConfig(
+                num_days=7,
+                max_solutions=1,
+                time_limit_seconds=5,
+                max_recipes_per_meal=max(1, int(settings.maxDishesPerSlot)),
+                per_meal_nutrient_caps={
+                    key: value
+                    for key, value in {
+                        "calories": settings.maxCalories,
+                        "carbs": settings.maxCarbs,
+                        "fat": settings.maxFat,
+                    }.items()
+                    if value is not None
+                },
+            ),
+            fixed_assignments=fixed_assignments,
+            targets_override=targets_override,
+        )
+        print(
+            f"[autofill] solver_success user_id={user_id} week_start={ws} "
+            f"objective={generated.selected_plan.objective_value:.2f}"
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        print(f"[autofill] solver_value_error user_id={user_id} week_start={ws} detail={detail}")
+        status = 404 if "not found" in detail.lower() else 400
+        raise HTTPException(status_code=status, detail=detail) from exc
+    except RuntimeError as exc:
+        print(f"[autofill] solver_runtime_error user_id={user_id} week_start={ws} detail={exc}")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
-    added = 0
+    item_rows = _build_autofill_insert_rows(
+        generated=generated,
+        user_id=user_id,
+        week_start=ws,
+        occupied=occupied,
+        settings=settings,
+    )
 
-    for day_index in range(7):
-        for meal_type in AUTOFILL_MEAL_TYPES:
-            slot_key = (day_index, meal_type)
-
-            # Skip locked (past) slots
-            if _is_slot_locked(ws, day_index, meal_type):
-                continue
-
-            # Skip non-empty slots
-            if occupied.get(slot_key):
-                continue
-
-            # Filter dishes for this meal type
-            filtered = filter_dishes(
-                all_dishes,
-                user_profile,
-                meal_type,
-                ingredient_cache,
-                filter_meal_type=True,
-                filter_diet=True,
-                filter_allergies=True,
-                filter_conditions=True,
-            )
-
-            # Score and sort
-            scored = []
-            for dish in filtered:
-                score = score_dish(
-                    dish,
-                    user_profile.get("conditions", []),
-                    day_entries_map[day_index],
-                    meal_type,
-                    all_week_dish_ids,
-                    ingredient_cache,
-                )
-                scored.append((dish, score))
-            scored.sort(key=lambda x: x[1]["total"], reverse=True)
-
-            # Track slot nutrients for constraint checking
-            slot_nutrients = {"calories": 0.0, "carbs": 0.0, "fat": 0.0}
-            slot_dish_count = 0
-
-            # Get current max entry_order for this slot
-            max_order_row = conn.execute(
-                """
-                SELECT COALESCE(MAX(entry_order), -1) as m
-                FROM meal_plans
-                WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?
-                """,
-                (user_id, ws, day_index, meal_type),
-            ).fetchone()
-            entry_order = max_order_row["m"] + 1
-
-            for dish, score in scored:
-                if slot_dish_count >= settings.maxDishesPerSlot:
-                    break
-
-                # Get dish nutrients
-                dish_nutrients = get_row_nutrients(dish)
-
-                # Check if adding this dish would exceed constraints
-                new_cal = slot_nutrients["calories"] + dish_nutrients.get("calories", 0)
-                new_carbs = slot_nutrients["carbs"] + dish_nutrients.get("carbs", 0)
-                new_fat = slot_nutrients["fat"] + dish_nutrients.get("fat", 0)
-
-                # If we already have dishes in this slot, check constraints before adding
-                if slot_dish_count > 0:
-                    if settings.maxCalories is not None and new_cal > settings.maxCalories:
-                        break
-                    if settings.maxCarbs is not None and new_carbs > settings.maxCarbs:
-                        break
-                    if settings.maxFat is not None and new_fat > settings.maxFat:
-                        break
-
-                # Insert the dish
-                dish_id = str(dish["id"])
-                conn.execute(
-                    """
-                    INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (user_id, ws, day_index, meal_type, dish_id, 1.0, None, entry_order),
-                )
-                entry_order += 1
-                added += 1
-                slot_dish_count += 1
-                slot_nutrients["calories"] = new_cal
-                slot_nutrients["carbs"] = new_carbs
-                slot_nutrients["fat"] = new_fat
-
-                # Update tracking for subsequent scoring
-                fake_entry = {"dish_id": dish_id}
-                all_week_dish_ids.append(fake_entry)
-
-                # Check constraints after adding
-                if settings.maxCalories is not None and slot_nutrients["calories"] >= settings.maxCalories:
-                    break
-                if settings.maxCarbs is not None and slot_nutrients["carbs"] >= settings.maxCarbs:
-                    break
-                if settings.maxFat is not None and slot_nutrients["fat"] >= settings.maxFat:
-                    break
+    saved_rows = []
+    for row in item_rows:
+        inserted = conn.execute(
+            """
+            INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order
+            """,
+            (
+                row["user_id"],
+                row["week_start"],
+                row["day_index"],
+                row["meal_type"],
+                row["dish_id"],
+                row["servings"],
+                row["custom_ingredients"],
+                row["entry_order"],
+            ),
+        ).fetchone()
+        saved_rows.append(dict(inserted))
 
     conn.commit()
-    return {"success": True, "added": added}
+    print(f"[autofill] inserted_rows={len(saved_rows)} user_id={user_id} week_start={ws}")
+    _log_visible_week_plan(conn, user_id=user_id, week_start=ws)
+    return {"success": True, "added": len(saved_rows)}

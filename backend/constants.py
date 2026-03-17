@@ -10,10 +10,10 @@ NUTRIENT_KEYS = [
 ]
 
 RDA = {
-    "calories": 2000,
-    "protein": 50,
-    "carbs": 275,
-    "fat": 65,
+    "calories": 2400,
+    "protein": 75,
+    "carbs": 325,
+    "fat": 90,
     "fiber": 28,
     "sodium": 2300,
     "cholesterol": 300,
