@@ -29,6 +29,12 @@ class AddMealPlanBody(BaseModel):
     weekStart: str | None = None
 
 
+class GenerateMealPlanBody(BaseModel):
+    weekStart: str | None = None
+    days: int = Field(default=3, ge=1, le=7)
+    maxSolutions: int = Field(default=1, ge=1, le=3)
+
+
 class ToggleShoppingSelectionBody(BaseModel):
     weekStart: str
     dayIndex: int

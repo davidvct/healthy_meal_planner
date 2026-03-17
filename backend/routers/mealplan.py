@@ -1,12 +1,16 @@
 from typing import Any
 import json
+from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 
 from ..constants import CONDITION_RULES, NUTRIENT_KEYS, RDA
 from ..data import recommend_targets
 from ..db import get_db
-from ..schemas import AddMealPlanBody
+from ..schemas import AddMealPlanBody, GenerateMealPlanBody
+from ..services.core import generate_meal_plan_for_week
+from ..services.models import SolverConfig
 from ..services.nutrient_calculator import (
     get_day_nutrients,
     get_week_nutrients,
@@ -81,6 +85,89 @@ def _recipe_tags(row: dict[str, Any]) -> list[str]:
     if row.get("is_vegan"):
         tags.append("vegan")
     return list(dict.fromkeys(tags))
+
+
+def _build_generated_meal_plan_rows(
+    generated: Any,
+    *,
+    owner_id: str,
+    week_start: str,
+    duration_days: int,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    start_date = date.fromisoformat(week_start)
+    end_date = start_date + timedelta(days=max(0, duration_days - 1))
+
+    meal_plan_row = {
+        "id": None,
+        "user_id": owner_id,
+        "name": None,
+        "duration_days": duration_days,
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "status": "draft",
+        "members": None,
+        "created_at": None,
+        "updated_at": None,
+        "week_start": week_start,
+    }
+
+    item_rows: list[dict[str, Any]] = []
+    for day_index in range(generated.selected_plan.num_days):
+        for meal_type, picks in generated.selected_plan.picks[day_index].items():
+            for entry_order, pick in enumerate(picks):
+                item_rows.append(
+                    {
+                        "id": None,
+                        "meal_plan_id": None,
+                        "user_id": owner_id,
+                        "week_start": week_start,
+                        "day_index": day_index,
+                        "meal_type": meal_type,
+                        "dish_id": pick.recipe_id,
+                        "servings": pick.servings,
+                        "custom_ingredients": None,
+                        "entry_order": entry_order,
+                    }
+                )
+
+    return meal_plan_row, item_rows
+
+
+def _persist_generated_meal_plan(
+    conn: Any,
+    *,
+    user_id: str,
+    week_start: str,
+    item_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    conn.execute(
+        "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ?",
+        (user_id, week_start),
+    )
+
+    saved_rows: list[dict[str, Any]] = []
+    for row in item_rows:
+        inserted = conn.execute(
+            """
+            INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order
+            """,
+            (
+                row["user_id"],
+                row["week_start"],
+                row["day_index"],
+                row["meal_type"],
+                row["dish_id"],
+                row["servings"],
+                row["custom_ingredients"],
+                row["entry_order"],
+            ),
+        ).fetchone()
+        saved_rows.append(dict(inserted))
+
+    conn.commit()
+    return saved_rows
 
 
 @router.get("/{user_id}")
@@ -160,6 +247,49 @@ def add_dish_to_plan(
     )
     conn.commit()
     return {"success": True}
+
+
+@router.post("/{user_id}/generate")
+def generate_meal_plan(
+    user_id: str,
+    body: GenerateMealPlanBody,
+    conn: Any = Depends(get_db),
+) -> dict[str, Any]:
+    ws = body.weekStart or get_current_week_start()
+
+    try:
+        generated = generate_meal_plan_for_week(
+            conn,
+            patient_id=user_id,
+            week_start=ws,
+            config=SolverConfig(num_days=body.days, max_solutions=body.maxSolutions),
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        status = 404 if "not found" in detail.lower() else 400
+        raise HTTPException(status_code=status, detail=detail) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    meal_plan_row, item_rows = _build_generated_meal_plan_rows(
+        generated,
+        owner_id=user_id,
+        week_start=ws,
+        duration_days=body.days,
+    )
+    saved_rows = _persist_generated_meal_plan(
+        conn,
+        user_id=user_id,
+        week_start=ws,
+        item_rows=item_rows,
+    )
+
+    return {
+        "saved_meal_plans_rows": saved_rows,
+        "selected_plan": jsonable_encoder(generated.selected_plan),
+        "targets": generated.inputs.targets,
+        "profile": generated.inputs.profile,
+    }
 
 
 @router.delete("/{user_id}/remove/{entry_id}")

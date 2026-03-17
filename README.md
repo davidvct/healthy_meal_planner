@@ -1,90 +1,106 @@
-# MealWise — Smart Meal Planner
+# MealWise
 
-A health-aware weekly meal planning app for Singaporean elderly users, with dynamic dish recommendations, nutrient tracking, and shopping list generation.
+MealWise is a health-aware weekly meal planning app for Singaporean elderly users. The current stack is:
+
+- frontend: React + Vite
+- backend: FastAPI
+- database: PostgreSQL via `psycopg`
+- solver: OR-Tools CP-SAT
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) v18 or later (includes npm)
+- Python 3.13+
+- Node.js 18+
+- a PostgreSQL database reachable through `DATABASE_URL`
 
 ## Project Structure
 
-```
-project/
-├── frontend/                          # React + Vite (UI only)
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── App.jsx                # Root component (profile state, routing)
-│   │   │   ├── OnboardingScreen.jsx   # 3-step health profile wizard
-│   │   │   ├── CalendarScreen.jsx     # Weekly planner grid + header
-│   │   │   ├── AddDishModal.jsx       # Dish recommendation list with filters
-│   │   │   ├── DishCard.jsx           # Single dish card in recommendation list
-│   │   │   ├── DishDetail.jsx         # Slide-up panel: servings, ingredients, recipe
-│   │   │   ├── RecipeViewModal.jsx    # Full-screen recipe for cooking mode
-│   │   │   ├── ShoppingListPanel.jsx  # Aggregated weekly shopping list
-│   │   │   ├── NutrientSummaryPanel.jsx # Weekly nutrition overview + chart
-│   │   │   └── ui/                    # Reusable UI atoms
-│   │   │       ├── NutrientBar.jsx
-│   │   │       ├── ScoreBadge.jsx
-│   │   │       ├── WarningTag.jsx
-│   │   │       └── FilterChip.jsx
-│   │   ├── constants/
-│   │   │   ├── colors.js             # Theme color palette
-│   │   │   └── mealTypes.js          # MEAL_TYPES, DAYS, RDA values
-│   │   ├── services/
-│   │   │   └── api.js                # HTTP client for all backend API calls
-│   │   └── index.jsx                 # Entry point
-│   ├── index.html
-│   ├── vite.config.js                # Dev server + proxy /api → backend
-│   └── package.json
-│
-├── backend/                           # Express.js + SQLite
-│   ├── src/
-│   │   ├── server.js                 # Express entry point (port 8080)
-│   │   ├── db.js                     # SQLite connection, schema, auto-seeding
-│   │   ├── routes/
-│   │   │   ├── dishes.js             # GET /api/dishes, GET /api/dishes/:id,
-│   │   │   │                         # GET /api/dishes/recommend/:userId
-│   │   │   ├── mealplan.js           # GET/POST/DELETE meal plan entries,
-│   │   │   │                         # GET weekly & daily nutrient summaries
-│   │   │   ├── shoppingList.js       # GET /api/shopping-list/:userId
-│   │   │   └── users.js             # POST /api/users/profile, GET/DELETE user
-│   │   ├── services/                 # Business logic (testable independently)
-│   │   │   ├── nutrientCalculator.js # Nutrient math for dishes, days, weeks
-│   │   │   ├── recommendationEngine.js # Dish scoring, filtering, warnings
-│   │   │   └── shoppingListGenerator.js # Ingredient aggregation
-│   │   └── data/                     # Seed data (loaded into SQLite on first run)
-│   │       ├── ingredients.js        # Nutritional values per 100g
-│   │       ├── dishes.js             # 10 Singaporean dishes with ingredients
-│   │       ├── recipes.js            # Step-by-step cooking instructions
-│   │       └── conditionRules.js     # Health condition thresholds
-│   ├── mealwise.db                   # SQLite database (auto-created on first run)
-│   └── package.json
-│
-├── shared/                            # Constants shared by frontend & backend
-│   └── nutrientKeys.js               # NUTRIENT_KEYS, RDA
-│
-├── mealplan-app.jsx                   # Original monolithic prototype (reference)
-├── architecture.md                    # System architecture & API design
-├── flow.md                            # User flow documentation
-├── dev_phase.md                       # Development phase roadmap
-└── planning.md                        # Recommendation scoring design
+```text
+.
+├── README.md
+├── pyproject.toml
+├── application.properties
+├── .env
+├── backend
+│   ├── main.py
+│   ├── db.py
+│   ├── config.py
+│   ├── schemas.py
+│   ├── security.py
+│   ├── utils.py
+│   ├── data.py
+│   ├── constants.py
+│   ├── routers
+│   │   ├── auth.py
+│   │   ├── caretakers.py
+│   │   ├── dishes.py
+│   │   ├── health.py
+│   │   ├── mealplan.py
+│   │   ├── shopping_list.py
+│   │   └── users.py
+│   └── services
+│       ├── core.py
+│       ├── inputs.py
+│       ├── models.py
+│       ├── nutrient_calculator.py
+│       ├── recommendation_engine.py
+│       └── shopping_list_generator.py
+└── frontend
+    ├── package.json
+    ├── vite.config.js
+    └── src
+        ├── index.jsx
+        ├── services
+        │   └── api.js
+        ├── constants
+        │   ├── colors.js
+        │   └── mealTypes.js
+        └── components
+            ├── App.jsx
+            ├── AuthScreen.jsx
+            ├── CaretakerSetup.jsx
+            ├── DinerDashboard.jsx
+            ├── OnboardingScreen.jsx
+            ├── CalendarScreen.jsx
+            ├── AddDishModal.jsx
+            ├── MealSlotDetail.jsx
+            ├── DishCard.jsx
+            ├── DishDetail.jsx
+            ├── RecipeViewModal.jsx
+            ├── ShoppingListPanel.jsx
+            ├── NutrientSummaryPanel.jsx
+            └── ui
+                ├── FilterChip.jsx
+                ├── NutrientBar.jsx
+                ├── NutritionBarChart.jsx
+                ├── ScoreBadge.jsx
+                └── WarningTag.jsx
 ```
 
 ## Running Locally
 
-Open **two terminals** from the project root:
+Open two terminals from the project root.
 
-### Terminal 1 — Start the Backend
+### Backend
+
+Create or activate your virtual environment, install Python dependencies, and start FastAPI:
 
 ```bash
-cd backend
-npm install
-npm run dev
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -e .
+.venv/bin/uvicorn backend.main:app --reload
 ```
 
-The backend starts on **http://localhost:8080**. On first run, it automatically creates `mealwise.db` and seeds it with all dish, ingredient, and recipe data.
+The backend runs at `http://127.0.0.1:8000`.
 
-### Terminal 2 — Start the Frontend
+Configuration:
+
+- `.env` is read before `application.properties`
+- `DATABASE_URL` must be a PostgreSQL URL
+- on startup, the backend runs schema initialization/migrations via `backend.db.init_db()`
+
+### Frontend
 
 ```bash
 cd frontend
@@ -92,37 +108,116 @@ npm install
 npm run dev
 ```
 
-The frontend starts on **http://localhost:3000**. Vite's dev server automatically proxies all `/api/*` requests to the backend at `localhost:8080`.
-
-### Open the App
-
-Visit **http://localhost:3000** in your browser.
+The frontend runs at `http://localhost:3000` and proxies `/api/*` requests to the backend.
 
 ## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/dishes` | List all dishes |
-| `GET` | `/api/dishes/:id` | Dish detail with recipe and nutrients |
-| `GET` | `/api/dishes/recommend/:userId` | Scored + filtered recommendations for a meal slot |
-| `GET` | `/api/mealplan/:userId` | Retrieve weekly meal plan |
-| `POST` | `/api/mealplan/:userId/add` | Add a dish to a meal slot |
-| `DELETE` | `/api/mealplan/:userId/remove/:entryId` | Remove a dish from the plan |
-| `GET` | `/api/mealplan/:userId/nutrients/week` | Weekly nutrient summary |
-| `GET` | `/api/mealplan/:userId/nutrients/day/:dayIndex` | Single day nutrient totals |
-| `GET` | `/api/shopping-list/:userId` | Aggregated weekly shopping list |
-| `POST` | `/api/users/profile` | Create or update user profile |
-| `GET` | `/api/users/:id` | Get user profile |
-| `DELETE` | `/api/users/:id` | Delete user and their meal plans |
-| `GET` | `/api/health` | Backend health check |
+| `POST` | `/api/auth/request-otp` | Request email OTP |
+| `POST` | `/api/auth/verify-otp` | Verify OTP |
+| `POST` | `/api/auth/register` | Register account |
+| `POST` | `/api/auth/login` | Login and get bearer token |
+| `POST` | `/api/caretakers` | Create caretaker |
+| `GET` | `/api/caretakers/by-auth/{auth_user_id}` | Load caretaker by auth user |
+| `GET` | `/api/caretakers/{caretaker_id}/diners` | List family members |
+| `GET` | `/api/dishes` | List dishes |
+| `GET` | `/api/dishes/recommend/{user_id}` | Get filtered/scored dishes |
+| `GET` | `/api/mealplan/{user_id}` | Read weekly meal plan |
+| `POST` | `/api/mealplan/{user_id}/add` | Add one meal plan entry |
+| `POST` | `/api/mealplan/{user_id}/generate` | Run solver and persist generated rows into `meal_plans` |
+| `DELETE` | `/api/mealplan/{user_id}/remove/{entry_id}` | Delete one meal plan entry |
+| `GET` | `/api/mealplan/{user_id}/nutrients/week` | Weekly nutrients |
+| `GET` | `/api/mealplan/{user_id}/nutrients/day/{day_index}` | Daily nutrients |
+| `GET` | `/api/shopping-list/{user_id}` | Shopping list |
+| `POST` | `/api/shopping-list/{user_id}/toggle-selection` | Toggle shopping selection |
+| `POST` | `/api/users/profile` | Create or update diner profile |
+| `GET` | `/api/users/{user_id}` | Get profile |
+| `DELETE` | `/api/users/{user_id}` | Delete profile |
+| `GET` | `/api/health` | Health check |
+
+## Testing the API
+
+You can test the FastAPI backend locally with Postman.
+
+### 1. Start the backend
+
+From the project root:
+
+```bash
+.venv/bin/uvicorn backend.main:app --reload
+```
+
+The API will be available at **http://127.0.0.1:8000**.
+
+### 2. Get a JWT token
+
+Most `/api/*` routes require a bearer token. First call the login endpoint:
+
+- Method: `POST`
+- URL: `http://127.0.0.1:8000/api/auth/login`
+- Header: `Content-Type: application/json`
+- Body:
+
+```json
+{
+  "email": "your-email@example.com",
+  "password": "YourPassword123!"
+}
+```
+
+Copy the `token` value from the response.
+
+### 3. Call the meal plan generator
+
+- Method: `POST`
+- URL: `http://127.0.0.1:8000/api/mealplan/{user_id}/generate`
+- Headers:
+
+```text
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+```
+
+- Example URL:
+
+```text
+http://127.0.0.1:8000/api/mealplan/5e4e9c29-99bd-4fc2-8232-0ebdf44345b8/generate
+```
+
+- Body:
+
+```json
+{
+  "weekStart": "2026-03-09",
+  "days": 3,
+  "maxSolutions": 1
+}
+```
+
+### 4. Expected response
+
+The endpoint writes generated rows into the `meal_plans` table for the given `user_id` and `weekStart`, then returns JSON with both persisted rows and solver debug information.
+
+Response fields include:
+
+- `saved_meal_plans_rows`
+- `selected_plan`
+- `targets`
+- `profile`
+
+### 5. Health check
+
+To confirm the backend is up:
+
+- Method: `GET`
+- URL: `http://127.0.0.1:8000/api/health`
 
 ## Tech Stack
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|
-| Frontend | React 18 + Vite | UI rendering and dev server |
-| Backend | Express.js (Node.js) | REST API and business logic |
-| Database | SQLite (via better-sqlite3) | Local data storage, zero-config |
-| Charts | Recharts (optional, CDN) | Weekly nutrition bar chart |
-
-**Phase 3 migration:** SQLite will be swapped for PostgreSQL when deploying to cloud. See `dev_phase.md` for the full roadmap.
+| Frontend | React 18 + Vite | UI rendering |
+| Backend | FastAPI | REST API |
+| Database | PostgreSQL + psycopg | persistence |
+| Solver | OR-Tools | meal plan generation |
