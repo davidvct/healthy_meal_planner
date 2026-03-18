@@ -60,14 +60,28 @@ function toWeekStart(date) {
   ].join('-');
 }
 
+// Returns which day indices (0–6) are in the selected range for the given week
+function getRangeDays(range, monday) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const mondayTime = monday.getTime();
+  const todayIdx = Math.round((today.getTime() - mondayTime) / 86400000);
+  const isCurrentWeek = todayIdx >= 0 && todayIdx < 7;
+
+  if (range === 'today')  return isCurrentWeek ? [todayIdx] : [];
+  if (range === '3days')  return isCurrentWeek
+    ? [0, 1, 2].map(i => todayIdx + i).filter(d => d < 7)
+    : [];
+  return [0, 1, 2, 3, 4, 5, 6];
+}
+
 export default function ShoppingScreen({ diners, activeDiner }) {
-  const [range,         setRange]         = useState('week');
-  const [activeDiners,  setActiveDiners]  = useState(() => new Set(activeDiner ? [activeDiner.userId] : []));
-  const [items,         setItems]         = useState({});
-  const [checked,       setChecked]       = useState(new Set());
-  const [loading,       setLoading]       = useState(false);
-  const [activeCategory,setActiveCategory]= useState(null);
-  const [weekOffset,    setWeekOffset]    = useState(0);
+  const [range,          setRange]          = useState('week');
+  const [activeDiners,   setActiveDiners]   = useState(() => new Set(activeDiner ? [activeDiner.userId] : []));
+  const [items,          setItems]          = useState({});
+  const [checked,        setChecked]        = useState(new Set());
+  const [loading,        setLoading]        = useState(false);
+  const [activeCategory, setActiveCategory] = useState(null);
+  const [weekOffset,     setWeekOffset]     = useState(0);
 
   // Sync activeDiners when prop changes
   useEffect(() => {
@@ -76,20 +90,70 @@ export default function ShoppingScreen({ diners, activeDiner }) {
     }
   }, [activeDiner]);
 
+  // Reset checked items when range/week changes
+  useEffect(() => { setChecked(new Set()); }, [range, weekOffset]);
+
   const monday    = getMonday(addDays(new Date(), weekOffset * 7));
-  const weekStart = toWeekStart(monday);
   const weekLabel = `${monday.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })} – ${addDays(monday, 6).toLocaleDateString('en-SG', { day: 'numeric', month: 'short' })}`;
 
   const loadList = useCallback(async () => {
     if (activeDiners.size === 0) { setItems({}); return; }
     setLoading(true);
     try {
+      const m  = getMonday(addDays(new Date(), weekOffset * 7));
+      const ws = toWeekStart(m);
+      const rangeDays = new Set(getRangeDays(range, m));
+
       const allItems = [];
+
       for (const userId of activeDiners) {
-        const res  = await api.getShoppingList(userId, weekStart);
-        const list = res?.items || res || [];
+        // Fetch meal plan and current shopping selections in parallel
+        const [plan, shoppingRes] = await Promise.all([
+          api.getMealPlan(userId, ws),
+          api.getShoppingList(userId, ws),
+        ]);
+
+        const existingSelections = new Set(
+          (shoppingRes?.selections || []).map(s => `${s.dayIndex}:${s.mealType}`)
+        );
+
+        // Desired selections = filled slots that fall within the current range
+        const desiredSelections = new Set();
+        for (const dayIndex of rangeDays) {
+          const dayMeals = plan?.[dayIndex] || {};
+          for (const [mealType, entries] of Object.entries(dayMeals)) {
+            if (Array.isArray(entries) && entries.length > 0) {
+              desiredSelections.add(`${dayIndex}:${mealType}`);
+            }
+          }
+        }
+
+        // Slots to add (planned but not yet selected)
+        const toAdd = [...desiredSelections].filter(k => !existingSelections.has(k));
+        // Slots to remove (selected but no longer in range/plan)
+        const toRemove = [...existingSelections].filter(k => !desiredSelections.has(k));
+
+        const toggles = [
+          ...toAdd.map(k => {
+            const [di, mt] = k.split(':');
+            return api.toggleShoppingSelection(userId, ws, Number(di), mt);
+          }),
+          ...toRemove.map(k => {
+            const [di, mt] = k.split(':');
+            return api.toggleShoppingSelection(userId, ws, Number(di), mt);
+          }),
+        ];
+
+        if (toggles.length > 0) {
+          await Promise.allSettled(toggles);
+        }
+
+        // Fetch the final shopping list with synced selections
+        const finalRes = await api.getShoppingList(userId, ws);
+        const list = finalRes?.items || (Array.isArray(finalRes) ? finalRes : []);
         allItems.push(...list);
       }
+
       setItems(categorise(allItems));
     } catch (err) {
       console.error('Failed to load shopping list:', err);
@@ -97,14 +161,14 @@ export default function ShoppingScreen({ diners, activeDiner }) {
     } finally {
       setLoading(false);
     }
-  }, [activeDiners, weekStart]);
+  }, [activeDiners, weekOffset, range]);
 
   useEffect(() => { loadList(); }, [loadList]);
 
-  const allItems    = Object.values(items).flat();
+  const allItems     = Object.values(items).flat();
   const checkedCount = checked.size;
-  const totalCount  = allItems.length;
-  const pct         = totalCount ? Math.round((checkedCount / totalCount) * 100) : 0;
+  const totalCount   = allItems.length;
+  const pct          = totalCount ? Math.round((checkedCount / totalCount) * 100) : 0;
 
   const toggleCheck = (key) => {
     setChecked(prev => {
@@ -122,6 +186,10 @@ export default function ShoppingScreen({ diners, activeDiner }) {
     });
   };
 
+  // For "Today" and "3 Days", disable week nav (only relevant for current week)
+  const isCurrentWeek = weekOffset === 0;
+  const rangeNeedsCurrentWeek = range === 'today' || range === '3days';
+
   const displayedCategories = activeCategory
     ? (items[activeCategory] ? { [activeCategory]: items[activeCategory] } : {})
     : items;
@@ -135,30 +203,32 @@ export default function ShoppingScreen({ diners, activeDiner }) {
         {/* ── Controls bar ── */}
         <div className="shop-bar">
           {/* Range pills */}
-          {RANGE_OPTIONS.map(r => (
-            <button
-              key={r.id}
-              className={`shop-rpill${range === r.id ? ' on' : ''}`}
-              onClick={() => setRange(r.id)}
-            >
-              {r.label}
-            </button>
-          ))}
+          {RANGE_OPTIONS.map(r => {
+            const disabled = (r.id === 'today' || r.id === '3days') && !isCurrentWeek;
+            return (
+              <button
+                key={r.id}
+                className={`shop-rpill${range === r.id ? ' on' : ''}`}
+                onClick={() => { if (!disabled) setRange(r.id); }}
+                style={disabled ? { opacity: 0.4, cursor: 'default' } : undefined}
+              >
+                {r.label}
+              </button>
+            );
+          })}
 
-          {range === 'week' && (
-            <>
-              <div className="shop-sep" />
-              <button
-                onClick={() => setWeekOffset(o => o - 1)}
-                style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0 }}
-              >‹</button>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', minWidth: 110, textAlign: 'center' }}>{weekLabel}</span>
-              <button
-                onClick={() => setWeekOffset(o => o + 1)}
-                style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0 }}
-              >›</button>
-            </>
-          )}
+          {/* Week nav — always shown */}
+          <div className="shop-sep" />
+          <button
+            onClick={() => setWeekOffset(o => o - 1)}
+            style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0 }}
+          >‹</button>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', minWidth: 110, textAlign: 'center' }}>{weekOffset === 0 ? 'This week' : weekLabel}</span>
+          <button
+            onClick={() => setWeekOffset(o => o + 1)}
+            disabled={weekOffset >= 0}
+            style={{ width: 24, height: 24, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--white)', cursor: weekOffset >= 0 ? 'default' : 'pointer', fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0, opacity: weekOffset >= 0 ? 0.35 : 1 }}
+          >›</button>
 
           {/* Diner chips (only if multiple diners) */}
           {diners.length > 1 && (
@@ -185,6 +255,13 @@ export default function ShoppingScreen({ diners, activeDiner }) {
             </>
           )}
         </div>
+
+        {/* ── No-meals-in-range notice ── */}
+        {rangeNeedsCurrentWeek && !isCurrentWeek && !loading && (
+          <div style={{ padding: '8px 16px', fontSize: 11, color: 'var(--text3)', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+            "Today" and "3 Days" only apply to the current week. Switch to <strong>This week</strong> to browse other weeks.
+          </div>
+        )}
 
         {/* ── Progress row ── */}
         {totalCount > 0 && (
@@ -228,9 +305,9 @@ export default function ShoppingScreen({ diners, activeDiner }) {
             {visibleCats.map(cat => {
               const on       = activeCategory === cat;
               const catItems = items[cat] || [];
-              const catCheckedCount = catItems.filter(it => checked.has(it.key || it.ingredientName || it.name)).length;
-              const catPct   = catItems.length ? Math.round((catCheckedCount / catItems.length) * 100) : 0;
-              const allDone  = catCheckedCount === catItems.length && catItems.length > 0;
+              const catChecked = catItems.filter(it => checked.has(it.name)).length;
+              const catPct   = catItems.length ? Math.round((catChecked / catItems.length) * 100) : 0;
+              const allDone  = catChecked === catItems.length && catItems.length > 0;
               return (
                 <button
                   key={cat}
@@ -244,7 +321,7 @@ export default function ShoppingScreen({ diners, activeDiner }) {
                       <span className="shop-si-lbl">{cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
                       {allDone
                         ? <span className="shop-si-done">✓</span>
-                        : <span className="shop-si-count">{catCheckedCount}/{catItems.length}</span>
+                        : <span className="shop-si-count">{catChecked}/{catItems.length}</span>
                       }
                     </div>
                     <div className="shop-si-bar">
@@ -272,7 +349,7 @@ export default function ShoppingScreen({ diners, activeDiner }) {
                   <div className="shop-cat-hd">{CATEGORY_ICONS[cat]} {cat.charAt(0).toUpperCase() + cat.slice(1)}</div>
                   <div className="shop-tokens">
                     {catItems.map(item => {
-                      const key       = item.key || item.ingredientName || item.name || Math.random().toString();
+                      const key       = item.name || Math.random().toString();
                       const isChecked = checked.has(key);
                       return (
                         <button
@@ -281,9 +358,9 @@ export default function ShoppingScreen({ diners, activeDiner }) {
                           onClick={() => toggleCheck(key)}
                         >
                           <span className="shop-tok-dot" />
-                          <span className="shop-tok-name">{item.ingredientName || item.name}</span>
-                          {item.quantity && (
-                            <span className="shop-tok-qty">{item.quantity}{item.unit ? ` ${item.unit}` : ''}</span>
+                          <span className="shop-tok-name">{item.name}</span>
+                          {item.grams != null && item.grams > 0 && (
+                            <span className="shop-tok-qty">{item.grams}g</span>
                           )}
                         </button>
                       );

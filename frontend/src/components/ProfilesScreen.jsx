@@ -14,8 +14,7 @@ function getMonday(date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
   const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
   return d;
 }
 
@@ -23,6 +22,19 @@ function addDays(date, n) {
   const d = new Date(date);
   d.setDate(d.getDate() + n);
   return d;
+}
+
+function toDateStr(d) {
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+}
+
+function toWeekStart(d) { return toDateStr(getMonday(d)); }
+
+function getWeeksInRange(startMonday, endDate) {
+  const weeks = [];
+  let cur = new Date(startMonday);
+  while (cur <= endDate) { weeks.push(new Date(cur)); cur = addDays(cur, 7); }
+  return weeks;
 }
 
 const EMPTY_VALUES = new Set(['none', 'no restriction', 'no restrictions', 'any', 'n/a', 'na', 'not specified', 'none flagged']);
@@ -42,39 +54,46 @@ function conditionTagClass(cond) {
 }
 
 const NUTRIENT_TABS = [
-  { key: 'calories',  label: 'Calories',  unit: 'kcal', color: '#069B8E', target: 2000 },
-  { key: 'protein',   label: 'Protein',   unit: 'g',    color: '#6EE7B7', target: 50 },
-  { key: 'carbs',     label: 'Carbs',     unit: 'g',    color: '#FCD34D', target: 275 },
-  { key: 'fat',       label: 'Fat',       unit: 'g',    color: '#93C5FD', target: 78 },
-  { key: 'sodium',    label: 'Sodium',    unit: 'mg',   color: '#F9A8D4', target: 2300 },
+  { key: 'calories',  label: 'Calories', unit: 'kcal', color: '#069B8E', target: 2000 },
+  { key: 'protein',   label: 'Protein',  unit: 'g',    color: '#6EE7B7', target: 50 },
+  { key: 'carbs',     label: 'Carbs',    unit: 'g',    color: '#FCD34D', target: 275 },
+  { key: 'fat',       label: 'Fat',      unit: 'g',    color: '#93C5FD', target: 78 },
+  { key: 'sodium',    label: 'Sodium',   unit: 'mg',   color: '#F9A8D4', target: 2300 },
 ];
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function buildChartData(weekNutrients, tabKey) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const monday = getMonday(today);
-  return DAY_ABBR.map((lbl, i) => {
-    const dayDate = addDays(monday, i);
-    dayDate.setHours(0, 0, 0, 0);
-    const active = dayDate.getTime() === today.getTime();
-    const dayNut = weekNutrients?.days?.[i] || weekNutrients?.[i];
-    return { label: lbl, value: dayNut?.[tabKey] || 0, active };
-  });
+// Average daily nutrients across a week's daily array
+function weeklyAvgPoint(dailyArr, monday) {
+  const withMeals = dailyArr.filter(d => d.hasMeals);
+  const nutrients = {};
+  if (withMeals.length) {
+    const keys = Object.keys(withMeals[0]?.nutrients || {});
+    for (const k of keys) {
+      nutrients[k] = withMeals.reduce((s, d) => s + (d.nutrients?.[k] || 0), 0) / withMeals.length;
+    }
+  }
+  return {
+    label: monday.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' }),
+    nutrients,
+    active: false,
+    hasMeals: withMeals.length > 0,
+  };
 }
 
 function buildStats(chartData, target) {
   const values = chartData.map(d => d.value);
-  const onTrack = values.filter(v => v >= target * 0.8).length;
-  const overTarget = values.filter(v => v > target).length;
   const nonZero = values.filter(v => v > 0);
-  const highest = nonZero.length ? Math.round(Math.max(...nonZero)) : null;
-  const lowest = nonZero.length ? Math.round(Math.min(...nonZero)) : null;
-  const avg = nonZero.length ? nonZero.reduce((a, b) => a + b, 0) / nonZero.length : 0;
-  const avgPct = target ? Math.round((avg / target) * 100) : 0;
-  const highestDay = highest != null ? DAY_ABBR[values.indexOf(Math.max(...nonZero))] : null;
-  const lowestDay = lowest != null ? DAY_ABBR[values.indexOf(Math.min(...nonZero))] : null;
+  const onTrack    = values.filter(v => v >= target * 0.8).length;
+  const overTarget = values.filter(v => v > target).length;
+  const maxVal = nonZero.length ? Math.max(...nonZero) : 0;
+  const minVal = nonZero.length ? Math.min(...nonZero) : 0;
+  const highest  = nonZero.length ? Math.round(maxVal) : null;
+  const lowest   = nonZero.length ? Math.round(minVal) : null;
+  const avg      = nonZero.length ? nonZero.reduce((a, b) => a + b, 0) / nonZero.length : 0;
+  const avgPct   = target ? Math.round((avg / target) * 100) : 0;
+  const highestDay = highest != null ? chartData[values.indexOf(maxVal)]?.label : null;
+  const lowestDay  = lowest  != null ? chartData[values.indexOf(minVal)]?.label  : null;
   return { onTrack, overTarget, highest, lowest, highestDay, lowestDay, avg: Math.round(avg), avgPct };
 }
 
@@ -86,45 +105,92 @@ function buildStatusSpill(avgPct) {
 }
 
 export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onAddDiner, onEditDiner, onDinersChanged, onViewPlan }) {
-  const [selected, setSelected] = useState(activeDiner || diners[0] || null);
-  const [ndNut, setNdNut] = useState('calories');
-  const [weekNutrients, setWeekNutrients] = useState(null);
+  const [selected,     setSelected]     = useState(activeDiner || diners[0] || null);
+  const [ndNut,        setNdNut]        = useState('calories');
   const [mealsPlanned, setMealsPlanned] = useState(0);
+
+  // Range filter state
+  const [rangeMode,    setRangeMode]    = useState('week');
+  const [rangeOffset,  setRangeOffset]  = useState(0);
+  const [customStart,  setCustomStart]  = useState(() => toWeekStart(new Date()));
+  const [customEnd,    setCustomEnd]    = useState(() => toDateStr(addDays(getMonday(new Date()), 6)));
+
+  // Raw data: array of { label, nutrients, active, hasMeals }
+  const [rawPoints,    setRawPoints]    = useState([]);
+  const [chartLoading, setChartLoading] = useState(false);
 
   useEffect(() => {
     setSelected(activeDiner || diners[0] || null);
   }, [activeDiner, diners]);
 
-  const monday = getMonday(new Date());
-  const weekStart = [
-    monday.getFullYear(),
-    String(monday.getMonth() + 1).padStart(2, '0'),
-    String(monday.getDate()).padStart(2, '0'),
-  ].join('-');
+  // Reset offset when switching modes
+  const handleSetRangeMode = (mode) => {
+    setRangeMode(mode);
+    setRangeOffset(0);
+  };
 
-  const loadWeekNutrients = useCallback(async () => {
+  const loadChartData = useCallback(async () => {
     if (!selected?.userId) return;
+    setChartLoading(true);
     try {
-      const res = await api.getWeekNutrients(selected.userId, weekStart);
-      setWeekNutrients(res);
-    } catch {
-      setWeekNutrients(null);
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+
+      if (rangeMode === 'week') {
+        const monday = getMonday(addDays(new Date(), rangeOffset * 7));
+        const res = await api.getWeekNutrients(selected.userId, toWeekStart(monday));
+        const daily = res?.daily || [];
+        const points = DAY_ABBR.map((lbl, i) => {
+          const dayDate = addDays(monday, i); dayDate.setHours(0, 0, 0, 0);
+          const dayData = daily.find(d => d.dayIndex === i);
+          return {
+            label: lbl,
+            nutrients: dayData?.nutrients || {},
+            active: dayDate.getTime() === today.getTime(),
+            hasMeals: dayData?.hasMeals || false,
+          };
+        });
+        setRawPoints(points);
+
+      } else if (rangeMode === 'month') {
+        const ref = new Date(today.getFullYear(), today.getMonth() + rangeOffset, 1);
+        const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+        const weeks = getWeeksInRange(getMonday(ref), lastDay);
+        const responses = await Promise.all(
+          weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))
+        );
+        setRawPoints(weeks.map((monday, wi) => weeklyAvgPoint(responses[wi]?.daily || [], monday)));
+
+      } else if (rangeMode === 'custom' && customStart && customEnd) {
+        const startMonday = getMonday(new Date(customStart));
+        const endDate = new Date(customEnd);
+        if (endDate < startMonday) { setRawPoints([]); return; }
+        const weeks = getWeeksInRange(startMonday, endDate).slice(0, 12); // cap 12 weeks
+        const responses = await Promise.all(
+          weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))
+        );
+        setRawPoints(weeks.map((monday, wi) => weeklyAvgPoint(responses[wi]?.daily || [], monday)));
+      }
+    } catch (err) {
+      console.error('Failed to load chart data:', err);
+      setRawPoints([]);
+    } finally {
+      setChartLoading(false);
     }
-  }, [selected?.userId, weekStart]);
+  }, [selected?.userId, rangeMode, rangeOffset, customStart, customEnd]);
 
-  useEffect(() => { loadWeekNutrients(); }, [loadWeekNutrients]);
+  useEffect(() => { loadChartData(); }, [loadChartData]);
 
-  const isMyself = selected?.userId === diners[0]?.userId;
+  const currentWeekStart = toWeekStart(getMonday(new Date()));
 
   useEffect(() => {
-    if (!selected?.userId || isMyself) return;
-    api.getMealPlan(selected.userId, weekStart).then(plan => {
+    if (!selected?.userId) return;
+    api.getMealPlan(selected.userId, currentWeekStart).then(plan => {
       const count = Object.values(plan || {}).flatMap(day =>
         Object.values(day).flatMap(entries => Array.isArray(entries) ? entries : [])
       ).length;
       setMealsPlanned(count);
     }).catch(() => setMealsPlanned(0));
-  }, [selected?.userId, weekStart, isMyself]);
+  }, [selected?.userId, currentWeekStart]);
 
   const handleDelete = async (diner) => {
     if (!confirm(`Delete ${diner.name}? This cannot be undone.`)) return;
@@ -136,10 +202,15 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
     }
   };
 
-  const nutTab = NUTRIENT_TABS.find(t => t.key === ndNut) || NUTRIENT_TABS[0];
-  const chartData = buildChartData(weekNutrients, ndNut);
-  const weekAvg = Math.round(chartData.reduce((s, d) => s + (d.value || 0), 0) / 7);
-  const hasData = chartData.some(d => d.value > 0);
+  // Derived chart data
+  const nutTab   = NUTRIENT_TABS.find(t => t.key === ndNut) || NUTRIENT_TABS[0];
+  const chartData = rawPoints.map(d => ({ label: d.label, value: d.nutrients?.[ndNut] || 0, active: d.active }));
+  const hasData   = chartData.some(d => d.value > 0);
+
+  const nonZeroVals = chartData.filter(d => d.value > 0);
+  const periodAvg   = nonZeroVals.length
+    ? Math.round(nonZeroVals.reduce((s, d) => s + d.value, 0) / nonZeroVals.length)
+    : 0;
 
   const stats = buildStats(chartData, nutTab.target);
   const spill = buildStatusSpill(stats.avgPct);
@@ -148,10 +219,32 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
   const avCls = AV_CLASSES[selectedIdx % AV_CLASSES.length] || 'dcav-t';
 
   const conditions = parseTags(selected?.conditions);
-  const diet = parseTags(selected?.diet);
-  const allergies = parseTags(selected?.allergies);
+  const diet       = parseTags(selected?.diet);
+  const allergies  = parseTags(selected?.allergies);
+  const daysPlanned = rawPoints.filter(d => d.hasMeals).length;
 
-  const daysPlanned = chartData.filter(d => d.value > 0).length;
+  // Period label for nav pill
+  const rangePeriodLabel = (() => {
+    if (rangeMode === 'week') {
+      if (rangeOffset === 0) return 'This week';
+      if (rangeOffset === -1) return 'Last week';
+      const m = getMonday(addDays(new Date(), rangeOffset * 7));
+      return m.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
+    }
+    if (rangeMode === 'month') {
+      if (rangeOffset === 0) return 'This month';
+      const d = new Date(new Date().getFullYear(), new Date().getMonth() + rangeOffset, 1);
+      return d.toLocaleDateString('en-SG', { month: 'short', year: 'numeric' });
+    }
+    return '';
+  })();
+
+  const periodUnit = rangeMode === 'week' ? 'days' : 'weeks';
+  const periodLabel = rangeMode === 'week' ? rangePeriodLabel
+    : rangeMode === 'month' ? rangePeriodLabel
+    : 'Custom range';
+
+  const isMyself = selected?.userId === diners[0]?.userId;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '16px 18px' }}>
@@ -162,7 +255,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
         <div className="prof-rail">
           {diners.map((d, i) => {
             const isActive = selected?.userId === d.userId;
-            const avClass = AV_CLASSES[i % AV_CLASSES.length];
+            const avClass  = AV_CLASSES[i % AV_CLASSES.length];
             return (
               <div
                 key={d.userId}
@@ -191,18 +284,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
 
         {/* Right panel */}
         <div className="prof-panel">
-          {!selected ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12, color: 'var(--text3)' }}>
-              <div style={{ fontSize: 36 }}>👤</div>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>No diner selected</div>
-              <button
-                onClick={onAddDiner}
-                style={{ padding: '7px 18px', borderRadius: 'var(--r-sm)', background: 'var(--teal)', color: '#fff', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-              >
-                Add your first diner
-              </button>
-            </div>
-          ) : (
+          {selected ? (
             <>
               {/* Card 1: Person header */}
               <div className="prof-card">
@@ -238,18 +320,10 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                         )}
                       </div>
                     </div>
-                    <button
-                      className="btn btn-outline"
-                      style={{ fontSize: 11, padding: '5px 12px' }}
-                      onClick={() => onEditDiner(selected)}
-                    >
+                    <button className="btn btn-outline" style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => onEditDiner(selected)}>
                       Edit profile
                     </button>
-                    <button
-                      className="btn btn-navy"
-                      style={{ fontSize: 11, padding: '5px 12px' }}
-                      onClick={() => onViewPlan(selected)}
-                    >
+                    <button className="btn btn-navy" style={{ fontSize: 11, padding: '5px 12px' }} onClick={() => onViewPlan(selected)}>
                       View plan →
                     </button>
                     {selected.userId !== diners[0]?.userId && (
@@ -304,6 +378,53 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
 
               {/* Card 3: Nutrition dashboard */}
               <div className="prof-card">
+
+                {/* Range filter row */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 15px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+                  {['week', 'month', 'custom'].map(mode => (
+                    <button
+                      key={mode}
+                      className={`nd-range-pill${rangeMode === mode ? ' active' : ''}`}
+                      onClick={() => handleSetRangeMode(mode)}
+                    >
+                      {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                    </button>
+                  ))}
+
+                  {rangeMode !== 'custom' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
+                      <button className="nd-range-nav-btn" onClick={() => setRangeOffset(o => o - 1)}>‹</button>
+                      <span className="nd-range-period">{rangePeriodLabel}</span>
+                      <button
+                        className="nd-range-nav-btn"
+                        onClick={() => setRangeOffset(o => o + 1)}
+                        disabled={rangeOffset >= 0}
+                        style={{ opacity: rangeOffset >= 0 ? 0.35 : 1 }}
+                      >›</button>
+                    </div>
+                  )}
+
+                  {rangeMode === 'custom' && (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
+                      <input
+                        type="date"
+                        value={customStart}
+                        onChange={e => setCustomStart(e.target.value)}
+                        style={{ fontSize: 11, border: '1.5px solid var(--border2)', borderRadius: 6, padding: '3px 7px', fontFamily: 'var(--font)', color: 'var(--text)', background: 'var(--white)' }}
+                      />
+                      <span style={{ fontSize: 11, color: 'var(--text3)' }}>–</span>
+                      <input
+                        type="date"
+                        value={customEnd}
+                        min={customStart}
+                        onChange={e => setCustomEnd(e.target.value)}
+                        style={{ fontSize: 11, border: '1.5px solid var(--border2)', borderRadius: 6, padding: '3px 7px', fontFamily: 'var(--font)', color: 'var(--text)', background: 'var(--white)' }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Nutrient tabs */}
                 <div className="nd-tabs-row">
                   {NUTRIENT_TABS.map(t => (
                     <button
@@ -319,23 +440,16 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                 </div>
 
                 <div className="nd-wrap">
-                  {!hasData ? (
-                    <div className="nd-empty">
-                      <div className="nd-empty-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                          <path d="M12 3a9 9 0 100 18A9 9 0 0012 3z" stroke="var(--teal)" strokeWidth="1.5"/>
-                          <path d="M12 7v5l3 3" stroke="var(--teal)" strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                      </div>
-                      <div className="nd-empty-title">No nutrition data yet</div>
-                      <div className="nd-empty-sub">Start planning meals for {selected.name?.split(' ')[0]} to see calorie and macro trends here.</div>
+                  {chartLoading ? (
+                    <div style={{ padding: '32px 0', textAlign: 'center', fontSize: 11, color: 'var(--text3)' }}>
+                      Loading…
                     </div>
-                  ) : (
+                  ) : hasData ? (
                     <div className="nd-chart-section">
                       <div className="nd-chart-meta">
                         <div>
-                          <div className="nd-avgval">{weekAvg} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text2)' }}>{nutTab.unit}/day avg</span></div>
-                          <div className="nd-avgsub">This week · {nutTab.label}</div>
+                          <div className="nd-avgval">{periodAvg} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text2)' }}>{nutTab.unit}/day avg</span></div>
+                          <div className="nd-avgsub">{periodLabel} · {nutTab.label}</div>
                           <div className="nd-avgtgt">Target: {nutTab.target} {nutTab.unit}/day</div>
                           <div className="nd-status">
                             <span className={`nd-spill ${spill.cls}`}>{spill.label}</span>
@@ -364,27 +478,32 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                         />
                       </div>
                     </div>
+                  ) : (
+                    <div className="nd-empty">
+                      <div className="nd-empty-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                          <path d="M12 3a9 9 0 100 18A9 9 0 0012 3z" stroke="var(--teal)" strokeWidth="1.5"/>
+                          <path d="M12 7v5l3 3" stroke="var(--teal)" strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                      <div className="nd-empty-title">No nutrition data yet</div>
+                      <div className="nd-empty-sub">Start planning meals for {selected.name?.split(' ')[0]} to see calorie and macro trends here.</div>
+                    </div>
                   )}
 
                   <div className="nd-sumrow">
                     <div className="nd-sum-cell">
                       <div className="nd-sum-lbl-wrap">
                         <span className="nd-sum-lbl">On track</span>
-                        <span className="nd-tip">
-                          <i className="nd-tip-ic">?</i>
-                          <div className="nd-tip-bubble">Days where intake reached ≥80% of target</div>
-                        </span>
+                        <span className="nd-tip"><i className="nd-tip-ic">?</i><div className="nd-tip-bubble">Days/weeks where intake reached ≥80% of target</div></span>
                       </div>
                       <div className="nd-sum-val">{hasData ? stats.onTrack : '—'}</div>
-                      <div className="nd-sum-sub">{hasData ? 'days ≥80%' : ''}</div>
+                      <div className="nd-sum-sub">{hasData ? `${periodUnit} ≥80%` : ''}</div>
                     </div>
                     <div className="nd-sum-cell">
                       <div className="nd-sum-lbl-wrap">
                         <span className="nd-sum-lbl">Over target</span>
-                        <span className="nd-tip">
-                          <i className="nd-tip-ic">?</i>
-                          <div className="nd-tip-bubble">Days where intake exceeded the daily target</div>
-                        </span>
+                        <span className="nd-tip"><i className="nd-tip-ic">?</i><div className="nd-tip-bubble">Days/weeks where intake exceeded the daily target</div></span>
                       </div>
                       <div className="nd-sum-val" style={{ color: stats.overTarget > 0 ? 'var(--red)' : 'var(--text)' }}>
                         {hasData ? stats.overTarget : '—'}
@@ -393,10 +512,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                     <div className="nd-sum-cell">
                       <div className="nd-sum-lbl-wrap">
                         <span className="nd-sum-lbl">Highest</span>
-                        <span className="nd-tip">
-                          <i className="nd-tip-ic">?</i>
-                          <div className="nd-tip-bubble">Peak intake day in this period</div>
-                        </span>
+                        <span className="nd-tip"><i className="nd-tip-ic">?</i><div className="nd-tip-bubble">Peak intake in this period</div></span>
                       </div>
                       <div className="nd-sum-val">{hasData && stats.highest != null ? stats.highest : '—'}</div>
                       <div className="nd-sum-sub">{hasData && stats.highestDay ? stats.highestDay : ''}</div>
@@ -404,10 +520,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                     <div className="nd-sum-cell">
                       <div className="nd-sum-lbl-wrap">
                         <span className="nd-sum-lbl">Lowest</span>
-                        <span className="nd-tip">
-                          <i className="nd-tip-ic">?</i>
-                          <div className="nd-tip-bubble">Lowest intake day in this period</div>
-                        </span>
+                        <span className="nd-tip"><i className="nd-tip-ic">?</i><div className="nd-tip-bubble">Lowest intake in this period</div></span>
                       </div>
                       <div className="nd-sum-val">{hasData && stats.lowest != null ? stats.lowest : '—'}</div>
                       <div className="nd-sum-sub">{hasData && stats.lowestDay ? stats.lowestDay : ''}</div>
@@ -415,10 +528,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                     <div className="nd-sum-cell">
                       <div className="nd-sum-lbl-wrap">
                         <span className="nd-sum-lbl">Avg vs target</span>
-                        <span className="nd-tip">
-                          <i className="nd-tip-ic">?</i>
-                          <div className="nd-tip-bubble">Average daily intake as % of the recommended target</div>
-                        </span>
+                        <span className="nd-tip"><i className="nd-tip-ic">?</i><div className="nd-tip-bubble">Average daily intake as % of the recommended target</div></span>
                       </div>
                       <div className="nd-sum-val">{hasData ? `${stats.avgPct}%` : '—'}</div>
                     </div>
@@ -426,6 +536,17 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                 </div>
               </div>
             </>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12, color: 'var(--text3)' }}>
+              <div style={{ fontSize: 36 }}>👤</div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>No diner selected</div>
+              <button
+                onClick={onAddDiner}
+                style={{ padding: '7px 18px', borderRadius: 'var(--r-sm)', background: 'var(--teal)', color: '#fff', border: 'none', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Add your first diner
+              </button>
+            </div>
           )}
         </div>
       </div>
