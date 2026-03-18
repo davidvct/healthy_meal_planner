@@ -104,3 +104,10 @@ class SaveThresholdsBody(BaseModel):
 
 class UpdateTierBody(BaseModel):
     tier: str = Field(pattern=r"^(free|paid)$")
+
+
+class GeneratePlanBody(BaseModel):
+    weekStart: str | None = None
+    numDays: int = 7
+    timeLimitSeconds: int = 10
+    dayIndex: int | None = None  # generate for a single day only

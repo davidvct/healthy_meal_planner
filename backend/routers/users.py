@@ -140,6 +140,13 @@ def create_or_update_profile(
                         status_code=403,
                         detail="Free plan allows 1 diner only. Upgrade to add more.",
                     )
+            else:
+                count_row = conn.execute(
+                    "SELECT COUNT(*) AS c FROM family_members WHERE user_id = ?",
+                    (auth_user_id,),
+                ).fetchone()
+                if (count_row["c"] if count_row else 0) >= 5:
+                    raise HTTPException(status_code=400, detail="Maximum of 5 diners allowed per caretaker")
             order_row = conn.execute(
                 "SELECT COALESCE(MAX(sort_order), 0) AS m FROM family_members WHERE user_id = ?",
                 (auth_user_id,),
@@ -239,12 +246,14 @@ def delete_user(user_id: str, conn: Any = Depends(get_db)) -> dict[str, bool]:
         member_pk = _normalize_member_user_id(user_id)
         conn.execute("DELETE FROM shopping_selections WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM meal_plans WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM favourites WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM family_members WHERE id::text = ?", (member_pk,))
         conn.commit()
         return {"success": True}
 
     conn.execute("DELETE FROM shopping_selections WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM meal_plans WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM favourites WHERE user_id = ?", (user_id,))
     conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     return {"success": True}

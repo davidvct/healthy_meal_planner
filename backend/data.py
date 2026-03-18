@@ -162,7 +162,7 @@ def _parse_ingredients(ingredients_text: str) -> dict[str, float]:
 
     result: dict[str, float] = {}
     for line in raw_lines:
-        item = line.lstrip("-* ").strip()
+        item = re.sub(r'^[\-\*•·‣►▪◦\s]+', '', line).strip()
         if not item:
             continue
 
@@ -432,14 +432,31 @@ def load_seed_data() -> dict[str, Any]:
                 "hypertensionCategory": (row.get("hypertension_category") or "").strip(),
                 "diabetesCategory": (row.get("diabetes_category") or "").strip(),
                 "cholesterolCategory": (row.get("cholesterol_category") or "").strip(),
+                "goutCategory": (row.get("gout_category") or "").strip(),
             }
             dishes.append(dish_record)
 
             recipes[recipe_id] = {
                 "name": name,
+                "category": (row.get("category") or "").strip(),
+                "allergies": _normalize_allergies_text(row.get("Allergies", "")),
                 "prepTime": int(_parse_float(row.get("prep_time"))),
                 "cookTime": int(_parse_float(row.get("cook_time"))),
                 "steps": _parse_steps(row.get("instructions", "")),
+                "ingredients": ingredients,
+                "calories": _parse_float(row.get("calories")),
+                "protein": _parse_float(row.get("protein")),
+                "fat": _parse_float(row.get("fat")),
+                "totalCarbs": _parse_float(row.get("total_carbs")),
+                "fiber": _parse_float(row.get("fiber")),
+                "sodium": _parse_float(row.get("sodium")),
+                "cholesterol": _parse_float(row.get("cholesterol")),
+                "sugar": _parse_float(row.get("sugar")),
+                "hypertensionCategory": (row.get("hypertension_category") or "").strip(),
+                "diabetesCategory": (row.get("diabetes_category") or "").strip(),
+                "cholesterolCategory": (row.get("cholesterol_category") or "").strip(),
+                "goutCategory": (row.get("gout_category") or "").strip(),
+                "imageUrl": (row.get("image_url") or "").strip(),
             }
 
     ingredients_nutrients = {

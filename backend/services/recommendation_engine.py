@@ -57,6 +57,7 @@ def score_dish(
     meal_type: str,
     all_week_entries: list[dict[str, Any]],
     ingredient_cache: dict[str, list[float]],
+    favourite_ids: set[str] | None = None,
 ) -> dict[str, int]:
     dish_id = str(dish["id"] if isinstance(dish, dict) else dish.get("id"))
     dish_id_alt = f"r{dish_id}" if not dish_id.startswith("r") else dish_id[1:]
@@ -113,14 +114,33 @@ def score_dish(
     )
     pref_score += max(0, 5 - count * 2)
     pref_score += 5 if meal_type in meal_types else 1
+    if favourite_ids and dish_id in favourite_ids:
+        pref_score += 10
 
-    total = round(max(0, min(100, health_score + nutrient_score + pref_score)))
+    total = round(max(0, min(110, health_score + nutrient_score + pref_score)))
     return {
         "total": int(total),
         "healthScore": int(round(health_score)),
         "nutrientScore": int(round(nutrient_score)),
         "prefScore": int(round(pref_score)),
     }
+
+
+_MEAL_TYPE_CATEGORY_MAP = {
+    "breakfast": {"breakfast"},
+    "lunch":     {"main course", "soup", "salad", "side dish", "sauce", "basics", "condiment"},
+    "dinner":    {"main course", "soup", "salad", "side dish", "sauce", "basics", "condiment"},
+    "snack":     {"snack", "dessert", "appetizer", "beverage", "drink", "smoothie", "dip"},
+}
+
+
+def _category_matches_meal_type(category: str, meal_type: str) -> bool:
+    """Check if a recipe's raw category matches the requested meal type."""
+    allowed = _MEAL_TYPE_CATEGORY_MAP.get(meal_type)
+    if not allowed:
+        return True
+    cat_lower = category.lower()
+    return any(kw in cat_lower for kw in allowed)
 
 
 def filter_dishes(
@@ -133,13 +153,13 @@ def filter_dishes(
     filter_diet: bool = True,
     filter_allergies: bool = True,
     filter_conditions: bool = True,
+    sub_category: str | None = None,
 ) -> list[dict[str, Any]]:
     filtered: list[dict[str, Any]] = []
 
     for dish in dishes:
         ingredients = parse_json(dish["ingredients"], {})
         tags = parse_json(dish["tags"], [])
-        meal_types = parse_json(dish["meal_types"], [])
         dish_allergies = parse_json(dish["allergies"], [])
 
         if filter_allergies and user_profile.get("allergies"):
@@ -165,12 +185,18 @@ def filter_dishes(
                 continue
             if diet == "vegan" and "vegan" not in tags and dish_diet != "vegan":
                 continue
-            if diet == "pescatarian" and any(x in ingredients for x in ["beef", "pork", "chicken", "lamb", "turkey"]):
+
+            # Check ingredient keys for substring matches (keys are full strings like "8-10 slices bacon")
+            ing_keys_lower = " ".join(k.lower() for k in ingredients.keys())
+            if diet == "pescatarian" and any(x in ing_keys_lower for x in ["beef", "pork", "chicken", "lamb", "turkey", "duck", "veal"]):
                 continue
-            if diet == "halal" and any(x in ingredients for x in ["pork", "ham", "bacon", "lard"]):
+            if diet == "halal" and any(x in ing_keys_lower for x in ["pork", "ham", "bacon", "lard", "prosciutto", "pancetta", "chorizo"]):
                 continue
 
-        if filter_meal_type and meal_type not in meal_types:
+        if filter_meal_type and not _category_matches_meal_type(dish.get("category") or "", meal_type):
+            continue
+
+        if sub_category and sub_category.lower() not in (dish.get("category") or "").lower():
             continue
 
         if filter_conditions and user_profile.get("conditions"):

@@ -14,6 +14,7 @@ from ..schemas import (
     AutofillConstraintViolation,
     AutofillValidationResponse,
     GenerateMealPlanBody,
+    GeneratePlanBody,
 )
 from ..security import require_paid_tier
 from ..services.core import generate_meal_plan_for_week
@@ -188,7 +189,10 @@ def get_meal_plan(
 
     rows = conn.execute(
         """
-        SELECT mp.*, r.id AS recipe_id, r.name AS recipe_name, r.ingredients AS recipe_ingredients, r.category, r.keywords, r.cuisine
+        SELECT mp.*, r.id AS recipe_id, r.name AS recipe_name, r.ingredients AS recipe_ingredients,
+               r.category, r.keywords, r.cuisine,
+               r.calories, r.protein, r.total_carbs AS carbs, r.fat,
+               r.fiber, r.sodium, r.cholesterol, r.sugar
         FROM meal_plans mp
         JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
         WHERE mp.user_id = ? AND mp.week_start = ?
@@ -214,6 +218,14 @@ def get_meal_plan(
                 "tags": _recipe_tags(row),
                 "mealTypes": _derive_meal_types(row.get("category") or ""),
                 "recipeId": str(row["recipe_id"]),
+                "kcal": parse_float(row.get("calories"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "protein": parse_float(row.get("protein"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "carbs": parse_float(row.get("carbs"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "fat": parse_float(row.get("fat"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "sodium": parse_float(row.get("sodium"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "fiber": parse_float(row.get("fiber"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "cholesterol": parse_float(row.get("cholesterol"), 0.0) * parse_float(row.get("servings"), 1.0),
+                "sugar": parse_float(row.get("sugar"), 0.0) * parse_float(row.get("servings"), 1.0),
             }
         )
 
@@ -228,19 +240,16 @@ def add_dish_to_plan(
 ) -> dict[str, bool]:
     ws = body.weekStart or get_current_week_start()
 
-    max_order_row = conn.execute(
-        """
-        SELECT COALESCE(MAX(entry_order), -1) as m
-        FROM meal_plans
-        WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?
-        """,
+    # Replace existing entry for this slot (1 meal per slot)
+    conn.execute(
+        "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?",
         (user_id, ws, body.dayIndex, body.mealType),
-    ).fetchone()
+    )
 
     conn.execute(
         """
         INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, custom_ingredients, entry_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
         """,
         (
             user_id,
@@ -250,7 +259,6 @@ def add_dish_to_plan(
             body.dishId,
             body.servings,
             json.dumps(body.customIngredients) if body.customIngredients else None,
-            max_order_row["m"] + 1,
         ),
     )
     conn.commit()
@@ -867,3 +875,94 @@ def autofill_plan(
     print(f"[autofill] inserted_rows={len(saved_rows)} user_id={user_id} week_start={ws}")
     _log_visible_week_plan(conn, user_id=user_id, week_start=ws)
     return {"success": True, "added": len(saved_rows)}
+
+
+@router.post("/{user_id}/generate")
+def generate_plan(
+    user_id: str,
+    body: GeneratePlanBody,
+    conn: Any = Depends(get_db),
+) -> dict:
+    from ..services.solver.core import generate_meal_plan_for_week, plan_result_to_entries
+    from ..services.solver.models import FixedMealAssignment, SolverConfig, MEALS as SOLVER_MEALS
+
+    ws = body.weekStart or get_current_week_start()
+    target_day = body.dayIndex  # None = all days, int = single day
+
+    # Load existing meal plan entries as fixed assignments
+    existing = conn.execute(
+        "SELECT day_index, meal_type, dish_id, servings FROM meal_plans WHERE user_id = ? AND week_start = ?",
+        (user_id, ws),
+    ).fetchall()
+
+    num_days = 1 if target_day is not None else min(body.numDays, 7)
+
+    fixed_assignments: list[FixedMealAssignment] = []
+    # For single-day mode, collect dish IDs used on OTHER days to exclude
+    exclude_recipe_ids: set[str] | None = None
+    for row in existing:
+        day_idx = int(row["day_index"])
+        if target_day is not None:
+            if day_idx != target_day:
+                # Track dishes used on other days so solver avoids them
+                if exclude_recipe_ids is None:
+                    exclude_recipe_ids = set()
+                exclude_recipe_ids.add(str(row["dish_id"]).removeprefix("r"))
+                continue
+            day_idx = 0
+        fixed_assignments.append(FixedMealAssignment(
+            day_index=day_idx,
+            meal_type=str(row["meal_type"]),
+            recipe_id=str(row["dish_id"]).removeprefix("r"),
+            servings=parse_float(row.get("servings"), 1.0),
+        ))
+
+    config = SolverConfig(
+        num_days=num_days,
+        time_limit_seconds=min(body.timeLimitSeconds, 30) if target_day is None else 3,
+    )
+
+    try:
+        result = generate_meal_plan_for_week(
+            conn,
+            patient_id=user_id,
+            week_start=ws,
+            config=config,
+            fixed_assignments=fixed_assignments if fixed_assignments else None,
+            exclude_recipe_ids=exclude_recipe_ids,
+        )
+    except (ValueError, RuntimeError) as exc:
+        return {"success": False, "error": str(exc)}
+
+    # Write generated entries (only for slots that aren't already filled)
+    occupied_slots: set[tuple[int, str]] = set()
+    for row in existing:
+        occupied_slots.add((int(row["day_index"]), str(row["meal_type"])))
+
+    entries_written = 0
+    for entry in result.entries:
+        # Remap day index back for single-day mode
+        actual_day = (target_day if target_day is not None else entry.day_index)
+        if (actual_day, entry.meal_type) in occupied_slots:
+            continue
+
+        # Ensure only 1 entry per slot
+        conn.execute(
+            "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?",
+            (user_id, ws, actual_day, entry.meal_type),
+        )
+
+        conn.execute(
+            "INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, entry_order) VALUES (?, ?, ?, ?, ?, ?, 0)",
+            (user_id, ws, actual_day, entry.meal_type, entry.recipe_id, entry.servings),
+        )
+        entries_written += 1
+
+    conn.commit()
+
+    return {
+        "success": True,
+        "entriesWritten": entries_written,
+        "totalSlots": config.num_days * len(SOLVER_MEALS),
+        "existingSlots": len(occupied_slots),
+    }

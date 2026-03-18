@@ -70,6 +70,14 @@ def init_db() -> None:
         _init_schema(conn)
         _migrate_schema(conn)
         _seed_from_dataset(conn)
+        _backfill_recipe_nutrients(conn)
+        _backfill_recipe_ingredients(conn)
+        _backfill_recipe_diet_flags(conn)
+        _backfill_strip_ingredient_bullets(conn)
+        _backfill_health_categories(conn)
+        _backfill_recipe_category(conn)
+        _backfill_recipe_allergies(conn)
+        _backfill_recipe_image_url(conn)
         conn.commit()
     finally:
         conn.close()
@@ -166,6 +174,14 @@ def _init_schema(conn: DBConnection) -> None:
           servings DOUBLE PRECISION NOT NULL DEFAULT 1,
           custom_ingredients TEXT,
           entry_order INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS favourites (
+          id BIGSERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          dish_id TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE(user_id, dish_id)
         );
 
         CREATE TABLE IF NOT EXISTS shopping_selections (
@@ -529,8 +545,11 @@ def _migrate_schema(conn: DBConnection) -> None:
     _add_column_if_missing(conn, "recipes", "hypertension_category", "TEXT")
     _add_column_if_missing(conn, "recipes", "diabetes_category", "TEXT")
     _add_column_if_missing(conn, "recipes", "cholesterol_category", "TEXT")
+    _add_column_if_missing(conn, "recipes", "gout_category", "TEXT")
     _add_column_if_missing(conn, "recipes", "is_vegetarian", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_vegan", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(conn, "recipes", "is_gluten_free", "BOOLEAN NOT NULL DEFAULT FALSE")
+    _add_column_if_missing(conn, "recipes", "is_dairy_free", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_low_carb", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_high_protein", "BOOLEAN NOT NULL DEFAULT FALSE")
     _add_column_if_missing(conn, "recipes", "is_spicy", "BOOLEAN NOT NULL DEFAULT FALSE")
@@ -591,9 +610,9 @@ def _seed_from_dataset(conn: DBConnection) -> None:
             id, name, prep_time, cook_time, category, keywords, ingredients, instructions,
             description, url, image_url, calories, protein, fat, total_carbs, fiber, sugar, cholesterol, sodium,
             is_vegetarian, is_vegan, is_low_carb, is_high_protein, is_spicy, is_sweet, is_salty,
-            allergies, dietary_habits, hypertension_category, diabetes_category, cholesterol_category
+            allergies, dietary_habits, hypertension_category, diabetes_category, cholesterol_category, gout_category
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -601,36 +620,322 @@ def _seed_from_dataset(conn: DBConnection) -> None:
                 r["name"],
                 str(r["prepTime"]),
                 str(r["cookTime"]),
+                r.get("category") or "",
                 "",
-                "",
-                "",
+                json.dumps(r.get("ingredients") or {}),
                 json.dumps(r["steps"]),
                 "",
                 "",
+                r.get("imageUrl") or "",
+                str(r.get("calories") or 0),
+                str(r.get("protein") or 0),
+                str(r.get("fat") or 0),
+                str(r.get("totalCarbs") or 0),
+                str(r.get("fiber") or 0),
+                str(r.get("sugar") or 0),
+                str(r.get("cholesterol") or 0),
+                str(r.get("sodium") or 0),
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                False,
+                json.dumps(r.get("allergies") or []),
                 "",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                "0",
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                False,
-                "",
-                "",
-                "",
-                "",
-                "",
+                r.get("hypertensionCategory") or "",
+                r.get("diabetesCategory") or "",
+                r.get("cholesterolCategory") or "",
+                r.get("goutCategory") or "",
             )
             for recipe_id, r in seed_data["recipes"].items()
         ],
     )
 
     _write_meta(conn, "dataset_version", data_version)
+
+
+def _backfill_recipe_nutrients(conn: DBConnection) -> None:
+    """Update existing recipes that were seeded with 0-value nutrients."""
+    if _read_meta(conn, "nutrients_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE calories IS NULL OR calories = '0' OR calories = ''"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "nutrients_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        numeric_id = recipe_id.removeprefix("r")
+        conn.execute(
+            """
+            UPDATE recipes
+            SET calories = ?, protein = ?, fat = ?, total_carbs = ?,
+                fiber = ?, sugar = ?, cholesterol = ?, sodium = ?
+            WHERE id::text = ?
+            """,
+            (
+                str(r.get("calories") or 0),
+                str(r.get("protein") or 0),
+                str(r.get("fat") or 0),
+                str(r.get("totalCarbs") or 0),
+                str(r.get("fiber") or 0),
+                str(r.get("sugar") or 0),
+                str(r.get("cholesterol") or 0),
+                str(r.get("sodium") or 0),
+                numeric_id,
+            ),
+        )
+
+    _write_meta(conn, "nutrients_backfilled", "1")
+
+
+def _backfill_recipe_ingredients(conn: DBConnection) -> None:
+    """Update existing recipes that were seeded with empty ingredients."""
+    if _read_meta(conn, "ingredients_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE ingredients IS NULL OR ingredients = '' OR ingredients = '{}'"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "ingredients_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        numeric_id = recipe_id.removeprefix("r")
+        conn.execute(
+            "UPDATE recipes SET ingredients = ? WHERE id::text = ?",
+            (json.dumps(r.get("ingredients") or {}), numeric_id),
+        )
+
+    _write_meta(conn, "ingredients_backfilled", "1")
+
+
+def _backfill_recipe_diet_flags(conn: DBConnection) -> None:
+    """Update boolean diet-flag columns that were seeded as all-False."""
+    if _read_meta(conn, "diet_flags_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE is_vegetarian = FALSE AND is_vegan = FALSE AND is_low_carb = FALSE"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "diet_flags_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    FLAG_KEYS = {"vegetarian", "vegan", "gluten_free", "dairy_free", "low_carb", "high_protein", "spicy", "sweet", "salty"}
+
+    for dish in seed_data["dishes"]:
+        recipe_id = dish.get("recipeId", "")
+        numeric_id = recipe_id.removeprefix("r")
+        if not numeric_id:
+            continue
+        tags = set(dish.get("tags", []))
+        flags = {k: (k in tags) for k in FLAG_KEYS}
+        conn.execute(
+            """
+            UPDATE recipes SET
+                is_vegetarian = ?,
+                is_vegan = ?,
+                is_gluten_free = ?,
+                is_dairy_free = ?,
+                is_low_carb = ?,
+                is_high_protein = ?,
+                is_spicy = ?,
+                is_sweet = ?,
+                is_salty = ?
+            WHERE id::text = ?
+            """,
+            (
+                flags["vegetarian"],
+                flags["vegan"],
+                flags["gluten_free"],
+                flags["dairy_free"],
+                flags["low_carb"],
+                flags["high_protein"],
+                flags["spicy"],
+                flags["sweet"],
+                flags["salty"],
+                numeric_id,
+            ),
+        )
+
+    _write_meta(conn, "diet_flags_backfilled", "1")
+
+
+def _backfill_strip_ingredient_bullets(conn: DBConnection) -> None:
+    """Strip leading bullet-point characters from ingredient JSON keys."""
+    if _read_meta(conn, "ingredient_bullets_stripped"):
+        return
+
+    import re as _re
+    _BULLET_RE = _re.compile(r'^[\-\*\u2022\u00B7\u2023\u25BA\u25AA\u25E6\s]+')
+
+    rows = conn.execute(
+        "SELECT id, ingredients FROM recipes WHERE ingredients IS NOT NULL AND ingredients != '' AND ingredients != '{}'"
+    ).fetchall()
+
+    for row in rows:
+        try:
+            ing = json.loads(row["ingredients"])
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(ing, dict):
+            continue
+        if not any(_BULLET_RE.match(k) for k in ing if k):
+            continue
+        cleaned: dict = {}
+        for k, v in ing.items():
+            clean_key = _BULLET_RE.sub("", k).strip()
+            if clean_key:
+                cleaned[clean_key] = cleaned.get(clean_key, 0) + v
+        conn.execute(
+            "UPDATE recipes SET ingredients = ? WHERE id::text = ?",
+            (json.dumps(cleaned), str(row["id"])),
+        )
+
+    _write_meta(conn, "ingredient_bullets_stripped", "1")
+
+
+def _backfill_health_categories(conn: DBConnection) -> None:
+    """Populate hypertension/diabetes/cholesterol category columns from dataset."""
+    if _read_meta(conn, "health_categories_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE (hypertension_category IS NULL OR hypertension_category = '') "
+        "AND (diabetes_category IS NULL OR diabetes_category = '') "
+        "AND (cholesterol_category IS NULL OR cholesterol_category = '')"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "health_categories_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        numeric_id = recipe_id.removeprefix("r")
+        hyp = r.get("hypertensionCategory") or ""
+        dia = r.get("diabetesCategory") or ""
+        cho = r.get("cholesterolCategory") or ""
+        gou = r.get("goutCategory") or ""
+        if hyp or dia or cho or gou:
+            conn.execute(
+                """
+                UPDATE recipes
+                SET hypertension_category = ?, diabetes_category = ?, cholesterol_category = ?, gout_category = ?
+                WHERE id::text = ?
+                """,
+                (hyp, dia, cho, gou, numeric_id),
+            )
+
+    _write_meta(conn, "health_categories_backfilled", "1")
+
+
+def _backfill_recipe_category(conn: DBConnection) -> None:
+    """Populate the category column from the dataset CSV."""
+    if _read_meta(conn, "category_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE category IS NULL OR category = ''"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "category_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        cat = r.get("category") or ""
+        if cat:
+            numeric_id = recipe_id.removeprefix("r")
+            conn.execute(
+                "UPDATE recipes SET category = ? WHERE id::text = ?",
+                (cat, numeric_id),
+            )
+
+    _write_meta(conn, "category_backfilled", "1")
+
+
+def _backfill_recipe_allergies(conn: DBConnection) -> None:
+    """Populate the allergies column from the dataset CSV."""
+    if _read_meta(conn, "allergies_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE allergies IS NULL OR allergies = '' OR allergies = '[]'"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "allergies_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        allerg = r.get("allergies") or []
+        if allerg:
+            numeric_id = recipe_id.removeprefix("r")
+            conn.execute(
+                "UPDATE recipes SET allergies = ? WHERE id::text = ?",
+                (json.dumps(allerg), numeric_id),
+            )
+
+    _write_meta(conn, "allergies_backfilled", "1")
+
+
+def _backfill_recipe_image_url(conn: DBConnection) -> None:
+    """Populate the image_url column from the dataset CSV."""
+    if _read_meta(conn, "image_url_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE image_url IS NULL OR image_url = ''"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "image_url_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        url = r.get("imageUrl") or ""
+        if url:
+            numeric_id = recipe_id.removeprefix("r")
+            conn.execute(
+                "UPDATE recipes SET image_url = ? WHERE id::text = ?",
+                (url, numeric_id),
+            )
+
+    _write_meta(conn, "image_url_backfilled", "1")

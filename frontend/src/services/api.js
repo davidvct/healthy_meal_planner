@@ -109,7 +109,7 @@ export async function getDishDetail(dishId) {
   return request(`/dishes/${dishId}`);
 }
 
-export async function getRecommendedDishes(userId, { day, mealType, filterMealType, filterDiet, filterAllergies, filterConditions, search, weekStart }) {
+export async function getRecommendedDishes(userId, { day, mealType, filterMealType, filterDiet, filterAllergies, filterConditions, search, weekStart, dietValue, subCategory, allergenValues }) {
   const params = new URLSearchParams({
     day: String(day),
     mealType,
@@ -120,6 +120,9 @@ export async function getRecommendedDishes(userId, { day, mealType, filterMealTy
   });
   if (search) params.set("search", search);
   if (weekStart) params.set("weekStart", weekStart);
+  if (dietValue) params.set("dietValue", dietValue);
+  if (subCategory) params.set("subCategory", subCategory);
+  if (allergenValues) params.set("allergenValues", allergenValues);
   return request(`/dishes/recommend/${userId}?${params}`);
 }
 
@@ -160,6 +163,13 @@ export async function clearWeekMealPlan(userId, weekStart) {
   return request(`/mealplan/${userId}/clear${params}`, { method: "DELETE" });
 }
 
+export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLimitSeconds = 10, dayIndex } = {}) {
+  return request(`/mealplan/${userId}/generate`, {
+    method: "POST",
+    body: JSON.stringify({ weekStart, numDays, timeLimitSeconds, dayIndex: dayIndex ?? null }),
+  });
+}
+
 export async function getWeekNutrients(userId, weekStart) {
   const params = weekStart ? `?weekStart=${weekStart}` : "";
   return request(`/mealplan/${userId}/nutrients/week${params}`);
@@ -168,6 +178,20 @@ export async function getWeekNutrients(userId, weekStart) {
 export async function getDayNutrients(userId, dayIndex, weekStart) {
   const params = weekStart ? `?weekStart=${weekStart}` : "";
   return request(`/mealplan/${userId}/nutrients/day/${dayIndex}${params}`);
+}
+
+// ---- Favourites ----
+
+export async function getFavourites(userId) {
+  return request(`/favourites/${userId}`);
+}
+
+export async function addFavourite(userId, dishId) {
+  return request(`/favourites/${userId}/${dishId}`, { method: "POST" });
+}
+
+export async function removeFavourite(userId, dishId) {
+  return request(`/favourites/${userId}/${dishId}`, { method: "DELETE" });
 }
 
 // ---- Shopping List ----
