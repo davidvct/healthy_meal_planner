@@ -425,11 +425,14 @@ def load_seed_data() -> dict[str, Any]:
                 "hypertensionCategory": (row.get("hypertension_category") or "").strip(),
                 "diabetesCategory": (row.get("diabetes_category") or "").strip(),
                 "cholesterolCategory": (row.get("cholesterol_category") or "").strip(),
+                "goutCategory": (row.get("gout_category") or "").strip(),
             }
             dishes.append(dish_record)
 
             recipes[recipe_id] = {
                 "name": name,
+                "category": (row.get("category") or "").strip(),
+                "allergies": _normalize_allergies_text(row.get("Allergies", "")),
                 "prepTime": int(_parse_float(row.get("prep_time"))),
                 "cookTime": int(_parse_float(row.get("cook_time"))),
                 "steps": _parse_steps(row.get("instructions", "")),
@@ -442,6 +445,11 @@ def load_seed_data() -> dict[str, Any]:
                 "sodium": _parse_float(row.get("sodium")),
                 "cholesterol": _parse_float(row.get("cholesterol")),
                 "sugar": _parse_float(row.get("sugar")),
+                "hypertensionCategory": (row.get("hypertension_category") or "").strip(),
+                "diabetesCategory": (row.get("diabetes_category") or "").strip(),
+                "cholesterolCategory": (row.get("cholesterol_category") or "").strip(),
+                "goutCategory": (row.get("gout_category") or "").strip(),
+                "imageUrl": (row.get("image_url") or "").strip(),
             }
 
     ingredients_nutrients = {

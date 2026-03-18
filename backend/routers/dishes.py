@@ -108,9 +108,11 @@ def _recipe_to_dish_row(recipe: dict[str, Any]) -> dict[str, Any]:
         "sugar": parse_float(recipe.get("sugar"), 0.0),
         "allergies": json.dumps(allergies),
         "diet_label": _diet_label(recipe),
+        "category": recipe.get("category") or "",
         "hypertension_category": recipe.get("hypertension_category"),
         "diabetes_category": recipe.get("diabetes_category"),
         "cholesterol_category": recipe.get("cholesterol_category"),
+        "gout_category": recipe.get("gout_category"),
         "description": recipe.get("description") or "",
         "source_url": recipe.get("url") or "",
         "image_url": recipe.get("image_url") or "",
@@ -184,6 +186,9 @@ def recommend_dishes(
     filterConditions: str = Query(default="true"),
     search: str | None = Query(default=None),
     weekStart: str | None = Query(default=None),
+    dietValue: str | None = Query(default=None),
+    subCategory: str | None = Query(default=None),
+    allergenValues: str | None = Query(default=None),
     conn: Any = Depends(get_db),
 ) -> dict:
     ws = weekStart or get_current_week_start()
@@ -191,6 +196,14 @@ def recommend_dishes(
     user_profile = _load_user_profile(conn, user_id)
     if not user_profile:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Override profile diet with explicit chip value from the UI
+    if dietValue and dietValue.strip():
+        user_profile["diet"] = dietValue.strip().lower()
+
+    # Override profile allergies with explicit chip values from the UI
+    if allergenValues and allergenValues.strip():
+        user_profile["allergies"] = [a.strip().lower() for a in allergenValues.split(",") if a.strip()]
 
     recipe_rows = conn.execute("SELECT * FROM recipes").fetchall()
     all_dishes = [_recipe_to_dish_row(r) for r in recipe_rows]
@@ -221,6 +234,7 @@ def recommend_dishes(
         filter_diet=filterDiet != "false",
         filter_allergies=filterAllergies != "false",
         filter_conditions=filterConditions != "false",
+        sub_category=subCategory or None,
     )
 
     results = filtered
@@ -237,6 +251,7 @@ def recommend_dishes(
                 filter_diet=filterDiet != "false",
                 filter_allergies=filterAllergies != "false",
                 filter_conditions=filterConditions != "false",
+                sub_category=subCategory or None,
             )
             results = [d for d in broader if _matches_search(d, search)]
 

@@ -15,12 +15,13 @@ const dietOptions = [
 ];
 
 const allergyOptions = [
-  { value: "Peanut",       label: "Peanut",   emoji: "🥜" },
-  { value: "Egg",          label: "Egg",      emoji: "🥚" },
-  { value: "Shrimp",       label: "Shrimp",   emoji: "🍤" },
-  { value: "Fish",         label: "Fish",     emoji: "🐠" },
-  { value: "Soy Sauce",    label: "Soy",      emoji: "🫘" },
-  { value: "Coconut Milk", label: "Coconut",  emoji: "🥥" },
+  { value: "gluten",   label: "Gluten",   emoji: "🌾" },
+  { value: "dairy",    label: "Dairy",    emoji: "🥛" },
+  { value: "nut",      label: "Nuts",     emoji: "🥜" },
+  { value: "egg",      label: "Egg",      emoji: "🥚" },
+  { value: "seafood",  label: "Seafood",  emoji: "🦐" },
+  { value: "meat",     label: "Meat",     emoji: "🥩" },
+  { value: "soy",      label: "Soy",      emoji: "🫘" },
 ];
 
 const SEX_OPTIONS = [
