@@ -73,7 +73,7 @@ function tagClass(type) {
   return 'tg-muted';
 }
 
-export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail, userId, healthClass: healthClassProp }) {
+export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId, healthClass: healthClassProp }) {
   const [expanded, setExpanded] = useState(false);
   const [fav, setFav] = useState(false);
 
@@ -143,7 +143,20 @@ export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail
         {/* Left zone: thumb + info + actions */}
         <div className="mc-zone-left">
           <div className={`mc-thumb ${style.thumbCls}`}>
-            <span className="mc-icon">{style.emoji}</span>
+            {(dishDetail?.image_url || dishDetail?.imageUrl) ? (
+              <>
+                <img
+                  src={dishDetail.image_url || dishDetail.imageUrl}
+                  alt=""
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 'inherit' }}
+                  onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = ''; }}
+                />
+                <span className="mc-icon" style={{ display: 'none' }}>{style.emoji}</span>
+              </>
+            ) : (
+              <span className="mc-icon">{style.emoji}</span>
+            )}
           </div>
 
           <div className="mc-info">
@@ -169,10 +182,10 @@ export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button
               className="mc-swap-inline"
-              disabled={swapping}
-              onClick={e => { e.stopPropagation(); onSwap && onSwap(entry); }}
+              onClick={e => { e.stopPropagation(); onBrowse?.(); }}
+              style={{ color: 'var(--teal)' }}
             >
-              {swapping ? '…' : '⇄'} swap
+              Change
             </button>
             <button
               className={`mc-fav-btn${fav ? ' on' : ''}`}
@@ -184,19 +197,17 @@ export default function MealCard({ entry, mealType, onSwap, swapping, dishDetail
           </div>
         </div>
 
-        {/* Right zone: macro pills + show details toggle */}
+        {/* Compact macro row + details toggle */}
         <div className="mc-zone-right">
-          <div className="mc-macro-pills">
-            {macroData.map(x => (
-              <div key={x.l} className="mc-macro-pill">
-                <div className="mc-macro-pill-v">{x.v}</div>
-                <div className="mc-macro-pill-l">{x.l}</div>
-              </div>
-            ))}
-          </div>
-          <div className="mc-foot" />
-          <div className="mc-more" onClick={() => setExpanded(e => !e)}>
-            {expanded ? '− Hide details' : '+ Show details'}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text3)' }}>
+              {macroData.map(x => (
+                <span key={x.l}><strong style={{ color: 'var(--text2)' }}>{x.v}</strong> {x.l}</span>
+              ))}
+            </div>
+            <div className="mc-more" onClick={() => setExpanded(e => !e)} style={{ marginTop: 0, borderTop: 'none', padding: '4px 0' }}>
+              {expanded ? '− Less' : '+ More'}
+            </div>
           </div>
         </div>
 

@@ -38,7 +38,9 @@ function todayDayIndex(monday) {
   return diff >= 0 && diff < 7 ? diff : null;
 }
 
-function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse, rejectedIds }) {
+const MEAL_SLOT_INDEX = { breakfast: 0, lunch: 1, dinner: 2 };
+
+function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse }) {
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [addingId, setAddingId] = useState(null);
@@ -61,8 +63,25 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse, r
         const dishes = scored.map(s => ({
           ...(s.dish ?? s),
           kcal: s.nutrients?.calories ?? s.dish?.kcal ?? 0,
-        })).filter(d => !rejectedIds?.has(d.id));
-        if (!cancelled) setSuggestions(dishes.slice(0, 4));
+        }));
+        // Offset by day + meal type so every slot across the week gets different suggestions
+        // Wraps with modulo so we never run out of suggestions
+        const slotIdx = MEAL_SLOT_INDEX[mealType] || 0;
+        const rawOffset = (dayIndex * 3 + slotIdx) * 3;
+        const pool = dishes.length;
+        if (!cancelled) {
+          if (pool <= 3) {
+            setSuggestions(dishes.slice(0, 3));
+          } else {
+            const offset = rawOffset % Math.max(1, pool - 2);
+            const picked = dishes.slice(offset, offset + 3);
+            // If near the end, wrap around
+            if (picked.length < 3) {
+              picked.push(...dishes.slice(0, 3 - picked.length));
+            }
+            setSuggestions(picked);
+          }
+        }
       } catch {
         if (!cancelled) setSuggestions([]);
       } finally {
@@ -71,7 +90,7 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse, r
     };
     load();
     return () => { cancelled = true; };
-  }, [userId, mealType, dayIndex, weekStart, rejectedIds]);
+  }, [userId, mealType, dayIndex, weekStart]);
 
   const handleAdd = async (dish) => {
     const dishId = dish.id;
@@ -96,7 +115,7 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse, r
         </div>
         <button
           className="es-browse"
-          onClick={() => onBrowse({ userId, dayIndex, mealType, label: MEAL_LABELS[mealType] })}
+          onClick={() => onBrowse({ userId, dayIndex, mealType, label: MEAL_LABELS[mealType], weekStart })}
         >
           Browse all →
         </button>
@@ -113,10 +132,21 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse, r
           </div>
         ) : (
           <>
-            {suggestions.map(d => (
+            {suggestions.map(d => {
+              const suggImg = d.image_url || d.imageUrl || '';
+              return (
               <div key={d.id} className="sugg-hcard">
-                <div className={`sugg-himg ${THUMB_CLASS[mealType] || 'fv-l'}`}>
-                  <span style={{ fontSize: 16 }}>{MEAL_EMOJI[mealType] || '🍽️'}</span>
+                <div className={`sugg-himg ${THUMB_CLASS[mealType] || 'fv-l'}`} style={{ overflow: 'hidden' }}>
+                  {suggImg ? (
+                    <img
+                      src={suggImg}
+                      alt=""
+                      loading="lazy"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = ''; }}
+                    />
+                  ) : null}
+                  <span style={{ fontSize: 16, display: suggImg ? 'none' : '' }}>{MEAL_EMOJI[mealType] || '🍽️'}</span>
                 </div>
                 <div className="sugg-hbody">
                   <div className="sugg-hname">{d.dishName || d.name}</div>
@@ -130,10 +160,11 @@ function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse, r
                   {addingId === d.id ? '✓' : '+ Add'}
                 </button>
               </div>
-            ))}
+            );
+            })}
             <div
               className="sugg-hcard sugg-hmore"
-              onClick={() => onBrowse({ userId, dayIndex, mealType, label: MEAL_LABELS[mealType] })}
+              onClick={() => onBrowse({ userId, dayIndex, mealType, label: MEAL_LABELS[mealType], weekStart })}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ opacity: .4 }}>
                 <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3" />
@@ -165,20 +196,31 @@ function getDishHealthClass(dishDetail, conditions) {
   return worst === 'alert' ? 'mc-alert' : worst === 'warn' ? 'mc-warn' : 'mc-safe';
 }
 
-export default function TodayScreen({ activeDiner, userId, onBrowse }) {
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [activeDayIndex, setActiveDayIndex] = useState(() => {
+export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset: weekOffsetProp = 0, onWeekOffsetChange, initialDayIndex = null, onDayIndexChange }) {
+  const [weekOffsetLocal, setWeekOffsetLocal] = useState(weekOffsetProp);
+  const weekOffset = weekOffsetProp ?? weekOffsetLocal;
+  const setWeekOffset = (v) => {
+    const val = typeof v === 'function' ? v(weekOffset) : v;
+    setWeekOffsetLocal(val);
+    onWeekOffsetChange?.(val);
+  };
+  const [activeDayIndex, setActiveDayIndexRaw] = useState(() => {
+    if (initialDayIndex !== null) return initialDayIndex;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const mon = getMonday(today);
     return Math.max(0, Math.round((today - mon) / 86400000));
   });
+  const setActiveDayIndex = (v) => {
+    const val = typeof v === 'function' ? v(activeDayIndex) : v;
+    setActiveDayIndexRaw(val);
+    onDayIndexChange?.(val);
+  };
   const [mealPlan, setMealPlan] = useState({});
   const [dayNutrients, setDayNutrients] = useState(null);
   const [bannerDismissed, setBannerDismissed] = useState(
     () => localStorage.getItem('today-guide-dismissed') === '1'
   );
-  const [swappingKey, setSwappingKey] = useState(null);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [nutExpanded, setNutExpanded] = useState(true);
   const [recommendedTargets, setRecommendedTargets] = useState(null);
@@ -187,17 +229,24 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
   const [lastWeekHasMeals, setLastWeekHasMeals] = useState(false);
   const [prevWeekMealCount, setPrevWeekMealCount] = useState(0);
   const [copyingPlan, setCopyingPlan] = useState(false);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [genProgress, setGenProgress] = useState(0); // 0-7 days completed
   const [toast, setToast] = useState(null);
-  const [rejectedDishIds, setRejectedDishIds] = useState(new Set());
   const toastTimerRef = useRef(null);
 
   const monday   = getMonday(addDays(new Date(), weekOffset * 7));
   const weekStart = toWeekStart(monday);
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
+  const prevWeekOffsetRef = useRef(weekOffset);
   useEffect(() => {
-    const todayIdx = todayDayIndex(monday);
-    setActiveDayIndex(todayIdx !== null ? todayIdx : 0);
+    // Only reset day index when user navigates to a different week via arrows,
+    // not on initial mount (which should preserve the day from browse context)
+    if (prevWeekOffsetRef.current !== weekOffset) {
+      prevWeekOffsetRef.current = weekOffset;
+      const todayIdx = todayDayIndex(monday);
+      setActiveDayIndex(todayIdx !== null ? todayIdx : 0);
+    }
   }, [weekOffset]);
 
   const loadDishDetails = async (plan) => {
@@ -306,6 +355,34 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
     }
   };
 
+  const handleGeneratePlan = async () => {
+    setGeneratingPlan(true);
+    setGenProgress(0);
+    let totalAdded = 0;
+    try {
+      for (let day = 0; day < 7; day++) {
+        const result = await api.generateMealPlan(userId, { weekStart, dayIndex: day });
+        if (result.success === false) {
+          showToast(result.error || 'Could not generate plan');
+          break;
+        }
+        totalAdded += result.entriesWritten || 0;
+        setGenProgress(day + 1);
+        // Refresh UI after each day so meals appear progressively
+        const plan = await loadPlan();
+        if (plan) loadDishDetails(plan);
+      }
+      await loadNutrients();
+      if (totalAdded > 0) showToast(`Week planned! ${totalAdded} meals added`);
+    } catch (err) {
+      console.error('Plan generation failed:', err);
+      showToast('Failed to generate plan');
+    } finally {
+      setGeneratingPlan(false);
+      setGenProgress(0);
+    }
+  };
+
   const showToast = useCallback((msg, undo = null) => {
     if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     setToast({ msg, undo });
@@ -313,37 +390,6 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
       toastTimerRef.current = setTimeout(() => setToast(null), 3000);
     }
   }, []);
-
-  const handleSwap = async (entry, mealType) => {
-    const dishId  = entry.dishId || entry.id;
-    const entryId = entry.id;
-    const key     = `${activeDayIndex}-${mealType}`;
-    setSwappingKey(key);
-    setRejectedDishIds(prev => new Set([...prev, dishId]));
-    try {
-      await api.removeDishFromPlan(userId, entryId);
-      const plan = await loadPlan();
-      if (plan) loadDishDetails(plan);
-      await loadNutrients();
-      showToast('⇄ Meal swapped', async () => {
-        setRejectedDishIds(prev => { const n = new Set(prev); n.delete(dishId); return n; });
-        try {
-          await api.addDishToPlan(userId, { dayIndex: activeDayIndex, mealType, dishId, servings: entry.servings || 1, weekStart });
-          const p = await loadPlan();
-          if (p) loadDishDetails(p);
-          await loadNutrients();
-          showToast('↩ Meal restored');
-        } catch (err) {
-          console.error('Undo failed:', err);
-        }
-      });
-    } catch (err) {
-      console.error('Swap failed:', err);
-      setRejectedDishIds(prev => { const n = new Set(prev); n.delete(dishId); return n; });
-    } finally {
-      setSwappingKey(null);
-    }
-  };
 
   const handleRemove = async (entry) => {
     try {
@@ -524,8 +570,19 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
                         <span className="ewc-meal">Personalised to your health profile</span>
                       </div>
                     </div>
-                    <button className="ewc-btn ewc-btn-navy" disabled>
-                      Plan with AI ✨ <span style={{ fontSize: 9, opacity: .7 }}>(coming soon)</span>
+                    <button className="ewc-btn ewc-btn-navy" disabled={generatingPlan} onClick={handleGeneratePlan}
+                      style={{ position: 'relative', overflow: 'hidden' }}>
+                      {generatingPlan && (
+                        <div style={{
+                          position: 'absolute', left: 0, top: 0, bottom: 0,
+                          width: `${(genProgress / 7) * 100}%`,
+                          background: 'rgba(255,255,255,.18)',
+                          transition: 'width .4s ease',
+                        }} />
+                      )}
+                      <span style={{ position: 'relative' }}>
+                        {generatingPlan ? `Planning day ${genProgress + 1} of 7…` : 'Plan with AI ✨'}
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -536,18 +593,16 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
               <div className="meal-cards">
                 {MEAL_TYPES.map(mt => {
                   const entries  = dayMeals[mt] || [];
-                  const swapKey  = `${activeDayIndex}-${mt}`;
 
                   if (entries.length > 0) {
-                    return entries.map(entry => (
+                    // Only show 1 meal card per slot (safety net)
+                    return entries.slice(0, 1).map(entry => (
                       <MealCard
                         key={entry.id}
                         entry={entry}
                         mealType={mt}
                         onRemove={handleRemove}
-                        onSwap={e => handleSwap(e, mt)}
                         onBrowse={() => onBrowse({ userId, dayIndex: activeDayIndex, mealType: mt, label: MEAL_LABELS[mt], weekStart })}
-                        swapping={swappingKey === swapKey}
                         dishDetail={dishDetails[entry.dishId]}
                         healthClass={getDishHealthClass(dishDetails[entry.dishId], activeDiner?.conditions)}
                         userId={userId}
@@ -564,7 +619,6 @@ export default function TodayScreen({ activeDiner, userId, onBrowse }) {
                       userId={userId}
                       onAdded={() => { setToast(null); loadPlan(); loadNutrients(); }}
                       onBrowse={ctx => { setToast(null); onBrowse(ctx); }}
-                      rejectedIds={rejectedDishIds}
                     />
                   );
                 })}

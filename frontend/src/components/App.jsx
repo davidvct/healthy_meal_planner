@@ -44,6 +44,8 @@ export default function App() {
   const [activeDiner, setActiveDiner] = useState(null);
   const [activeTab, setActiveTab] = useState(TABS.TODAY);
   const [discoverSlotCtx, setDiscoverSlotCtx] = useState(null);
+  const [todayWeekOffset, setTodayWeekOffset] = useState(0);
+  const [todayDayIndex, setTodayDayIndex] = useState(null); // null = use today's day
   // editingDiner: undefined = closed, null = new diner, object = editing existing
   const [editingDiner, setEditingDiner] = useState(undefined);
 
@@ -143,6 +145,7 @@ export default function App() {
 
   const openDiscover = (slotCtx) => {
     setDiscoverSlotCtx(slotCtx);
+    if (slotCtx?.dayIndex != null) setTodayDayIndex(slotCtx.dayIndex);
     setActiveTab(TABS.DISCOVER);
   };
 
@@ -171,7 +174,8 @@ export default function App() {
 
         {/* Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 18px', height: 50 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Left: logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '0 0 auto' }}>
             <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--teal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M6 1S4 4.5 4 7a2 2 0 004 0C8 4.5 6 1 6 1z" fill="white"/>
@@ -180,32 +184,47 @@ export default function App() {
             <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--navy)' }}>MealVitals</span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Diner avatar strip */}
-            {diners.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 24 }}>
-                {diners.map((d, i) => (
+          {/* Center: diner switcher */}
+          {diners.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 3, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 24 }}>
+              {diners.map((d, i) => {
+                const isOn = activeDiner?.userId === d.userId;
+                return (
                   <button
                     key={d.userId}
                     onClick={() => setActiveDiner(d)}
                     title={d.name}
                     style={{
-                      width: 28, height: 28, borderRadius: '50%',
-                      background: AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length],
-                      border: 'none', cursor: 'pointer', flexShrink: 0,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 10, fontWeight: 800, color: '#fff', fontFamily: 'var(--font)',
-                      outline: activeDiner?.userId === d.userId ? '2.5px solid var(--teal)' : '2.5px solid transparent',
-                      outlineOffset: 1, transition: 'outline-color 0.15s',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: isOn ? '3px 10px 3px 3px' : '3px',
+                      borderRadius: 20,
+                      background: isOn ? 'var(--white)' : 'transparent',
+                      border: isOn ? '1.5px solid var(--teal)' : '1.5px solid transparent',
+                      cursor: 'pointer', flexShrink: 0,
+                      fontFamily: 'var(--font)', transition: 'all 0.15s',
                     }}
                   >
-                    {avatarLabel(d.name)}
+                    <div style={{
+                      width: 24, height: 24, borderRadius: '50%',
+                      background: AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length],
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 800, color: '#fff', flexShrink: 0,
+                    }}>
+                      {avatarLabel(d.name)}
+                    </div>
+                    {isOn && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                        {d.name?.split(' ')[0]}
+                      </span>
+                    )}
                   </button>
-                ))}
-              </div>
-            )}
+                );
+              })}
+            </div>
+          )}
 
-            {/* Logout */}
+          {/* Right: logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
             <button
               onClick={handleLogout}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}
@@ -257,10 +276,10 @@ export default function App() {
       {/* ── Screen content ── */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {activeTab === TABS.TODAY && activeDiner && (
-          <TodayScreen activeDiner={activeDiner} userId={activeDiner.userId} onBrowse={openDiscover} />
+          <TodayScreen activeDiner={activeDiner} userId={activeDiner.userId} onBrowse={openDiscover} weekOffset={todayWeekOffset} onWeekOffsetChange={setTodayWeekOffset} initialDayIndex={todayDayIndex} onDayIndexChange={setTodayDayIndex} />
         )}
         {activeTab === TABS.SHOP && (
-          <ShoppingScreen diners={diners} activeDiner={activeDiner} />
+          <ShoppingScreen diners={diners} activeDiner={activeDiner} onGoToPlan={() => setActiveTab(TABS.TODAY)} />
         )}
         {activeTab === TABS.PROFILES && (
           <ProfilesScreen

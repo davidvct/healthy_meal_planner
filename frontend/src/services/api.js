@@ -129,6 +129,13 @@ export async function removeDishFromPlan(userId, entryId) {
   return request(`/mealplan/${userId}/remove/${entryId}`, { method: "DELETE" });
 }
 
+export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLimitSeconds = 10, dayIndex } = {}) {
+  return request(`/mealplan/${userId}/generate`, {
+    method: "POST",
+    body: JSON.stringify({ weekStart, numDays, timeLimitSeconds, dayIndex: dayIndex ?? null }),
+  });
+}
+
 export async function getWeekNutrients(userId, weekStart) {
   const params = weekStart ? `?weekStart=${weekStart}` : "";
   return request(`/mealplan/${userId}/nutrients/week${params}`);

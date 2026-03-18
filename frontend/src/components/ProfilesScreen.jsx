@@ -77,23 +77,6 @@ function getDinerTabs(condList) {
 
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// Average daily nutrients across a week's daily array
-function weeklyAvgPoint(dailyArr, monday) {
-  const withMeals = dailyArr.filter(d => d.hasMeals);
-  const nutrients = {};
-  if (withMeals.length) {
-    const keys = Object.keys(withMeals[0]?.nutrients || {});
-    for (const k of keys) {
-      nutrients[k] = withMeals.reduce((s, d) => s + (d.nutrients?.[k] || 0), 0) / withMeals.length;
-    }
-  }
-  return {
-    label: monday.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' }),
-    nutrients,
-    active: false,
-    hasMeals: withMeals.length > 0,
-  };
-}
 
 function buildStats(chartData, target) {
   const values = chartData.map(d => d.value);
@@ -142,7 +125,6 @@ function buildInsight(name, nutTab, avg, tgt, pct, onTrack, over, vals, isWeek) 
 export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onAddDiner, onEditDiner, onDinersChanged, onViewPlan }) {
   const [selected,     setSelected]     = useState(activeDiner || diners[0] || null);
   const [ndNut,        setNdNut]        = useState('calories');
-  const [mealsPlanned, setMealsPlanned] = useState(0);
 
   // Range filter state
   const [rangeMode,    setRangeMode]    = useState('week');
@@ -190,27 +172,59 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
       } else if (rangeMode === 'month') {
         const ref = new Date(today.getFullYear(), today.getMonth() + rangeOffset, 1);
         const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
-        // Start from the first Monday that falls within the month (not the Monday before)
         const firstMonday = getMonday(ref);
         const monthStart = firstMonday < ref ? addDays(firstMonday, 7) : firstMonday;
         const weeks = getWeeksInRange(monthStart, lastDay);
         const responses = await Promise.all(
           weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))
         );
-        setRawPoints(weeks.map((monday, wi) => weeklyAvgPoint(responses[wi]?.daily || [], monday)));
+        // Expand to daily points for continuous bars
+        const dailyPoints = [];
+        weeks.forEach((monday, wi) => {
+          const daily = responses[wi]?.daily || [];
+          for (let d = 0; d < 7; d++) {
+            const dayDate = addDays(monday, d);
+            if (dayDate > lastDay) break;
+            if (dayDate < ref) continue;
+            const dayData = daily.find(dd => dd.dayIndex === d);
+            dailyPoints.push({
+              label: dayDate.getDate() === 1 ? dayDate.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' }) : String(dayDate.getDate()),
+              nutrients: dayData?.nutrients || {},
+              active: dayDate.getTime() === today.getTime(),
+              hasMeals: dayData?.hasMeals || false,
+            });
+          }
+        });
+        setRawPoints(dailyPoints);
 
       } else if (rangeMode === 'custom' && customStart && customEnd) {
         const startDate = new Date(customStart); startDate.setHours(0,0,0,0);
         const endDate   = new Date(customEnd);   endDate.setHours(0,0,0,0);
         if (endDate < startDate) { setRawPoints([]); return; }
-        // Start from first Monday within the range (same logic as month view)
         const firstMonday = getMonday(startDate);
         const startMonday = firstMonday < startDate ? addDays(firstMonday, 7) : firstMonday;
-        const weeks = getWeeksInRange(startMonday, endDate).slice(0, 12); // cap 12 weeks
+        const weeks = getWeeksInRange(startMonday, endDate).slice(0, 12);
         const responses = await Promise.all(
           weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))
         );
-        setRawPoints(weeks.map((monday, wi) => weeklyAvgPoint(responses[wi]?.daily || [], monday)));
+        // Expand to daily points
+        const dailyPoints = [];
+        weeks.forEach((monday, wi) => {
+          const daily = responses[wi]?.daily || [];
+          for (let d = 0; d < 7; d++) {
+            const dayDate = addDays(monday, d);
+            if (dayDate > endDate) break;
+            if (dayDate < startDate) continue;
+            const dayData = daily.find(dd => dd.dayIndex === d);
+            dailyPoints.push({
+              label: dayDate.getDate() === 1 ? dayDate.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' }) : String(dayDate.getDate()),
+              nutrients: dayData?.nutrients || {},
+              active: dayDate.getTime() === today.getTime(),
+              hasMeals: dayData?.hasMeals || false,
+            });
+          }
+        });
+        setRawPoints(dailyPoints);
       }
     } catch (err) {
       console.error('Failed to load chart data:', err);
@@ -222,17 +236,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
 
   useEffect(() => { loadChartData(); }, [loadChartData]);
 
-  const currentWeekStart = toWeekStart(getMonday(new Date()));
 
-  useEffect(() => {
-    if (!selected?.userId) return;
-    api.getMealPlan(selected.userId, currentWeekStart).then(plan => {
-      const count = Object.values(plan || {}).flatMap(day =>
-        Object.values(day).flatMap(entries => Array.isArray(entries) ? entries : [])
-      ).length;
-      setMealsPlanned(count);
-    }).catch(() => setMealsPlanned(0));
-  }, [selected?.userId, currentWeekStart]);
 
   const handleDelete = async (diner) => {
     if (!confirm(`Delete ${diner.name}? This cannot be undone.`)) return;
@@ -269,7 +273,6 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
   const conditions = parseTags(selected?.conditions);
   const diet       = parseTags(selected?.diet);
   const allergies  = parseTags(selected?.allergies);
-  const daysPlanned = rawPoints.filter(d => d.hasMeals).length;
 
   // Period label for nav pill
   const rangePeriodLabel = (() => {
@@ -289,142 +292,118 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
 
   const periodUnit = rangeMode === 'week' ? 'days' : 'weeks';
 
-  const isMyself = selected?.userId === diners[0]?.userId;
 
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '16px 18px' }}>
       <div style={{ maxWidth: '80%', margin: '0 auto', paddingTop: 4 }}>
-      <div className="prof-layout">
 
-        {/* Left rail */}
-        <div className="prof-rail">
+        {/* Centered diner switcher strip */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 14 }}>
           {diners.map((d, i) => {
             const isActive = selected?.userId === d.userId;
             const avClass  = AV_CLASSES[i % AV_CLASSES.length];
             return (
-              <div
+              <button
                 key={d.userId}
-                className={`prof-person${isActive ? ' active' : ''}`}
+                className={`prof-chip${isActive ? ' prof-chip-on' : ''}`}
                 onClick={() => { setSelected(d); onSelectDiner(d); }}
                 title={d.name}
               >
-                <div className={`prof-pav ${avClass}`}>{avatarLabel(d.name)}</div>
-                <div className="prof-pname">{d.name?.split(' ')[0]}</div>
-              </div>
+                <div className={`prof-pav ${avClass}`} style={{ width: 28, height: 28, fontSize: 11 }}>{avatarLabel(d.name)}</div>
+                <span className="prof-chip-name">{d.name?.split(' ')[0]}</span>
+              </button>
             );
           })}
-          <div className="prof-rail-sep" />
           {diners.length < 5 ? (
-            <div className="prof-add" onClick={onAddDiner} title="Add diner">
-              <div className="prof-add-ic">+</div>
-              <div className="prof-add-lbl">Add</div>
-            </div>
+            <button className="prof-chip prof-chip-add" onClick={onAddDiner} title="Add diner">
+              <span style={{ fontSize: 16, lineHeight: 1, color: 'var(--text3)' }}>+</span>
+              <span className="prof-chip-name" style={{ color: 'var(--text3)' }}>Add</span>
+            </button>
           ) : (
-            <div className="prof-add" title="Maximum 5 diners reached" style={{ opacity: 0.6, cursor: 'not-allowed', pointerEvents: 'none' }}>
-              <div className="prof-add-ic" style={{ fontSize: 11 }}>5/5</div>
-              <div className="prof-add-lbl">Full</div>
-            </div>
+            <button className="prof-chip" title="Maximum 5 diners reached" style={{ opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)' }}>5/5</span>
+            </button>
           )}
         </div>
 
-        {/* Right panel */}
+        {/* Main panel */}
         <div className="prof-panel">
           {selected ? (
             <>
-              {/* Card 1: Person header */}
+              {/* Card 1: Person header + health profile (consolidated) */}
               <div className="prof-card" style={{ borderLeft: '3px solid var(--teal)' }}>
-                <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 11 }}>
-                  <div className={`dcav ${avCls}`} style={{ width: 40, height: 40, fontSize: 13, flexShrink: 0 }}>
-                    {avatarLabel(selected.name)}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--display)', fontSize: 15, fontWeight: 800, color: 'var(--text)', lineHeight: 1.2 }}>
-                      {selected.name}
+                <div style={{ padding: '14px 16px' }}>
+                  {/* Row 1: avatar + name + stats + actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div className={`dcav ${avCls}`} style={{ width: 48, height: 48, fontSize: 15, flexShrink: 0 }}>
+                      {avatarLabel(selected.name)}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                      {[selected.age && `${selected.age} yrs`, selected.sex, selected.weightKg && `${selected.weightKg} kg`].filter(Boolean).join(' · ') || 'No details set'}
-                    </div>
-                    <div style={{ display: 'flex', gap: 14, marginTop: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <span className="dcs-v" style={{ fontSize: 13 }}>{daysPlanned}</span>
-                        <span className="dcs-l">days planned</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {isMyself ? (
-                          <>
-                            <span className="dcs-v" style={{ fontSize: 13 }}>{Math.max(0, diners.length - 1)}</span>
-                            <span className="dcs-l">diners managed</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="dcs-v" style={{ fontSize: 13 }}>{mealsPlanned}</span>
-                            <span className="dcs-l">meals planned</span>
-                          </>
-                        )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <div style={{ fontFamily: 'var(--display)', fontSize: 17, fontWeight: 800, color: 'var(--text)', lineHeight: 1.2 }}>
+                          {selected.name}
+                        </div>
+                        <span style={{ fontSize: 11, color: 'var(--text3)' }}>
+                          {[selected.age && `${selected.age}y`, selected.sex, selected.weightKg && `${selected.weightKg}kg`].filter(Boolean).join(' · ')}
+                        </span>
                       </div>
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
-                    <button className="btn btn-outline" style={{ fontSize: 11, padding: '5px 11px' }} onClick={() => onEditDiner(selected)}>
-                      Edit
-                    </button>
-                    <button className="btn btn-navy" style={{ fontSize: 11, padding: '5px 11px' }} onClick={() => onViewPlan(selected)}>
-                      View plan →
-                    </button>
-                    {selected.userId !== diners[0]?.userId && (
-                      <button
-                        onClick={() => handleDelete(selected)}
-                        title="Delete diner"
-                        style={{ width: 28, height: 28, borderRadius: 'var(--r-xs)', border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', flexShrink: 0 }}
-                        onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--red)'; e.currentTarget.style.color = 'var(--red)'; e.currentTarget.style.background = 'var(--red-l)'; }}
-                        onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.background = 'var(--white)'; }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                          <path d="M2 3h8M5 3V2h2v1M4.5 5v4M7.5 5v4M3 3l.5 7h5l.5-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button className="btn btn-navy" style={{ fontSize: 11, padding: '7px 14px' }} onClick={() => onViewPlan(selected)}>
+                        View plan →
                       </button>
-                    )}
+                      <button className="btn btn-outline" style={{ fontSize: 11, padding: '7px 12px' }} onClick={() => onEditDiner(selected)}>
+                        Edit
+                      </button>
+                      {selected.userId !== diners[0]?.userId && (
+                        <button
+                          onClick={() => handleDelete(selected)}
+                          title="Delete diner"
+                          style={{ width: 32, height: 32, borderRadius: 'var(--r-xs)', border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text3)', flexShrink: 0, transition: 'all .15s' }}
+                          onMouseOver={e => { e.currentTarget.style.borderColor = 'var(--red)'; e.currentTarget.style.color = 'var(--red)'; e.currentTarget.style.background = 'var(--red-l)'; }}
+                          onMouseOut={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.background = 'var(--white)'; }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 3h8M5 3V2h2v1M4.5 5v4M7.5 5v4M3 3l.5 7h5l.5-7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {/* Health / Diet / Allergens — inline row within same card */}
+                <div style={{ borderTop: '1px solid var(--border)', padding: '10px 16px', display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)' }}>Health</span>
+                    {conditions.length === 0
+                      ? <span className="tag tg-green" style={{ fontSize: 10 }}>No conditions</span>
+                      : conditions.map(c => <span key={c} className={`tag ${conditionTagClass(c)}`} style={{ fontSize: 10 }}>{c}</span>)
+                    }
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)' }}>Diet</span>
+                    {diet.length === 0
+                      ? <span className="tag tg-muted" style={{ fontSize: 10 }}>No restriction</span>
+                      : diet.map(d => <span key={d} className="tag tg-teal" style={{ fontSize: 10 }}>{d}</span>)
+                    }
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text3)' }}>Allergies</span>
+                    {allergies.length === 0
+                      ? <span className="tag tg-muted" style={{ fontSize: 10 }}>None</span>
+                      : allergies.map(a => <span key={a} className="tag tg-amber" style={{ fontSize: 10 }}>{a}</span>)
+                    }
                   </div>
                 </div>
               </div>
 
-              {/* Card 2: Health / Diet / Allergens */}
-              <div className="prof-card">
-                <div className="dc-hda">
-                  <div className="dc-hda-col">
-                    <div className="dc-hda-lbl">Health profile</div>
-                    {conditions.length === 0
-                      ? <span className="tag tg-green">No conditions</span>
-                      : <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {conditions.map(c => <span key={c} className={`tag ${conditionTagClass(c)}`}>{c}</span>)}
-                        </div>
-                    }
-                  </div>
-                  <div className="dc-hda-col">
-                    <div className="dc-hda-lbl">Diet</div>
-                    {diet.length === 0
-                      ? <span className="tag tg-muted">No restriction</span>
-                      : <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {diet.map(d => <span key={d} className="tag tg-teal">{d}</span>)}
-                        </div>
-                    }
-                  </div>
-                  <div className="dc-hda-col">
-                    <div className="dc-hda-lbl">Allergens</div>
-                    {allergies.length === 0
-                      ? <span className="tag tg-muted">None flagged</span>
-                      : <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {allergies.map(a => <span key={a} className="tag tg-amber">{a}</span>)}
-                        </div>
-                    }
-                  </div>
-                </div>
-              </div>
+
 
               {/* Card 3: Nutrition dashboard */}
+              {hasData ? (
               <div className="prof-card">
 
-                {/* Range filter row — mode pills only, period nav lives in chart meta */}
+                {/* Range filter row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
                   {['week', 'month', 'custom'].map(mode => (
                     <button
@@ -665,6 +644,22 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
                   </div>
                 </div>
               </div>
+              ) : (
+              <div className="prof-card" style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 10 }}>📊</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>No nutrition data yet</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', lineHeight: 1.5 }}>
+                  Plan some meals to start tracking nutrition trends.
+                </div>
+                <button
+                  className="btn btn-navy"
+                  style={{ fontSize: 11, padding: '7px 16px', marginTop: 14 }}
+                  onClick={() => onViewPlan(selected)}
+                >
+                  Plan meals →
+                </button>
+              </div>
+              )}
             </>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200, gap: 12, color: 'var(--text3)' }}>
@@ -679,7 +674,6 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
             </div>
           )}
         </div>
-      </div>
       </div>
     </div>
   );

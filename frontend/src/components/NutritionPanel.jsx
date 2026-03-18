@@ -87,12 +87,12 @@ export default function NutritionPanel({ nutrients, conditions, diet, dinerName,
   const targets  = getTargets(condList, recommendedTargets);
 
   const kcal    = nutrients?.calories ?? 0;
-  const kcalPct = Math.min(Math.round((kcal / targets.calories) * 100), 100);
+  const kcalPct = Math.round((kcal / targets.calories) * 100);
   const kcalRem = Math.max(targets.calories - Math.round(kcal), 0);
 
   const r    = 30, cx = 38, cy = 38;
   const circ = 2 * Math.PI * r;
-  const dashFill = circ * Math.min(kcalPct / 100, 1);
+  const dashFill = circ * Math.min(kcalPct, 100) / 100;
 
   const summaryHtml = buildSummary(nutrients, targets, mealCount);
 
@@ -164,15 +164,15 @@ export default function NutritionPanel({ nutrients, conditions, diet, dinerName,
           {MACROS.map(m => {
             const val       = nutrients?.[m.key] ?? 0;
             const tgt       = targets[m.targetKey];
-            const pct       = tgt ? Math.min(Math.round((val / tgt) * 100), 100) : 0;
-            const over      = pct >= 90;
+            const pct       = tgt ? Math.round((val / tgt) * 100) : 0;
+            const over      = pct > 100;
             const fillColor = over ? 'var(--red)' : m.color;
             return (
               <div key={m.key} className="msr-cell">
                 <div className="msr-dot" style={{ background: m.color }} />
                 <div className="msr-name">{m.label}</div>
                 <div className="msr-bar">
-                  <div className="msr-fill" style={{ background: fillColor, width: `${pct}%` }} />
+                  <div className="msr-fill" style={{ background: fillColor, width: `${Math.min(pct, 100)}%` }} />
                 </div>
                 <div className="msr-pct" style={{ color: fillColor }}>{pct}%</div>
                 <div className="msr-val">

@@ -57,6 +57,7 @@ def score_dish(
     meal_type: str,
     all_week_entries: list[dict[str, Any]],
     ingredient_cache: dict[str, list[float]],
+    favourite_ids: set[str] | None = None,
 ) -> dict[str, int]:
     dish_id = str(dish["id"] if isinstance(dish, dict) else dish.get("id"))
     dish_id_alt = f"r{dish_id}" if not dish_id.startswith("r") else dish_id[1:]
@@ -113,8 +114,10 @@ def score_dish(
     )
     pref_score += max(0, 5 - count * 2)
     pref_score += 5 if meal_type in meal_types else 1
+    if favourite_ids and dish_id in favourite_ids:
+        pref_score += 10
 
-    total = round(max(0, min(100, health_score + nutrient_score + pref_score)))
+    total = round(max(0, min(110, health_score + nutrient_score + pref_score)))
     return {
         "total": int(total),
         "healthScore": int(round(health_score)),

@@ -255,12 +255,16 @@ def recommend_dishes(
             )
             results = [d for d in broader if _matches_search(d, search)]
 
+    # Load favourites for scoring boost
+    fav_rows = conn.execute("SELECT dish_id FROM favourites WHERE user_id = ?", (user_id,)).fetchall()
+    favourite_ids = {str(row["dish_id"]) for row in fav_rows}
+
     scored = []
     for dish in results:
         ingredients = parse_json(dish["ingredients"], {})
         row_nutrients = {k: float(dish[k] or 0) for k in NUTRIENT_KEYS}
         nutrients = get_dish_nutrients(ingredients, ingredient_cache, dish_nutrients=row_nutrients)
-        score = score_dish(dish, user_profile["conditions"], day_entries, mealType, all_week_entries, ingredient_cache)
+        score = score_dish(dish, user_profile["conditions"], day_entries, mealType, all_week_entries, ingredient_cache, favourite_ids=favourite_ids)
         warnings = get_warnings(nutrients, user_profile["conditions"], dish)
         scored.append(
             {

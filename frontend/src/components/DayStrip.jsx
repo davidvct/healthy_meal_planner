@@ -13,10 +13,6 @@ function weekLabel(weekDates) {
   return `${fmt(weekDates[0])} – ${fmt(weekDates[6])}`;
 }
 
-function shortName(name, max = 14) {
-  if (!name) return '';
-  return name.length > max ? name.slice(0, max - 1) + '…' : name;
-}
 
 export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelectDay, onPrevWeek, onNextWeek, dayLabel, daysWithMeals, dinerName }) {
   if (!weekDates || weekDates.length < 7) return null;
@@ -78,10 +74,11 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
                     <div
                       key={sl.key}
                       className={`ds-slot ${sl.cls}${filled ? ' ds-filled' : ''}`}
+                      title={filled ? firstName : ''}
                     >
                       <div className="ds-slot-ic">{sl.label}</div>
                       <div className="ds-slot-name">
-                        {filled ? shortName(firstName, 12) : 'Not planned'}
+                        {filled ? firstName : 'Not planned'}
                       </div>
                     </div>
                   );

@@ -53,3 +53,10 @@ class RegisterBody(BaseModel):
 class LoginBody(BaseModel):
     email: str = Field(min_length=3)
     password: str = Field(min_length=1)
+
+
+class GeneratePlanBody(BaseModel):
+    weekStart: str | None = None
+    numDays: int = 7
+    timeLimitSeconds: int = 10
+    dayIndex: int | None = None  # generate for a single day only
