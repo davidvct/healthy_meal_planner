@@ -294,11 +294,11 @@
     .nd-tab:hover{color:var(--text)}
     .nd-tab.nd-active{font-weight:700;color:var(--text)}
     .nd-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-    .nd-chart-section{padding:18px 20px 12px}
-    .nd-chart-meta{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
-    .nd-avgval{font-size:16px;font-weight:700;color:var(--text);line-height:1}
-    .nd-avgsub{font-size:11px;color:var(--text2);margin-top:3px}
-    .nd-avgtgt{font-size:11px;color:var(--text2);margin-top:1px}
+    .nd-chart-section{padding:14px 20px 10px}
+    .nd-chart-meta{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+    .nd-avgval{font-size:20px;font-weight:800;color:var(--text);line-height:1;font-family:var(--display)}
+    .nd-avgsub{font-size:10px;color:var(--text2);margin-top:4px}
+    .nd-avgtgt{font-size:10px;color:var(--text3)}
     .nd-status{margin-top:5px}
     .nd-spill{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;display:inline-block}
     .nd-spill-green{background:var(--green-l);color:var(--green)}
@@ -322,13 +322,22 @@
     .nd-sum-lbl-wrap{display:flex;align-items:center;gap:3px;margin-bottom:2px}
     .nd-tip{position:relative;display:inline-flex;align-items:center;cursor:default}
     .nd-tip-ic{width:13px;height:13px;border-radius:50%;background:var(--border2);color:var(--text2);font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1;font-style:normal;flex-shrink:0}
-    .nd-tip-bubble{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:10px;font-weight:500;line-height:1.4;padding:6px 9px;border-radius:6px;white-space:nowrap;z-index:20;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+    .nd-tip-bubble{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:10px;font-weight:500;line-height:1.55;padding:8px 11px;border-radius:7px;white-space:normal;width:240px;overflow-wrap:break-word;word-break:normal;z-index:20;pointer-events:none;box-shadow:0 4px 16px rgba(11,34,64,0.25)}
     .nd-tip-bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--navy)}
+    .nd-tip-bubble.tip-right{left:auto;right:-6px;transform:none}
+    .nd-tip-bubble.tip-right::after{left:auto;right:14px;transform:none}
     .nd-tip:hover .nd-tip-bubble{display:block}
     .nd-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px;gap:12px;text-align:center}
     .nd-empty-icon{width:56px;height:56px;border-radius:50%;background:var(--teal-xl);border:1.5px solid rgba(6,155,142,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
     .nd-empty-title{font-size:13px;font-weight:700;color:var(--text)}
     .nd-empty-sub{font-size:11px;color:var(--text3);line-height:1.55;max-width:240px}
+    .nd-insight{background:var(--teal-xl);border-left:2px solid var(--teal);padding:9px 14px;font-size:10px;color:var(--text2);line-height:1.55}
+    .nd-insight strong{color:var(--text);font-weight:700}
+    .nd-flag{font-size:9px;font-weight:700;padding:1px 5px;border-radius:20px;flex-shrink:0}
+    .nd-bar-legend{display:flex;align-items:center;gap:12px;padding:10px 20px 12px;border-top:1px solid var(--border);flex-wrap:wrap}
+    .nd-bl-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text2);white-space:nowrap}
+    .nd-sum-cell-accent{background:var(--teal-xl)}
+    .nd-bl-swatch{width:10px;height:10px;border-radius:2px;flex-shrink:0}
 
     /* ── Onboarding wizard ── */
     .overlay-hdr{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
