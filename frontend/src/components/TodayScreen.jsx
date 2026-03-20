@@ -4,6 +4,7 @@ import MealCard from './MealCard';
 import NutritionPanel from './NutritionPanel';
 import AutofillSettingsModal, { loadAutofillSettings } from './AutofillSettingsModal';
 import ThresholdSettingsModal from './ThresholdSettingsModal';
+import UpgradePromptModal from './UpgradePromptModal';
 import * as api from '../services/api';
 
 const MEAL_TYPES  = ['breakfast', 'lunch', 'dinner'];
@@ -290,6 +291,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   const [showAutofillSettings, setShowAutofillSettings] = useState(false);
   const [showThresholds, setShowThresholds] = useState(false);
   const [autofilling, setAutofilling] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState(null);
 
   const monday   = getMonday(addDays(new Date(), weekOffset * 7));
   const weekStart = toWeekStart(monday);
@@ -614,22 +616,25 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           <button
             className="af-action-btn af-btn-primary"
-            onClick={handleAutofill}
+            onClick={userTier === 'paid' ? handleAutofill : () => setUpgradeFeature('Auto-fill Week')}
             disabled={autofilling}
+            style={userTier !== 'paid' ? { opacity: 0.6 } : undefined}
           >
-            {autofilling ? 'Filling…' : '⚡ Auto-fill week'}
+            {userTier !== 'paid' && '🔒 '}{autofilling ? 'Filling…' : '⚡ Auto-fill week'}
           </button>
           <button
             className="af-action-btn af-btn-secondary"
-            onClick={() => setShowAutofillSettings(true)}
+            onClick={userTier === 'paid' ? () => setShowAutofillSettings(true) : () => setUpgradeFeature('Auto-fill Settings')}
+            style={userTier !== 'paid' ? { opacity: 0.6 } : undefined}
           >
-            ⚙ Auto-fill Settings
+            {userTier !== 'paid' ? '🔒' : '⚙'} Auto-fill Settings
           </button>
           <button
             className="af-action-btn af-btn-secondary"
-            onClick={() => setShowThresholds(true)}
+            onClick={userTier === 'paid' ? () => setShowThresholds(true) : () => setUpgradeFeature('Nutrient Thresholds')}
+            style={userTier !== 'paid' ? { opacity: 0.6 } : undefined}
           >
-            🎯 Thresholds
+            {userTier !== 'paid' ? '🔒' : '🎯'} Thresholds
           </button>
         </div>
 
@@ -798,6 +803,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
       {/* Modals */}
       {showAutofillSettings && <AutofillSettingsModal onClose={() => setShowAutofillSettings(false)} />}
       {showThresholds && <ThresholdSettingsModal userId={userId} onClose={() => setShowThresholds(false)} />}
+      {upgradeFeature && <UpgradePromptModal featureName={upgradeFeature} onClose={() => setUpgradeFeature(null)} />}
     </div>
   );
 }

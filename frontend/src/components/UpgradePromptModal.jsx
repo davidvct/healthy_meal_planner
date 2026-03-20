@@ -1,12 +1,10 @@
-import { COLORS } from "../constants/colors";
-
 export default function UpgradePromptModal({ featureName, onClose }) {
   return (
     <div
       style={{
         position: "fixed",
         inset: 0,
-        background: "rgba(0,0,0,0.4)",
+        background: "rgba(0,0,0,0.35)",
         zIndex: 2000,
         display: "flex",
         justifyContent: "center",
@@ -16,13 +14,14 @@ export default function UpgradePromptModal({ featureName, onClose }) {
     >
       <div
         style={{
-          background: COLORS.card,
-          borderRadius: 20,
+          background: "#FEF0EB",
+          borderRadius: 16,
           padding: "32px 28px",
           maxWidth: 380,
           width: "90%",
           textAlign: "center",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+          boxShadow: "0 8px 32px rgba(6,155,142,0.25)",
+          fontFamily: "var(--font)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -31,8 +30,9 @@ export default function UpgradePromptModal({ featureName, onClose }) {
           style={{
             fontSize: 18,
             fontWeight: 700,
-            color: COLORS.navy,
+            color: "var(--navy)",
             margin: "0 0 8px 0",
+            fontFamily: "var(--font)",
           }}
         >
           Premium Feature
@@ -40,7 +40,7 @@ export default function UpgradePromptModal({ featureName, onClose }) {
         <p
           style={{
             fontSize: 14,
-            color: COLORS.gray,
+            color: "var(--navy)",
             margin: "0 0 20px 0",
             lineHeight: 1.5,
           }}
@@ -54,10 +54,11 @@ export default function UpgradePromptModal({ featureName, onClose }) {
             padding: "10px 28px",
             borderRadius: 12,
             border: "none",
-            background: COLORS.accent,
+            background: "var(--teal)",
             color: "#fff",
             fontWeight: 700,
             fontSize: 14,
+            fontFamily: "var(--font)",
             cursor: "pointer",
           }}
         >
