@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import DayStrip from './DayStrip';
 import MealCard from './MealCard';
 import NutritionPanel from './NutritionPanel';
+import AutofillSettingsModal, { loadAutofillSettings } from './AutofillSettingsModal';
+import ThresholdSettingsModal from './ThresholdSettingsModal';
 import * as api from '../services/api';
 
 const MEAL_TYPES  = ['breakfast', 'lunch', 'dinner'];
@@ -238,7 +240,17 @@ function getDishHealthClass(dishDetail, conditions) {
   return worst === 'alert' ? 'mc-alert' : worst === 'warn' ? 'mc-warn' : 'mc-safe';
 }
 
-export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset: weekOffsetProp = 0, onWeekOffsetChange, initialDayIndex = null, onDayIndexChange }) {
+function formatAutofillViolations(violations) {
+  if (!violations?.length) return '';
+  return violations
+    .map((v) => {
+      const slot = v.mealType ? `Day ${v.dayIndex + 1} ${v.mealType}` : `Day ${v.dayIndex + 1}`;
+      return `- ${slot}: ${v.title}`;
+    })
+    .join('\n');
+}
+
+export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset: weekOffsetProp = 0, onWeekOffsetChange, initialDayIndex = null, onDayIndexChange, userTier = 'paid' }) {
   const [weekOffsetLocal, setWeekOffsetLocal] = useState(weekOffsetProp);
   const weekOffset = weekOffsetProp ?? weekOffsetLocal;
   const setWeekOffset = (v) => {
@@ -275,6 +287,9 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   const [genProgress, setGenProgress] = useState(0); // 0-7 days completed
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const [showAutofillSettings, setShowAutofillSettings] = useState(false);
+  const [showThresholds, setShowThresholds] = useState(false);
+  const [autofilling, setAutofilling] = useState(false);
 
   const monday   = getMonday(addDays(new Date(), weekOffset * 7));
   const weekStart = toWeekStart(monday);
@@ -397,6 +412,14 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
     }
   };
 
+  const showToast = useCallback((msg, undo = null) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ msg, undo });
+    if (!undo) {
+      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+    }
+  }, []);
+
   const handleGeneratePlan = async () => {
     setGeneratingPlan(true);
     setGenProgress(0);
@@ -410,7 +433,6 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
         }
         totalAdded += result.entriesWritten || 0;
         setGenProgress(day + 1);
-        // Refresh UI after each day so meals appear progressively
         const plan = await loadPlan();
         if (plan) loadDishDetails(plan);
       }
@@ -425,13 +447,59 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
     }
   };
 
-  const showToast = useCallback((msg, undo = null) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ msg, undo });
-    if (!undo) {
-      toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  const handleAutofill = useCallback(async () => {
+    setAutofilling(true);
+    try {
+      const raw = loadAutofillSettings();
+      const settings = {
+        maxDishesPerSlot: raw.maxDishesPerSlot || 2,
+        maxCalories: raw.maxCalories ? parseFloat(raw.maxCalories) : null,
+        maxCarbs: raw.maxCarbs ? parseFloat(raw.maxCarbs) : null,
+        maxFat: raw.maxFat ? parseFloat(raw.maxFat) : null,
+      };
+      const [availableNutrients, savedThresholds] = await Promise.all([
+        api.getAvailableNutrients(),
+        api.getThresholds(userId),
+      ]);
+      const requiredKeys = ['calories', 'protein', 'carbs', 'fat'];
+      const thresholdMap = new Map(savedThresholds.map((item) => [item.nutrientKey, item]));
+      for (const key of requiredKeys) {
+        const nutrient = availableNutrients.find((item) => item.key === key);
+        const dailyValue = nutrient?.defaultDaily ?? null;
+        const existing = thresholdMap.get(key);
+        const hasUsableValue = existing && ((existing.dailyValue ?? null) !== null || (existing.perMealValue ?? null) !== null);
+        if (hasUsableValue) continue;
+        thresholdMap.set(key, { nutrientKey: key, dailyValue, perMealValue: dailyValue ? Math.round(dailyValue / 3) : null });
+      }
+      const thresholds = Array.from(thresholdMap.values());
+      const validation = await api.validateAutofillPlan(userId, weekStart, settings, thresholds);
+      let allowConstraintRelaxation = false;
+      if (validation.violations?.length) {
+        const warning = [
+          'Some existing meals violate hard constraints.',
+          'If you proceed, autofill will relax those constraints for existing meals only.',
+          '', formatAutofillViolations(validation.violations), '', 'Proceed anyway?',
+        ].join('\n');
+        if (!window.confirm(warning)) return;
+        allowConstraintRelaxation = true;
+      }
+      await api.autofillPlan(userId, weekStart, settings, thresholds, allowConstraintRelaxation);
+      const plan = await loadPlan();
+      if (plan) loadDishDetails(plan);
+      await loadNutrients();
+      showToast('Auto-fill complete!');
+    } catch (err) {
+      console.error('Auto-fill failed:', err);
+      const message = err?.message || 'Auto-fill failed.';
+      if (message.includes('No feasible meal plan found.')) {
+        window.alert('No feasible meal plan was found for the selected week and current constraints.');
+      } else {
+        window.alert(message);
+      }
+    } finally {
+      setAutofilling(false);
     }
-  }, []);
+  }, [userId, weekStart, loadPlan, loadNutrients, showToast]);
 
   const handleRemove = async (entry) => {
     try {
@@ -539,6 +607,29 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
               />
             </svg>
             {nutExpanded ? 'Hide nutrition' : 'Show nutrition'}
+          </button>
+        </div>
+
+        {/* Auto-fill & Threshold action buttons */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+          <button
+            className="af-action-btn af-btn-primary"
+            onClick={handleAutofill}
+            disabled={autofilling}
+          >
+            {autofilling ? 'Filling…' : '⚡ Auto-fill week'}
+          </button>
+          <button
+            className="af-action-btn af-btn-secondary"
+            onClick={() => setShowAutofillSettings(true)}
+          >
+            ⚙ Auto-fill Settings
+          </button>
+          <button
+            className="af-action-btn af-btn-secondary"
+            onClick={() => setShowThresholds(true)}
+          >
+            🎯 Thresholds
           </button>
         </div>
 
@@ -703,6 +794,10 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
           )}
         </div>
       )}
+
+      {/* Modals */}
+      {showAutofillSettings && <AutofillSettingsModal onClose={() => setShowAutofillSettings(false)} />}
+      {showThresholds && <ThresholdSettingsModal userId={userId} onClose={() => setShowThresholds(false)} />}
     </div>
   );
 }

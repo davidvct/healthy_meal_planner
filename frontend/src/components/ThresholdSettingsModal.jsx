@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { COLORS } from "../constants/colors";
 import * as api from "../services/api";
 
 const DEFAULT_NUTRIENTS = ["calories", "protein", "carbs"];
@@ -78,7 +77,6 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
     try {
       await api.saveThresholds(userId, thresholds);
       savedSnapshotRef.current = snapshotKey(thresholds);
-      // Force re-render so hasChanges updates
       setThresholds([...thresholds]);
     } catch (err) {
       console.error("Failed to save thresholds:", err);
@@ -104,10 +102,11 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
     width: "100%",
     padding: "8px 10px",
     borderRadius: 8,
-    border: `1px solid ${COLORS.grayLight}`,
+    border: "1px solid #E8EDF3",
     fontSize: 13,
     outline: "none",
     boxSizing: "border-box",
+    fontFamily: "var(--font)",
   };
 
   const tabStyle = (active) => ({
@@ -115,10 +114,11 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
     padding: "8px 0",
     border: "none",
     borderRadius: 8,
-    background: active ? COLORS.accent : "transparent",
-    color: active ? "#fff" : COLORS.gray,
+    background: active ? "var(--teal)" : "transparent",
+    color: active ? "#fff" : "var(--text3)",
     fontWeight: 700,
     fontSize: 13,
+    fontFamily: "var(--font)",
     cursor: "pointer",
     transition: "all 0.15s",
   });
@@ -134,19 +134,22 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
         alignItems: "center",
         justifyContent: "center",
       }}
+      onClick={onClose}
     >
       <div
         style={{
-          background: COLORS.card,
+          background: "#FEF0EB",
           borderRadius: 16,
           padding: 28,
           width: 440,
           maxWidth: "90vw",
           maxHeight: "80vh",
           overflowY: "auto",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+          boxShadow: "0 8px 32px rgba(6,155,142,0.25)",
           position: "relative",
+          fontFamily: "var(--font)",
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button
@@ -158,7 +161,7 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
             background: "none",
             border: "none",
             fontSize: 20,
-            color: COLORS.gray,
+            color: "var(--text3)",
             cursor: "pointer",
             padding: "4px 8px",
             borderRadius: 6,
@@ -168,7 +171,7 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
         >
           ×
         </button>
-        <h3 style={{ margin: "0 0 16px", color: COLORS.navy, fontSize: 18 }}>
+        <h3 style={{ margin: "0 0 16px", color: "var(--navy)", fontSize: 18, fontFamily: "var(--font)" }}>
           Nutrient Thresholds
         </h3>
 
@@ -177,7 +180,7 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
           style={{
             display: "flex",
             gap: 4,
-            background: COLORS.grayLight,
+            background: "var(--border)",
             borderRadius: 10,
             padding: 3,
             marginBottom: 20,
@@ -192,7 +195,7 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
         </div>
 
         {loading ? (
-          <div style={{ textAlign: "center", padding: 20, color: COLORS.gray }}>Loading...</div>
+          <div style={{ textAlign: "center", padding: 20, color: "var(--text3)" }}>Loading...</div>
         ) : (
           <>
             {/* Threshold rows */}
@@ -205,14 +208,14 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
                   gap: 10,
                   marginBottom: 10,
                   padding: "6px 0",
-                  borderBottom: `1px solid ${COLORS.grayLight}`,
+                  borderBottom: "1px solid #E8EDF3",
                 }}
               >
                 <div style={{ width: 130, flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: COLORS.navy }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--navy)" }}>
                     {getLabel(t.nutrientKey)}
                   </span>
-                  <span style={{ fontSize: 11, color: COLORS.gray, fontWeight: 500, marginLeft: 4 }}>
+                  <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 500, marginLeft: 4 }}>
                     ({getUnit(t.nutrientKey)})
                   </span>
                 </div>
@@ -241,7 +244,7 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
                     style={{
                       background: "none",
                       border: "none",
-                      color: COLORS.warn,
+                      color: "var(--coral)",
                       fontSize: 18,
                       cursor: "pointer",
                       padding: "4px 8px",
@@ -268,11 +271,12 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
                     gap: 6,
                     padding: "8px 14px",
                     borderRadius: 10,
-                    border: `1px dashed ${COLORS.grayLight}`,
+                    border: "1px dashed var(--border2)",
                     background: "transparent",
-                    color: COLORS.accent,
+                    color: "var(--teal)",
                     fontWeight: 700,
                     fontSize: 13,
+                    fontFamily: "var(--font)",
                     cursor: "pointer",
                     width: "100%",
                     justifyContent: "center",
@@ -290,15 +294,15 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
                       marginBottom: 6,
                       background: "#fff",
                       borderRadius: 12,
-                      border: `2px solid ${COLORS.accent}`,
-                      boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
+                      border: "2px solid var(--teal)",
+                      boxShadow: "0 8px 28px rgba(6,155,142,0.18)",
                       zIndex: 20,
                       maxHeight: 280,
                       overflowY: "auto",
                       padding: "6px 0",
                     }}
                   >
-                    <div style={{ padding: "8px 16px 6px", fontSize: 11, fontWeight: 700, color: COLORS.gray, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                    <div style={{ padding: "8px 16px 6px", fontSize: 11, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 0.5 }}>
                       Select a nutrient to add
                     </div>
                     {addableNutrients.map((n) => (
@@ -312,20 +316,21 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
                           width: "100%",
                           padding: "12px 16px",
                           border: "none",
-                          borderBottom: `1px solid ${COLORS.grayLight}`,
+                          borderBottom: "1px solid #E8EDF3",
                           background: "transparent",
-                          color: COLORS.navy,
+                          color: "var(--navy)",
                           fontSize: 14,
                           fontWeight: 600,
+                          fontFamily: "var(--font)",
                           cursor: "pointer",
                           textAlign: "left",
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = COLORS.accentLight)}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--teal-xl)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >
                         <span>{n.label}</span>
                         {n.defaultDaily != null && (
-                          <span style={{ color: COLORS.gray, fontSize: 12, fontWeight: 500 }}>
+                          <span style={{ color: "var(--text3)", fontSize: 12, fontWeight: 500 }}>
                             RDA: {n.defaultDaily} {n.unit || ""}
                           </span>
                         )}
@@ -348,10 +353,11 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
               padding: "12px",
               borderRadius: 12,
               border: "none",
-              background: hasChanges ? COLORS.accent : COLORS.grayLight,
-              color: hasChanges ? "#fff" : COLORS.gray,
+              background: hasChanges ? "var(--teal)" : "var(--border)",
+              color: hasChanges ? "#fff" : "var(--text3)",
               fontWeight: 700,
               fontSize: 14,
+              fontFamily: "var(--font)",
               cursor: saving || !hasChanges ? "default" : "pointer",
               opacity: saving ? 0.7 : 1,
               transition: "all 0.15s",

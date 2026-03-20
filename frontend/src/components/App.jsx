@@ -294,7 +294,7 @@ export default function App() {
       {/* ── Screen content ── */}
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {activeTab === TABS.TODAY && activeDiner && (
-          <TodayScreen activeDiner={activeDiner} userId={activeDiner.userId} onBrowse={openDiscover} weekOffset={todayWeekOffset} onWeekOffsetChange={setTodayWeekOffset} initialDayIndex={todayDayIndex} onDayIndexChange={setTodayDayIndex} />
+          <TodayScreen activeDiner={activeDiner} userId={activeDiner.userId} onBrowse={openDiscover} weekOffset={todayWeekOffset} onWeekOffsetChange={setTodayWeekOffset} initialDayIndex={todayDayIndex} onDayIndexChange={setTodayDayIndex} userTier={userTier} />
         )}
         {activeTab === TABS.SHOP && (
           <ShoppingScreen diners={diners} activeDiner={activeDiner} onGoToPlan={() => setActiveTab(TABS.TODAY)} />

@@ -121,6 +121,11 @@
     .td-tip:hover .td-tip-bubble{display:block}
     /* ── Section header ── */
     .today-section-hd{display:flex;align-items:baseline;gap:8px;margin-bottom:6px}
+    /* ── Auto-fill action buttons ── */
+    .af-action-btn{padding:7px 14px;border-radius:var(--r-sm);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;border:none;transition:opacity .15s}
+    .af-action-btn:disabled{opacity:.45;cursor:default}
+    .af-btn-primary{background:var(--teal);color:#fff}.af-btn-primary:hover:not(:disabled){opacity:.88}
+    .af-btn-secondary{background:var(--card);color:var(--navy);border:1px solid var(--border)}.af-btn-secondary:hover{opacity:.85}
 
     /* ── Today screen layout ── */
     .today-guide-banner{background:var(--blue-xl);border:1px solid rgba(21,96,160,.18);border-radius:var(--r-sm);padding:10px 13px;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px;flex-shrink:0}

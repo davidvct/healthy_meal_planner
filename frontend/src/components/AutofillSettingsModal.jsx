@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { COLORS } from "../constants/colors";
 
 const STORAGE_KEY = "mealwise_autofill_settings";
 
@@ -32,16 +31,17 @@ export default function AutofillSettingsModal({ onClose }) {
     width: "100%",
     padding: "10px 12px",
     borderRadius: 10,
-    border: `1px solid ${COLORS.grayLight}`,
+    border: "1px solid #E8EDF3",
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
+    fontFamily: "var(--font)",
   };
 
   const labelStyle = {
     fontSize: 13,
     fontWeight: 700,
-    color: COLORS.navy,
+    color: "var(--navy)",
     marginBottom: 4,
     display: "block",
   };
@@ -61,17 +61,18 @@ export default function AutofillSettingsModal({ onClose }) {
     >
       <div
         style={{
-          background: COLORS.card,
+          background: "#FEF0EB",
           borderRadius: 16,
           padding: 28,
           width: 380,
           maxWidth: "90vw",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+          boxShadow: "0 8px 32px rgba(6,155,142,0.25)",
+          fontFamily: "var(--font)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <h3 style={{ margin: 0, color: COLORS.navy, fontSize: 18 }}>
+          <h3 style={{ margin: 0, color: "var(--navy)", fontSize: 18, fontFamily: "var(--font)" }}>
             Auto-fill Settings
           </h3>
           <button
@@ -80,7 +81,7 @@ export default function AutofillSettingsModal({ onClose }) {
               background: "none",
               border: "none",
               fontSize: 20,
-              color: COLORS.gray,
+              color: "var(--text3)",
               cursor: "pointer",
               padding: "0 4px",
               lineHeight: 1,
@@ -113,7 +114,7 @@ export default function AutofillSettingsModal({ onClose }) {
             onChange={(e) => update("maxCalories", e.target.value)}
             style={fieldStyle}
           />
-          <span style={{ fontSize: 11, color: COLORS.gray }}>Leave empty for no limit</span>
+          <span style={{ fontSize: 11, color: "var(--text3)" }}>Leave empty for no limit</span>
         </div>
 
         <div style={{ marginBottom: 16 }}>
@@ -126,7 +127,7 @@ export default function AutofillSettingsModal({ onClose }) {
             onChange={(e) => update("maxCarbs", e.target.value)}
             style={fieldStyle}
           />
-          <span style={{ fontSize: 11, color: COLORS.gray }}>Leave empty for no limit</span>
+          <span style={{ fontSize: 11, color: "var(--text3)" }}>Leave empty for no limit</span>
         </div>
 
         <div style={{ marginBottom: 16 }}>
@@ -139,7 +140,7 @@ export default function AutofillSettingsModal({ onClose }) {
             onChange={(e) => update("maxFat", e.target.value)}
             style={fieldStyle}
           />
-          <span style={{ fontSize: 11, color: COLORS.gray }}>Leave empty for no limit</span>
+          <span style={{ fontSize: 11, color: "var(--text3)" }}>Leave empty for no limit</span>
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -151,10 +152,11 @@ export default function AutofillSettingsModal({ onClose }) {
               padding: "12px",
               borderRadius: 12,
               border: "none",
-              background: hasChanges ? COLORS.accent : COLORS.grayLight,
-              color: hasChanges ? "#fff" : COLORS.gray,
+              background: hasChanges ? "var(--teal)" : "var(--border)",
+              color: hasChanges ? "#fff" : "var(--text3)",
               fontWeight: 700,
               fontSize: 14,
+              fontFamily: "var(--font)",
               cursor: hasChanges ? "pointer" : "default",
             }}
           >
@@ -166,11 +168,12 @@ export default function AutofillSettingsModal({ onClose }) {
               flex: 1,
               padding: "12px",
               borderRadius: 12,
-              border: `1px solid ${COLORS.grayLight}`,
-              background: COLORS.card,
-              color: COLORS.gray,
+              border: "1px solid var(--border2)",
+              background: "#fff",
+              color: "var(--text2)",
               fontWeight: 700,
               fontSize: 14,
+              fontFamily: "var(--font)",
               cursor: "pointer",
             }}
           >
