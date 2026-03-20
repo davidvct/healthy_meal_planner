@@ -298,6 +298,18 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   const weekDates = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
 
   const prevWeekOffsetRef = useRef(weekOffset);
+  const prevInitialDayIndexRef = useRef(initialDayIndex);
+  useEffect(() => {
+    // Reset to today when "Today's plan" tab is clicked (weekOffset=0, initialDayIndex=null)
+    if (prevInitialDayIndexRef.current !== null && initialDayIndex === null && weekOffsetProp === 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const mon = getMonday(today);
+      const idx = Math.max(0, Math.round((today - mon) / 86400000));
+      setActiveDayIndex(idx);
+    }
+    prevInitialDayIndexRef.current = initialDayIndex;
+  }, [initialDayIndex, weekOffsetProp]);
   useEffect(() => {
     // Only reset day index when user navigates to a different week via arrows,
     // not on initial mount (which should preserve the day from browse context)

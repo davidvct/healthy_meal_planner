@@ -276,7 +276,10 @@ export default function App() {
             return (
               <button
                 key={tab.id}
-                onClick={() => { setActiveTab(tab.id); setDiscoverSlotCtx(null); }}
+                onClick={() => {
+                  if (tab.id === TABS.TODAY) { setTodayWeekOffset(0); setTodayDayIndex(null); }
+                  setActiveTab(tab.id); setDiscoverSlotCtx(null);
+                }}
                 style={{
                   display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                   padding: '9px 8px 8px', cursor: 'pointer', position: 'relative',
