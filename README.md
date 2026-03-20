@@ -90,22 +90,20 @@ Open two terminals from the project root.
 
 ### Backend
 
-Create or activate your virtual environment, install Python dependencies, and start FastAPI:
+Install dependencies with [uv](https://docs.astral.sh/uv/) and start FastAPI:
 
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
-python3 -m pip install -e .
-.venv/bin/uvicorn backend.main:app --reload
+uv run uvicorn backend.main:app --reload --port 8080
 ```
 
-The backend runs at `http://127.0.0.1:8000`.
+The backend runs at `http://127.0.0.1:8080`.
 
 Configuration:
 
-- the backend reads real environment variables first, then falls back to `application.properties`
-- `.env` is not auto-loaded by the backend process
+- the backend loads `.env` in the project root automatically (via `python-dotenv`), then falls back to `application.properties`
+- environment variables always take priority over both files
 - `DATABASE_URL` must be a PostgreSQL URL
+- for local development, create a `.env` file with your database connection (see `.env.example`)
 - on startup, the backend runs schema initialization/migrations via `backend.db.init_db()`
 
 ### Frontend
@@ -159,17 +157,17 @@ You can test the FastAPI backend locally with Postman.
 From the project root:
 
 ```bash
-.venv/bin/uvicorn backend.main:app --reload
+.venv/bin/uvicorn backend.main:app --reload --port 8080
 ```
 
-The API will be available at **http://127.0.0.1:8000**.
+The API will be available at **http://127.0.0.1:8080**.
 
 ### 2. Get a JWT token
 
 Most `/api/*` routes require a bearer token. First call the login endpoint:
 
 - Method: `POST`
-- URL: `http://127.0.0.1:8000/api/auth/login`
+- URL: `http://127.0.0.1:8080/api/auth/login`
 - Header: `Content-Type: application/json`
 - Body:
 
@@ -185,7 +183,7 @@ Copy the `token` value from the response.
 ### 3. Call the meal plan generator
 
 - Method: `POST`
-- URL: `http://127.0.0.1:8000/api/mealplan/{user_id}/generate`
+- URL: `http://127.0.0.1:8080/api/mealplan/{user_id}/generate`
 - Headers:
 
 ```text
@@ -220,7 +218,7 @@ Recommended request flow:
 1. Validate existing fixed meals for the selected week.
 
 - Method: `POST`
-- URL: `http://127.0.0.1:8000/api/mealplan/{user_id}/autofill/validate`
+- URL: `http://127.0.0.1:8080/api/mealplan/{user_id}/autofill/validate`
 - Headers:
 
 ```text
@@ -253,7 +251,7 @@ If violations are found, the frontend shows a warning and lets the user decide w
 2. Run auto-fill.
 
 - Method: `POST`
-- URL: `http://127.0.0.1:8000/api/mealplan/{user_id}/autofill`
+- URL: `http://127.0.0.1:8080/api/mealplan/{user_id}/autofill`
 
 Use the same body as validation, and add:
 
@@ -277,7 +275,7 @@ Behavior summary:
 To confirm the backend is up:
 
 - Method: `GET`
-- URL: `http://127.0.0.1:8000/api/health`
+- URL: `http://127.0.0.1:8080/api/health`
 
 ## Tech Stack
 

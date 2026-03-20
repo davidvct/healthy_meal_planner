@@ -62,8 +62,12 @@ def _send_otp_email(email: str, otp_code: str) -> str:
     smtp_from = get_setting("SMTP_FROM", smtp_user or "no-reply@mealwise.local")
 
     if not smtp_host or not smtp_user or not smtp_password:
-        print(f"[auth] OTP for {email}: {otp_code}")
+        print(f"[auth] OTP for {email}: {otp_code}", flush=True)
         return "console"
+
+    # For local development, uncomment the next two lines to skip SMTP:
+    print(f"[auth] OTP for {email}: {otp_code}", flush=True)
+    return "console"
 
     message = EmailMessage()
     message["Subject"] = "MealWise OTP Verification"

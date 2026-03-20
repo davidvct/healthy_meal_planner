@@ -241,8 +241,20 @@ export default function App() {
             </div>
           )}
 
-          {/* Right: logout */}
+          {/* Right: tier toggle + logout */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
+            <button
+              onClick={handleTierToggle}
+              style={{
+                padding: '5px 11px', borderRadius: 'var(--r-sm)',
+                border: `1px solid ${userTier === 'paid' ? '#22c55e' : '#6C63FF'}`,
+                background: 'var(--white)', cursor: 'pointer', fontFamily: 'var(--font)',
+                fontSize: 11, fontWeight: 700,
+                color: userTier === 'paid' ? '#22c55e' : '#6C63FF',
+              }}
+            >
+              {userTier === 'paid' ? 'Paid Plan' : 'Free Plan'} (Demo)
+            </button>
             <button
               onClick={handleLogout}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 'var(--r-sm)', border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, color: 'var(--text2)' }}
