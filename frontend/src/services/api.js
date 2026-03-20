@@ -10,6 +10,12 @@ async function request(path, options = {}) {
     ...options,
   });
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith("/auth")) {
+      localStorage.removeItem("mealwise_auth_token");
+      localStorage.removeItem("mealwise_auth_user");
+      localStorage.removeItem("mealwise_caretaker");
+      window.location.reload();
+    }
     const err = await res.json().catch(() => ({ error: res.statusText }));
     const detail = err.detail;
     const message =

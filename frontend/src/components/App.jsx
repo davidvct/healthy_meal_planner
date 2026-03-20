@@ -81,8 +81,14 @@ export default function App() {
         setCaretaker(ct);
         setUserTier(ct.tier || "free");
         setView(VIEWS.APP);
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        if (err.status === 401) {
+          // Token expired/invalid — force re-login
+          setAuthUser(null); setAuthToken(null); setCaretaker(null);
+          setView(VIEWS.AUTH);
+          return;
+        }
         setCaretaker(null);
         setView(VIEWS.SETUP);
       }
