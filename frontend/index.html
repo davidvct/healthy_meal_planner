@@ -102,6 +102,18 @@
     .ds-d.ds-filled .ds-slot-name{color:#1E3A8A}
     .ds-b.ds-filled .ds-slot-ic,.ds-l.ds-filled .ds-slot-ic,.ds-d.ds-filled .ds-slot-ic{color:var(--teal)}
     .ds-card-footer{padding:4px 9px;border-top:1px solid var(--border);font-size:10px;font-weight:600;color:var(--text2);text-align:right}
+    /* Past days — grayed out */
+    .ds-card.ds-past{opacity:.5;pointer-events:auto}
+    .ds-card.ds-past .ds-card-hdr{background:var(--bg)}
+    .ds-card.ds-past .ds-card-day,.ds-card.ds-past .ds-card-date{color:var(--text3)}
+    .ds-card.ds-past.on{opacity:.7}
+    .ds-card.ds-past.on .ds-card-hdr{background:#3d4f65}
+    /* Locked slots */
+    .ds-slot.ds-locked{opacity:.45}
+    .ds-slot.ds-locked .ds-slot-ic{font-size:8px}
+    /* Locked slot card in TodayScreen */
+    .locked-slot{opacity:.6}
+    .locked-slot .es-header{background:var(--bg)}
     /* ── Today tips ── */
     .td-tip{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--teal-l);border:1.5px solid var(--teal);font-size:9px;font-weight:700;color:var(--teal);cursor:default;vertical-align:middle;margin-left:3px;flex-shrink:0;position:relative;user-select:none}
     .td-tip-bubble{display:none;position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:var(--white);border:1px solid var(--border2);border-radius:var(--r-sm);padding:6px 9px;font-size:10px;color:var(--text2);line-height:1.5;width:200px;white-space:normal;text-align:left;z-index:100;pointer-events:none;box-shadow:0 4px 12px rgba(11,34,64,.10)}

@@ -1,4 +1,5 @@
 // DayStrip — horizontal 7-day strip with B/L/D slot indicators
+import { isDayPast, isSlotLocked } from './TodayScreen';
 const DAY_ABBR = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const SLOTS = [
@@ -45,13 +46,14 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
         {weekDates.map((date, di) => {
           const isActive = di === activeDayIndex;
           const isToday = new Date(date).setHours(0,0,0,0) === today.getTime();
+          const past = isDayPast(date);
           const dayMeals = mealPlan?.[di] || {};
           const dayKcal = Object.values(dayMeals).flat().reduce((s, e) => s + (e.kcal || 0), 0);
 
           return (
             <div
               key={di}
-              className={`ds-card${isActive ? ' on' : ''}`}
+              className={`ds-card${isActive ? ' on' : ''}${past ? ' ds-past' : ''}`}
               onClick={() => onSelectDay(di)}
             >
               {/* Day header */}
@@ -69,16 +71,17 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
                 {SLOTS.map(sl => {
                   const entries   = dayMeals[sl.key] || [];
                   const filled    = entries.length > 0;
+                  const locked    = isSlotLocked(date, sl.key);
                   const firstName = filled ? entries[0].dishName : null;
                   return (
                     <div
                       key={sl.key}
-                      className={`ds-slot ${sl.cls}${filled ? ' ds-filled' : ''}`}
-                      title={filled ? firstName : ''}
+                      className={`ds-slot ${sl.cls}${filled ? ' ds-filled' : ''}${locked && !filled ? ' ds-locked' : ''}`}
+                      title={filled ? firstName : locked ? 'Past deadline' : ''}
                     >
-                      <div className="ds-slot-ic">{sl.label}</div>
+                      <div className="ds-slot-ic">{locked && !filled ? '🔒' : sl.label}</div>
                       <div className="ds-slot-name">
-                        {filled ? firstName : 'Not planned'}
+                        {filled ? firstName : locked ? 'Closed' : 'Not planned'}
                       </div>
                     </div>
                   );

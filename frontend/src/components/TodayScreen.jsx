@@ -8,6 +8,31 @@ const MEAL_TYPES  = ['breakfast', 'lunch', 'dinner'];
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
 const MEAL_EMOJI  = { breakfast: '☀️', lunch: '🌿', dinner: '🌙' };
 const THUMB_CLASS = { breakfast: 'fv-b', lunch: 'fv-l', dinner: 'fv-d' };
+const MEAL_CUTOFF = { breakfast: 11, lunch: 14, dinner: 20 };
+
+/** Check if a meal slot is locked (past its planning deadline). */
+export function isSlotLocked(date, mealType) {
+  const now = new Date();
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (d < today) return true;                       // past day
+  if (d.getTime() === today.getTime()) {             // today — check cutoff
+    const cutoff = MEAL_CUTOFF[mealType];
+    if (cutoff && now.getHours() >= cutoff) return true;
+  }
+  return false;
+}
+
+/** Check if an entire day is fully past (all slots locked). */
+export function isDayPast(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
+}
 
 function getMonday(date) {
   const d = new Date(date);
@@ -39,6 +64,23 @@ function todayDayIndex(monday) {
 }
 
 const MEAL_SLOT_INDEX = { breakfast: 0, lunch: 1, dinner: 2 };
+
+function LockedSlot({ mealType }) {
+  return (
+    <div className="empty-slot-c locked-slot">
+      <div className="es-header">
+        <div className="es-lbl">
+          <span>{MEAL_EMOJI[mealType]}</span>
+          {MEAL_LABELS[mealType]}
+          <span className="es-sub">— past deadline</span>
+        </div>
+      </div>
+      <div style={{ padding: '16px 14px', fontSize: 12, color: 'var(--text3)' }}>
+        🔒 Planning closed — {MEAL_LABELS[mealType].toLowerCase()} cutoff was {MEAL_CUTOFF[mealType] > 12 ? `${MEAL_CUTOFF[mealType] - 12} PM` : `${MEAL_CUTOFF[mealType]} AM`}
+      </div>
+    </div>
+  );
+}
 
 function EmptySlot({ mealType, dayIndex, weekStart, userId, onAdded, onBrowse }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -593,6 +635,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
               <div className="meal-cards">
                 {MEAL_TYPES.map(mt => {
                   const entries  = dayMeals[mt] || [];
+                  const locked   = isSlotLocked(activeDate, mt);
 
                   if (entries.length > 0) {
                     // Only show 1 meal card per slot (safety net)
@@ -601,13 +644,18 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                         key={entry.id}
                         entry={entry}
                         mealType={mt}
-                        onRemove={handleRemove}
-                        onBrowse={() => onBrowse({ userId, dayIndex: activeDayIndex, mealType: mt, label: MEAL_LABELS[mt], weekStart })}
+                        onRemove={locked ? undefined : handleRemove}
+                        onBrowse={locked ? undefined : () => onBrowse({ userId, dayIndex: activeDayIndex, mealType: mt, label: MEAL_LABELS[mt], weekStart })}
                         dishDetail={dishDetails[entry.dishId]}
                         healthClass={getDishHealthClass(dishDetails[entry.dishId], activeDiner?.conditions)}
                         userId={userId}
+                        locked={locked}
                       />
                     ));
+                  }
+
+                  if (locked) {
+                    return <LockedSlot key={mt} mealType={mt} />;
                   }
 
                   return (

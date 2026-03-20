@@ -73,7 +73,7 @@ function tagClass(type) {
   return 'tg-muted';
 }
 
-export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId, healthClass: healthClassProp }) {
+export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId, healthClass: healthClassProp, locked }) {
   const [expanded, setExpanded] = useState(false);
   const [fav, setFav] = useState(false);
 
@@ -180,6 +180,7 @@ export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {!locked && (
             <button
               className="mc-swap-inline"
               onClick={e => { e.stopPropagation(); onBrowse?.(); }}
@@ -187,6 +188,7 @@ export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId
             >
               Change
             </button>
+            )}
             <button
               className={`mc-fav-btn${fav ? ' on' : ''}`}
               data-tip={fav ? 'Remove from favourites' : 'Add to favourites'}
