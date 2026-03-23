@@ -176,10 +176,10 @@ export async function clearWeekMealPlan(userId, weekStart) {
   return request(`/mealplan/${userId}/clear${params}`, { method: "DELETE" });
 }
 
-export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLimitSeconds = 10, dayIndex, maxDishesPerSlot } = {}) {
+export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLimitSeconds = 10, dayIndex, maxDishesPerSlot, nutrientLimits } = {}) {
   return request(`/mealplan/${userId}/generate`, {
     method: "POST",
-    body: JSON.stringify({ weekStart, numDays, timeLimitSeconds, dayIndex: dayIndex ?? null, maxDishesPerSlot: maxDishesPerSlot ?? 1 }),
+    body: JSON.stringify({ weekStart, numDays, timeLimitSeconds, dayIndex: dayIndex ?? null, maxDishesPerSlot: maxDishesPerSlot ?? 1, nutrientLimits: nutrientLimits ?? null }),
   });
 }
 
@@ -229,6 +229,10 @@ export async function getAvailableNutrients() {
 
 export async function getThresholds(userId) {
   return request(`/thresholds/${userId}`);
+}
+
+export async function getRecommendedLimits(userId) {
+  return request(`/thresholds/${userId}/recommended`);
 }
 
 export async function saveThresholds(userId, thresholds) {

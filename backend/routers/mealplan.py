@@ -310,49 +310,6 @@ def add_dish_to_plan(
     return {"success": True}
 
 
-@router.post("/{user_id}/generate")
-def generate_meal_plan(
-    user_id: str,
-    body: GenerateMealPlanBody,
-    conn: Any = Depends(get_db),
-) -> dict[str, Any]:
-    ws = body.weekStart or get_current_week_start()
-
-    try:
-        generated = generate_meal_plan_for_week(
-            conn,
-            patient_id=user_id,
-            week_start=ws,
-            config=SolverConfig(num_days=body.days, max_solutions=body.maxSolutions),
-        )
-    except ValueError as exc:
-        detail = str(exc)
-        status = 404 if "not found" in detail.lower() else 400
-        raise HTTPException(status_code=status, detail=detail) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    meal_plan_row, item_rows = _build_generated_meal_plan_rows(
-        generated,
-        owner_id=user_id,
-        week_start=ws,
-        duration_days=body.days,
-    )
-    saved_rows = _persist_generated_meal_plan(
-        conn,
-        user_id=user_id,
-        week_start=ws,
-        item_rows=item_rows,
-    )
-
-    return {
-        "saved_meal_plans_rows": saved_rows,
-        "selected_plan": jsonable_encoder(generated.selected_plan),
-        "targets": generated.inputs.targets,
-        "profile": generated.inputs.profile,
-    }
-
-
 @router.delete("/{user_id}/remove/{entry_id}")
 def remove_dish_from_plan(entry_id: int, user_id: str, conn: Any = Depends(get_db)) -> dict[str, bool]:
     conn.execute("DELETE FROM meal_plans WHERE id = ? AND user_id = ?", (entry_id, user_id))
@@ -952,29 +909,24 @@ def generate_plan(
 
     num_days = 1 if target_day is not None else min(body.numDays, 7)
 
-    fixed_assignments: list[FixedMealAssignment] = []
-    exclude_recipe_ids: set[str] | None = None
-
-    # In single-day mode, load existing entries from OTHER days to exclude
-    # and treat same-day entries as fixed assignments.
-    # In full-week mode, generate a fresh plan with no fixed assignments.
-    if target_day is not None:
-        existing = conn.execute(
-            "SELECT day_index, meal_type, dish_id, servings FROM meal_plans WHERE user_id = ? AND week_start = ?",
-            (user_id, ws),
-        ).fetchall()
-        for row in existing:
-            day_idx = int(row["day_index"])
-            if day_idx != target_day:
-                if exclude_recipe_ids is None:
-                    exclude_recipe_ids = set()
-                exclude_recipe_ids.add(str(row["dish_id"]).removeprefix("r"))
-
+    resolved_dishes = _resolve_max_dishes(body.maxDishesPerSlot)
     config = SolverConfig(
         num_days=num_days,
-        time_limit_seconds=min(body.timeLimitSeconds, 30) if target_day is None else 5,
-        max_recipes_per_meal=_resolve_max_dishes(body.maxDishesPerSlot),
+        time_limit_seconds=min(body.timeLimitSeconds, 120) if target_day is None else 5,
+        max_recipes_per_meal=resolved_dishes,
     )
+
+    print(
+        f"[generate] user_id={user_id} week_start={ws} target_day={target_day} "
+        f"num_days={num_days} maxDishesPerSlot={body.maxDishesPerSlot} "
+        f"resolved={resolved_dishes} time_limit={config.time_limit_seconds}s"
+    )
+
+    # User-set nutrient limits override the profile-derived targets
+    targets_override = None
+    if body.nutrientLimits:
+        targets_override = {k: float(v) for k, v in body.nutrientLimits.items() if v}
+        print(f"[generate] nutrient_limits_override={targets_override}")
 
     try:
         result = generate_meal_plan_for_week(
@@ -983,9 +935,15 @@ def generate_plan(
             week_start=ws,
             config=config,
             fixed_assignments=None,
-            exclude_recipe_ids=exclude_recipe_ids,
+            exclude_recipe_ids=None,
+            targets_override=targets_override,
+        )
+        print(
+            f"[generate] success entries={len(result.entries)} "
+            f"objective={result.selected_plan.objective_value:.2f}"
         )
     except (ValueError, RuntimeError) as exc:
+        print(f"[generate] solver_error: {exc}")
         return {"success": False, "error": str(exc)}
 
     # For the target day(s), clear ALL existing entries first to prevent duplicates,
@@ -1016,5 +974,4 @@ def generate_plan(
         "success": True,
         "entriesWritten": entries_written,
         "totalSlots": config.num_days * len(SOLVER_MEALS),
-        "existingSlots": len(occupied_slots),
     }

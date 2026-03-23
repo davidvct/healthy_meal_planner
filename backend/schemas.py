@@ -113,3 +113,4 @@ class GeneratePlanBody(BaseModel):
     timeLimitSeconds: int = 10
     dayIndex: int | None = None  # generate for a single day only
     maxDishesPerSlot: int | dict[str, int] = 1
+    nutrientLimits: dict[str, float] | None = None  # user-set daily limits

@@ -32,6 +32,38 @@ def _import_cp_model():
     return cp_model
 
 
+MAX_CANDIDATES_PER_POOL = 80
+
+
+def _cap_pool(recipes: list[SolverRecipe], cap: int) -> list[SolverRecipe]:
+    """Trim a candidate pool to *cap* recipes.
+
+    Keeps a balanced mix: favourites first, then a random sample of main
+    courses and non-main courses so the solver always has both available.
+    """
+    if len(recipes) <= cap:
+        return recipes
+    import random as _rng
+
+    favs = [r for r in recipes if r.is_favourite]
+    main = [r for r in recipes if r.is_main_course and not r.is_favourite]
+    rest = [r for r in recipes if not r.is_main_course and not r.is_favourite]
+    _rng.shuffle(main)
+    _rng.shuffle(rest)
+
+    # Reserve half the remaining budget for mains, half for sides/others
+    budget = cap - len(favs)
+    main_budget = min(len(main), budget // 2)
+    rest_budget = min(len(rest), budget - main_budget)
+    # If one category didn't fill its half, give the remainder to the other
+    if main_budget < budget // 2:
+        rest_budget = min(len(rest), budget - main_budget)
+    elif rest_budget < budget - main_budget:
+        main_budget = min(len(main), budget - rest_budget)
+
+    return favs + main[:main_budget] + rest[:rest_budget]
+
+
 def build_candidate_pools(recipes: list[SolverRecipe]) -> dict[str, list[SolverRecipe]]:
     breakfast = [r for r in recipes if "breakfast" in r.meal_types]
     lunch_dinner = [r for r in recipes if "lunch" in r.meal_types or "dinner" in r.meal_types]
@@ -40,6 +72,8 @@ def build_candidate_pools(recipes: list[SolverRecipe]) -> dict[str, list[SolverR
         breakfast = lunch_dinner[:20]
     if not lunch_dinner:
         raise ValueError("No lunch/dinner candidates available for the solver.")
+
+    lunch_dinner = _cap_pool(lunch_dinner, MAX_CANDIDATES_PER_POOL)
 
     return {
         "breakfast": breakfast,
@@ -127,16 +161,13 @@ def _apply_constraints(
                     model.Add(servings[key] >= MIN_SERVINGS_PER_SELECTED * x[key])
                 meal_max = config.get_max_recipes(meal)
                 model.Add(sum(x[(day, meal, r.recipe_id)] for r in meal_recipes) <= meal_max)
-                model.Add(sum(x[(day, meal, r.recipe_id)] for r in meal_recipes) >= 1)
+                # When the user explicitly requests N dishes, enforce exactly N
+                # (not just "at least 1"). Fall back to >= 1 only for default (1).
+                meal_min = meal_max if meal_max <= len(meal_recipes) else min(1, len(meal_recipes))
+                model.Add(sum(x[(day, meal, r.recipe_id)] for r in meal_recipes) >= meal_min)
 
-                main_ids = [r.recipe_id for r in meal_recipes if r.is_main_course]
-                if meal in ("lunch", "dinner") and main_ids:
-                    # At least 1 main course required for lunch/dinner
-                    model.Add(sum(x[(day, meal, rid)] for rid in main_ids) >= 1)
-                    # When multiple dishes per meal, cap main courses at 1 so
-                    # remaining slots go to sides/soup/salad/appetizer/dessert
-                    if meal_max >= 2:
-                        model.Add(sum(x[(day, meal, rid)] for rid in main_ids) <= 1)
+                # Main course preference is handled in the objective (soft),
+                # not as a hard constraint, to avoid infeasibility.
 
 
 def _build_objective(
@@ -149,7 +180,10 @@ def _build_objective(
 ) -> Any:
     terms: list[Any] = []
 
-    # --- Nutrient deviation penalty (hit-target nutrients) ---
+    import random
+
+    # ── Priority 1: Nutrient targets (highest priority) ──
+    # Aim to hit daily calorie, protein, carbs targets.
     target_nutrient_getters = {
         "calories": lambda r: r.calories,
         "protein": lambda r: r.protein,
@@ -169,17 +203,11 @@ def _build_objective(
             neg = model.NewIntVar(0, 10**9, f"dn_{nutrient}_d{day}")
             model.Add(day_total - daily_target == pos - neg)
             weight = max(1, int(round(1000 / daily_target)))
-            terms.append(weight * (pos + neg) * 500)
+            terms.append(weight * (pos + neg) * 100)
 
-    # --- Undesirable nutrients: hard cap + minimization penalty ---
-    # Randomly relax 1 of 3 undesirable nutrients each solve to increase meal
-    # variety across regenerations. The relaxed nutrient still cannot exceed
-    # the daily limit (hard cap stays), but it won't be actively minimised,
-    # giving the solver more room to pick diverse dishes.
-    import random
-    undesirable = ["fat", "sodium", "sugar"]
-    relaxed_nutrient = random.choice(undesirable)
-
+    # ── Priority 2: Condition-safe nutrients (soft caps) ──
+    # Fat, sodium, sugar — penalise exceeding condition limits.
+    # All soft — the solver CAN exceed but strongly prefers not to.
     limit_nutrient_getters = {
         "fat":    lambda r: r.fat,
         "sodium": lambda r: r.sodium,
@@ -189,88 +217,40 @@ def _build_objective(
         daily_limit = to_int(targets.get(nutrient, 0))
         if daily_limit <= 0:
             continue
-        is_relaxed = nutrient == relaxed_nutrient
         for day in range(config.num_days):
             day_total = model.NewIntVar(0, 10**9, f"day{day}_{nutrient}")
             model.Add(day_total == sum(
                 to_int(getter(r)) * servings[(day, meal, r.recipe_id)]
                 for meal in MEALS for r in candidates[meal]
             ))
-            # Hard cap: never exceed the daily limit regardless
             over = model.NewIntVar(0, 10**9, f"over_{nutrient}_d{day}")
             model.Add(day_total - daily_limit <= over)
-            terms.append(over * 20000)
-            if not is_relaxed:
-                # Actively minimise the 2 strict nutrients
-                terms.append(day_total * 15)
+            terms.append(over * 5000)
 
-    # --- Desirable nutrient: maximize fiber ---
-    fiber_target = to_int(targets.get("fiber", 25.0))
-    if fiber_target > 0:
-        for day in range(config.num_days):
-            day_fiber = model.NewIntVar(0, 10**9, f"day{day}_fiber")
-            model.Add(day_fiber == sum(
-                to_int(r.fiber) * servings[(day, meal, r.recipe_id)]
-                for meal in MEALS for r in candidates[meal]
-            ))
-            # Reward hitting fiber target
-            shortfall = model.NewIntVar(0, 10**9, f"fiber_short_d{day}")
-            model.Add(fiber_target - day_fiber <= shortfall)
-            terms.append(shortfall * 200)
-
-    # --- Meal calorie ratio deviation ---
-    for day in range(config.num_days):
-        if any(fixed.get((day, meal)) for meal in MEALS):
-            continue
-        meal_cal = {}
-        for meal in MEALS:
-            mc = model.NewIntVar(0, 10**9, f"mc_d{day}_{meal}")
-            model.Add(mc == sum(
-                to_int(r.calories) * servings[(day, meal, r.recipe_id)]
-                for r in candidates[meal]
-            ))
-            meal_cal[meal] = mc
-        for meal in MEALS:
-            target = to_int(targets["calories"] * config.meal_calorie_ratio[meal])
-            pos = model.NewIntVar(0, 10**9, f"mr_p_d{day}_{meal}")
-            neg = model.NewIntVar(0, 10**9, f"mr_n_d{day}_{meal}")
-            model.Add(meal_cal[meal] - target == pos - neg)
-            terms.append((pos + neg) * 10)
-        model.Add(meal_cal["breakfast"] <= meal_cal["dinner"])
-        model.Add(meal_cal["dinner"] <= meal_cal["lunch"])
-
-    # --- No-repeat penalty (3-day sliding window) ---
+    # ── Priority 3: No same-dish-same-day + light variety ──
     all_ids = list(dict.fromkeys(r.recipe_id for meal in MEALS for r in candidates[meal]))
-    for rid in all_ids:
-        for start in range(config.num_days):
-            window = range(start, min(config.num_days, start + 3))
-            use_count = sum(
-                x[(d, m, rid)] for d in window for m in MEALS if (d, m, rid) in x
-            )
-            excess = model.NewIntVar(0, 20, f"rpt_{rid}_{start}")
-            model.Add(use_count - 1 <= excess)
-            terms.append(excess * 500000)
 
+    # Same-day no-repeat (strongest variety signal)
+    for rid in all_ids:
         for day in range(config.num_days):
             day_use = sum(x[(day, m, rid)] for m in MEALS if (day, m, rid) in x)
             excess = model.NewIntVar(0, 5, f"sameday_{rid}_{day}")
             model.Add(day_use - 1 <= excess)
-            terms.append(excess * 1000000)
+            terms.append(excess * 50000)
 
-    # --- Full-horizon uniqueness: penalize total uses > 1 across all days ---
-    for rid in all_ids:
-        total_uses = sum(x[(d, m, rid)] for d in range(config.num_days) for m in MEALS if (d, m, rid) in x)
-        excess = model.NewIntVar(0, config.num_days * 3, f"global_rpt_{rid}")
-        model.Add(total_uses - 1 <= excess)
-        terms.append(excess * 300000)
+    # Multi-day sliding window — only for multi-day solves, lighter weight
+    if config.num_days >= 3:
+        for rid in all_ids:
+            for start in range(config.num_days - 1):
+                window = range(start, min(config.num_days, start + 2))
+                use_count = sum(
+                    x[(d, m, rid)] for d in window for m in MEALS if (d, m, rid) in x
+                )
+                excess = model.NewIntVar(0, 10, f"rpt_{rid}_{start}")
+                model.Add(use_count - 1 <= excess)
+                terms.append(excess * 10000)
 
-    # --- Preference weights (health score, favourites, small variety noise) ---
-    # When preference_weights are provided by load_solver_inputs_from_db(), they
-    # encode condition-category health scores × 3000 plus favourite boost −50 000
-    # plus a small noise ±5 000.  This replaces the old pure-random ±500 000
-    # perturbation while keeping a weaker randomness signal for variety.
-    # Falls back to pure-random + favourite_boost when weights are absent (e.g.
-    # when SolverConfig is built manually without calling load_solver_inputs_from_db).
+    # ── Priority 4: Preference weights + condition penalties ──
     seen_weighted: set[str] = set()
     for day in range(config.num_days):
         for meal in MEALS:
@@ -278,17 +258,13 @@ def _build_objective(
                 if r.recipe_id not in seen_weighted:
                     seen_weighted.add(r.recipe_id)
                     if config.preference_weights:
-                        weight = config.preference_weights.get(r.recipe_id, 0)
+                        w = config.preference_weights.get(r.recipe_id, 0)
                     else:
-                        # Backward-compat: pure random + favourite boost
-                        weight = random.randint(-500000, 500000)
+                        w = random.randint(-5000, 5000)
                         if r.is_favourite:
-                            weight -= config.favourite_boost
-                    terms.append(weight * x[(day, meal, r.recipe_id)])
+                            w -= config.favourite_boost
+                    terms.append(w * x[(day, meal, r.recipe_id)])
 
-    # --- Condition penalties for caution / moderation dishes ---
-    # These are soft costs; the solver may still pick penalised dishes when no
-    # unpenalised candidate satisfies the hard nutrient constraints.
     if config.condition_penalties:
         seen_penalized: set[str] = set()
         for day in range(config.num_days):
@@ -298,7 +274,7 @@ def _build_objective(
                         seen_penalized.add(r.recipe_id)
                         terms.append(config.condition_penalties[r.recipe_id] * x[(day, meal, r.recipe_id)])
 
-    # --- Cross-week recency penalty: discourage dishes used in recent weeks ---
+    # Cross-week recency
     if config.recency_penalties:
         seen_recency: set[str] = set()
         for day in range(config.num_days):
@@ -308,35 +284,19 @@ def _build_objective(
                         seen_recency.add(r.recipe_id)
                         terms.append(config.recency_penalties[r.recipe_id] * x[(day, meal, r.recipe_id)])
 
-    # --- Sub-category variety bonus (multi-dish meals) ---
-    # When max_recipes_per_meal >= 2, reward picking dishes from different
-    # sub-categories within the same slot to encourage balanced meals
-    # (e.g. main + soup, main + salad, main + side, main + dessert).
-    if any(config.get_max_recipes(m) >= 2 for m in ("lunch", "dinner")):
-        _SUB_CATS = {
-            "side": lambda r: r.is_side_dish,
-            "soup": lambda r: r.is_soup,
-            "salad": lambda r: r.is_salad,
-            "appetizer": lambda r: r.is_appetizer,
-            "dessert": lambda r: r.is_dessert,
-            "snack": lambda r: r.is_snack,
-            "beverage": lambda r: r.is_beverage,
-        }
-        for day in range(config.num_days):
-            for meal in ("lunch", "dinner"):
-                cats_present: list[Any] = []
-                for cat_name, cat_fn in _SUB_CATS.items():
-                    cat_ids = [r.recipe_id for r in candidates[meal] if cat_fn(r)]
-                    if cat_ids:
-                        has_cat = model.NewBoolVar(f"has_{cat_name}_d{day}_{meal}")
-                        model.Add(sum(x[(day, meal, rid)] for rid in cat_ids) >= 1).OnlyEnforceIf(has_cat)
-                        model.Add(sum(x[(day, meal, rid)] for rid in cat_ids) == 0).OnlyEnforceIf(has_cat.Not())
-                        cats_present.append(has_cat)
-                # Reward variety: more distinct sub-categories = better
-                if cats_present:
-                    terms.append(-sum(cats_present) * 25000)
+    # ── Priority 5: Meal composition (light shaping) ──
+    # Prefer 1 main course per multi-dish lunch/dinner
+    for day in range(config.num_days):
+        for meal in ("lunch", "dinner"):
+            if config.get_max_recipes(meal) >= 2:
+                main_ids = [r.recipe_id for r in candidates[meal] if r.is_main_course]
+                if main_ids:
+                    main_count = sum(x[(day, meal, rid)] for rid in main_ids)
+                    excess_main = model.NewIntVar(0, 10, f"excess_main_d{day}_{meal}")
+                    model.Add(main_count - 1 <= excess_main)
+                    terms.append(excess_main * 5000)
 
-    # --- Satiety (protein + fiber) maximization ---
+    # ── Priority 6: Satiety bonus (lightest) ──
     satiety_terms: list[Any] = []
     for day in range(config.num_days):
         for meal in MEALS:
@@ -381,8 +341,13 @@ def solve_meal_plan(
     model.Minimize(objective)
 
     solver = cp_model_mod.CpSolver()
-    solver.parameters.max_time_in_seconds = config.time_limit_seconds
-    solver.parameters.num_search_workers = 4
+    # Scale time limit with problem complexity
+    base_time = config.time_limit_seconds
+    total_dishes = sum(config.get_max_recipes(m) for m in MEALS)
+    if total_dishes > 3:
+        base_time = max(base_time, total_dishes * config.num_days * 2)
+    solver.parameters.max_time_in_seconds = min(base_time, 120)
+    solver.parameters.num_search_workers = 8
     solver.parameters.random_seed = random.randint(0, 2**31 - 1)
 
     status = solver.Solve(model)

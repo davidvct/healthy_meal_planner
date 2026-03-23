@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import DayStrip from './DayStrip';
 import MealSlotCard from './MealSlotCard';
 import NutritionPanel from './NutritionPanel';
-import PlanSettingsModal from './PlanSettingsModal';
+// PlanSettingsModal replaced by unified AI planner modal
 import UpgradePromptModal from './UpgradePromptModal';
 import * as api from '../services/api';
 
@@ -277,7 +277,11 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [genProgress, setGenProgress] = useState(0); // 0-7 days completed
   const [showAiPlanModal, setShowAiPlanModal] = useState(false);
+  const [aiPlanMode, setAiPlanMode] = useState('week'); // 'week' = 7 days, 'day' = today only
   const [aiDishesPerMeal, setAiDishesPerMeal] = useState({ breakfast: 1, lunch: 1, dinner: 1 });
+  const [aiLimits, setAiLimits] = useState(null);       // {calories, protein, carbs, fat, sodium, sugar}
+  const [aiRecommended, setAiRecommended] = useState(null); // from backend
+  const [aiConditions, setAiConditions] = useState([]);
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
   const [showPlanSettings, setShowPlanSettings] = useState(false);
@@ -424,26 +428,68 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
     }
   }, []);
 
+  const openAiPlanModal = async (mode = 'week') => {
+    setAiPlanMode(mode);
+    setShowAiPlanModal(true);
+    if (!aiRecommended && userId) {
+      try {
+        const rec = await api.getRecommendedLimits(userId);
+        setAiRecommended(rec.recommended);
+        setAiConditions(rec.conditions || []);
+        // Pre-fill limits with recommended values
+        setAiLimits(prev => prev || { ...rec.recommended });
+      } catch (e) { console.warn('Failed to load recommended limits', e); }
+    }
+  };
+
   const handleGeneratePlan = async () => {
+    const mode = aiPlanMode;
     setShowAiPlanModal(false);
     setGeneratingPlan(true);
     setGenProgress(0);
+    let totalAdded = 0;
     try {
-      const result = await api.generateMealPlan(userId, {
-        weekStart,
-        numDays: 7,
-        timeLimitSeconds: 30,
-        maxDishesPerSlot: aiDishesPerMeal,
-      });
-      if (result.success === false) {
-        showToast(result.error || 'Could not generate plan');
+      if (mode === 'day') {
+        // Plan today only
+        const result = await api.generateMealPlan(userId, {
+          weekStart,
+          numDays: 1,
+          timeLimitSeconds: 15,
+          dayIndex: activeDayIndex,
+          maxDishesPerSlot: aiDishesPerMeal,
+          nutrientLimits: aiLimits,
+        });
+        if (result.success === false) {
+          showToast(result.error || 'Could not generate plan');
+        } else {
+          totalAdded = result.entriesWritten || 0;
+        }
       } else {
-        const plan = await loadPlan();
-        if (plan) loadDishDetails(plan);
-        await loadNutrients();
-        const added = result.entriesWritten || 0;
-        if (added > 0) showToast(`Week planned! ${added} meals added`);
+        // Plan full week — clear then day-by-day
+        await api.clearWeekMealPlan(userId, weekStart);
+        for (let day = 0; day < 7; day++) {
+          setGenProgress(day);
+          const result = await api.generateMealPlan(userId, {
+            weekStart,
+            numDays: 1,
+            timeLimitSeconds: 15,
+            dayIndex: day,
+            maxDishesPerSlot: aiDishesPerMeal,
+            nutrientLimits: aiLimits,
+          });
+          if (result.success === false) {
+            console.warn(`Day ${day} failed: ${result.error}`);
+            continue;
+          }
+          totalAdded += result.entriesWritten || 0;
+        }
       }
+      const plan = await loadPlan();
+      if (plan) loadDishDetails(plan);
+      await loadNutrients();
+      const label = mode === 'day' ? 'Today planned' : 'Week planned';
+      if (totalAdded > 0) showToast(`${label}! ${totalAdded} meals added`);
+      else showToast('Could not generate plan. Try fewer dishes per meal.');
     } catch (err) {
       console.error('Plan generation failed:', err);
       showToast('Failed to generate plan');
@@ -485,6 +531,10 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   const mealCount = MEAL_TYPES.filter(mt => (dayMeals[mt] || []).length > 0).length;
 
   const activeDate = weekDates[activeDayIndex] || weekDates[0];
+  // Check if all meal slots for the active day are locked (past cutoff)
+  const allSlotsLocked = MEAL_TYPES.every(mt => isSlotLocked(activeDate, mt));
+  // Check if the entire week is past (all 7 days are past)
+  const allWeekPast = weekDates.every(d => isDayPast(d));
   const _dayRaw = activeDate.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   const dayLabel = _dayRaw.replace(/^(\w+) /, '$1, ');
   const daysWithMeals = Object.keys(mealPlan).filter(di =>
@@ -580,14 +630,16 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
           </button>
         </div>
 
-        {/* Plan week button */}
+        {/* Plan today button */}
         <div style={{ marginBottom: 12 }}>
           <button
             className="af-action-btn af-btn-primary"
-            onClick={userTier === 'paid' ? () => setShowPlanSettings(true) : () => setUpgradeFeature('Plan Week')}
-            style={userTier !== 'paid' ? { opacity: 0.6 } : undefined}
+            disabled={allSlotsLocked}
+            onClick={allSlotsLocked ? undefined : userTier === 'paid' ? () => openAiPlanModal('day') : () => setUpgradeFeature('Plan Today')}
+            style={userTier !== 'paid' || allSlotsLocked ? { opacity: 0.5, cursor: 'default' } : undefined}
+            title={allSlotsLocked ? 'All meal slots have passed their cutoff time' : ''}
           >
-            {userTier !== 'paid' ? '🔒 ' : '⚡ '}Plan week
+            {allSlotsLocked ? '🔒 Past cutoff' : userTier !== 'paid' ? '🔒 Plan today' : '⚡ Plan today'}
           </button>
         </div>
 
@@ -661,18 +713,19 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                         <span className="ewc-meal">Personalised to your health profile</span>
                       </div>
                     </div>
-                    <button className="ewc-btn ewc-btn-navy" disabled={generatingPlan} onClick={() => setShowAiPlanModal(true)}
-                      style={{ position: 'relative', overflow: 'hidden' }}>
+                    <button className="ewc-btn ewc-btn-navy" disabled={generatingPlan || allWeekPast} onClick={allWeekPast ? undefined : () => openAiPlanModal('week')}
+                      style={{ position: 'relative', overflow: 'hidden', ...(allWeekPast ? { opacity: 0.5, cursor: 'default' } : {}) }}
+                      title={allWeekPast ? 'This week has already passed' : ''}>
                       {generatingPlan && (
                         <div style={{
                           position: 'absolute', left: 0, top: 0, bottom: 0,
-                          width: generatingPlan ? '100%' : '0%',
+                          width: `${((genProgress + 1) / 7) * 100}%`,
                           background: 'rgba(255,255,255,.18)',
                           transition: 'width .4s ease',
                         }} />
                       )}
                       <span style={{ position: 'relative' }}>
-                        {generatingPlan ? 'Planning 7 days…' : 'Plan with AI ✨'}
+                        {allWeekPast ? '🔒 Week has passed' : generatingPlan ? `Planning day ${genProgress + 1} of 7…` : 'Plan with AI ✨'}
                       </span>
                     </button>
                   </div>
@@ -698,6 +751,8 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                         onServingsChange={locked ? undefined : handleServingsChange}
                         userId={userId}
                         locked={locked}
+                        dayIndex={activeDayIndex}
+                        weekStart={weekStart}
                       />
                     );
                   }
@@ -753,14 +808,6 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
       )}
 
       {/* Modals */}
-      {showPlanSettings && (
-        <PlanSettingsModal
-          userId={userId}
-          weekStart={weekStart}
-          onClose={() => setShowPlanSettings(false)}
-          onGenerated={handlePlanGenerated}
-        />
-      )}
       {upgradeFeature && <UpgradePromptModal featureName={upgradeFeature} onClose={() => setUpgradeFeature(null)} />}
 
       {/* AI Plan — dishes per meal popout */}
@@ -770,14 +817,14 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }} onClick={() => setShowAiPlanModal(false)}>
           <div style={{
-            background: 'var(--coral-l)', borderRadius: 16, width: 380, maxWidth: '92vw',
+            background: 'var(--white)', borderRadius: 16, width: 380, maxWidth: '92vw',
             boxShadow: '0 8px 32px rgba(6,155,142,0.25)', fontFamily: 'var(--font)',
             overflow: 'hidden',
           }} onClick={e => e.stopPropagation()}>
 
             {/* Header */}
             <div style={{
-              background: 'var(--navy)', padding: '16px 20px',
+              background: 'var(--navy)', padding: '14px 20px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
               <div>
@@ -785,47 +832,169 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                   AI Planner
                 </div>
                 <div style={{ color: '#fff', fontSize: 16, fontWeight: 800 }}>
-                  Dishes per meal
+                  {aiPlanMode === 'day' ? 'Plan today' : 'Plan week'}
+                  {aiConditions.length > 0 && (
+                    <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 8, color: 'rgba(255,255,255,0.5)' }}>
+                      {aiConditions.join(' · ')}
+                    </span>
+                  )}
                 </div>
               </div>
               <button onClick={() => setShowAiPlanModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', lineHeight: 1 }}>×</button>
             </div>
 
             {/* Body */}
-            <div style={{ padding: '20px 20px 24px' }}>
-              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.4 }}>
-                Choose how many dishes the AI picks for each meal. Lunch and dinner with 2+ dishes will include 1 main course plus sides, soup, salad, or dessert.
+            <div style={{ padding: '16px 20px 20px', maxHeight: '70vh', overflowY: 'auto' }}>
+
+              {/* Dishes per meal — compact table */}
+              <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                Dishes per meal
+              </div>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px 8px',
+                marginBottom: 16, alignItems: 'center',
+              }}>
+                {[
+                  { key: 'breakfast', label: 'Breakfast', icon: '☀️' },
+                  { key: 'lunch',     label: 'Lunch',     icon: '🌿' },
+                  { key: 'dinner',    label: 'Dinner',    icon: '🌙' },
+                ].map(({ key, label, icon }) => (
+                  <React.Fragment key={key}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ fontSize: 13 }}>{icon}</span> {label}
+                    </span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[1, 2, 3].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setAiDishesPerMeal(prev => ({ ...prev, [key]: n }))}
+                          style={{
+                            flex: 1, padding: '6px 0', borderRadius: 8, textAlign: 'center',
+                            border: `1.5px solid ${aiDishesPerMeal[key] === n ? 'var(--teal)' : 'var(--border)'}`,
+                            background: aiDishesPerMeal[key] === n ? 'var(--teal)' : 'var(--white)',
+                            color: aiDishesPerMeal[key] === n ? '#fff' : 'var(--text2)',
+                            fontWeight: 700, fontSize: 13, fontFamily: 'var(--font)', cursor: 'pointer',
+                            transition: 'all 0.12s',
+                          }}
+                        >{n}</button>
+                      ))}
+                    </div>
+                  </React.Fragment>
+                ))}
               </div>
 
-              {[
-                { key: 'breakfast', label: 'Breakfast', icon: '☀️' },
-                { key: 'lunch',     label: 'Lunch',     icon: '🌿' },
-                { key: 'dinner',    label: 'Dinner',    icon: '🌙' },
-              ].map(({ key, label, icon }) => (
-                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <span style={{ width: 90, fontSize: 13, fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span>{icon}</span> {label}
-                  </span>
-                  <div style={{ display: 'flex', gap: 6, flex: 1 }}>
-                    {[1, 2, 3].map(n => (
+              {/* Nutrient limits */}
+              {aiLimits && aiRecommended && (() => {
+                // "Limit" nutrients: bad to exceed (flag in red)
+                // "Target" nutrients: aim for (no warning when exceeding)
+                const NUTRIENTS = [
+                  { key: 'calories', label: 'Calories', unit: 'kcal', dot: 'var(--navy)',   kind: 'target' },
+                  { key: 'protein',  label: 'Protein',  unit: 'g',    dot: 'var(--teal)',    kind: 'target' },
+                  { key: 'carbs',    label: 'Carbs',    unit: 'g',    dot: '#6366f1',        kind: 'target' },
+                  { key: 'fiber',    label: 'Fiber',    unit: 'g',    dot: '#22c55e',         kind: 'target' },
+                  { key: 'fat',      label: 'Fat',      unit: 'g',    dot: 'var(--purple)',   kind: 'limit' },
+                  { key: 'sodium',   label: 'Sodium',   unit: 'mg',   dot: 'var(--coral)',    kind: 'limit' },
+                  { key: 'sugar',    label: 'Sugar',    unit: 'g',    dot: 'var(--amber)',    kind: 'limit' },
+                ];
+                const hasLimitWarnings = NUTRIENTS.some(n =>
+                  n.kind === 'limit' && aiRecommended[n.key] && aiLimits[n.key] && aiLimits[n.key] > aiRecommended[n.key] * 1.1
+                );
+
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Daily nutrient limits
+                      </span>
                       <button
-                        key={n}
-                        onClick={() => setAiDishesPerMeal(prev => ({ ...prev, [key]: n }))}
+                        onClick={() => setAiLimits({ ...aiRecommended })}
                         style={{
-                          flex: 1, padding: '8px 0', borderRadius: 'var(--r-sm)', textAlign: 'center',
-                          border: `1.5px solid ${aiDishesPerMeal[key] === n ? 'var(--teal)' : 'var(--border)'}`,
-                          background: aiDishesPerMeal[key] === n ? 'var(--teal)' : 'var(--white)',
-                          color: aiDishesPerMeal[key] === n ? '#fff' : 'var(--text2)',
-                          fontWeight: 700, fontSize: 13, fontFamily: 'var(--font)', cursor: 'pointer',
+                          background: 'var(--teal-xl)', border: '1px solid rgba(6,155,142,0.2)', borderRadius: 6,
+                          padding: '3px 10px', fontSize: 10, fontWeight: 700, color: 'var(--teal)',
+                          cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all 0.12s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--teal-l)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'var(--teal-xl)'}
+                      >Reset</button>
+                    </div>
+                    {/* Legend */}
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 9, color: 'var(--text3)' }}>
+                      <span><strong>~</strong> = aim for this amount</span>
+                      <span><strong>≤</strong> = stay at or below</span>
+                    </div>
+
+                    {/* Nutrient rows */}
+                    {NUTRIENTS.map(({ key, label, unit, dot, kind }) => {
+                      const rec = aiRecommended[key];
+                      const val = aiLimits[key] ?? '';
+                      const numVal = parseFloat(val) || 0;
+                      const pct = rec ? Math.round((numVal / rec) * 100) : 0;
+                      const isLimit = kind === 'limit';
+                      // Only flag warnings on "limit" nutrients (fat, sodium, sugar)
+                      const exceeds = isLimit && rec && numVal > rec * 1.1;
+
+                      return (
+                        <div key={key} style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '4px 8px', marginBottom: 2, borderRadius: 8,
+                          background: 'var(--white)',
+                          border: `1px solid var(--border)`,
                           transition: 'all 0.15s',
                         }}
-                      >
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+                          title={isLimit
+                            ? (exceeds ? `${label} is ${pct}% of recommended ${Math.round(rec)}${unit} — may result in less healthy meals` : `Recommended max: ${rec ? Math.round(rec) : '–'}${unit}`)
+                            : `Target: ${rec ? Math.round(rec) : '–'}${unit} — higher values are generally fine`}
+                        >
+                          {/* Dot */}
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: dot, flexShrink: 0 }} />
+                          {/* Label */}
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--navy)', width: 55, flexShrink: 0 }}>{label}</span>
+                          {/* Input */}
+                          <input
+                            type="number" min={0}
+                            value={val}
+                            placeholder={rec ? String(Math.round(rec)) : '–'}
+                            onChange={e => setAiLimits(prev => ({ ...prev, [key]: e.target.value === '' ? null : parseFloat(e.target.value) }))}
+                            style={{
+                              width: 58, padding: '3px 5px', borderRadius: 6, textAlign: 'right',
+                              border: `1px solid ${exceeds ? 'var(--coral)' : 'var(--border2)'}`,
+                              fontSize: 13, fontWeight: 700,
+                              background: 'var(--white)', color: 'var(--navy)', fontFamily: 'var(--font)',
+                              outline: 'none', boxSizing: 'border-box',
+                            }}
+                          />
+                          <span style={{ fontSize: 9, color: 'var(--text3)', width: 24, flexShrink: 0 }}>{unit}</span>
+                          {/* Rec value + status */}
+                          <div style={{ flex: 1, textAlign: 'right', fontSize: 10, whiteSpace: 'nowrap' }}>
+                            {exceeds ? (
+                              <span style={{ color: 'var(--coral)', fontWeight: 700 }}>
+                                {pct}% of {Math.round(rec)}
+                              </span>
+                            ) : rec ? (
+                              <span style={{ color: 'var(--text3)' }}>
+                                {isLimit ? '≤' : '~'} {Math.round(rec)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Warning — only for limit nutrients */}
+                    {hasLimitWarnings && (
+                      <div style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 6,
+                        padding: '7px 8px', marginTop: 4, borderRadius: 8,
+                        background: 'var(--bg)', border: '1px solid var(--border)',
+                        fontSize: 10, color: 'var(--text2)', lineHeight: 1.4,
+                      }}>
+                        <span style={{ fontSize: 12, flexShrink: 0, marginTop: 1 }}>⚠️</span>
+                        <span>Fat, sodium, or sugar limits exceed your health profile recommendations. The AI may pick less healthy dishes to fill these limits.</span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Generate button */}
               <button
@@ -840,7 +1009,9 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                   marginTop: 14, transition: 'all 0.15s',
                 }}
               >
-                {generatingPlan ? 'Planning 7 days…' : 'Plan with AI ✨'}
+                {generatingPlan
+                  ? (aiPlanMode === 'day' ? 'Planning today…' : `Planning day ${genProgress + 1} of 7…`)
+                  : (aiPlanMode === 'day' ? 'Plan today ✨' : 'Plan week ✨')}
               </button>
             </div>
           </div>

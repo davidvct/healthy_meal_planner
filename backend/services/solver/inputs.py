@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from typing import Any
 
-from ...constants import CONDITION_CONFIG
+from ...constants import CONDITION_CONFIG, get_condition_targets
 from ...utils import parse_float
 from ..dish_candidate import DishCandidate, build_dish_candidate, is_condiment_like
 from ..nutrient_calculator import load_ingredient_cache
@@ -20,44 +20,35 @@ from .models import (
 )
 
 # ---------------------------------------------------------------------------
-# Condition-aware daily nutrient targets (healthy baseline)
+# Condition-aware daily nutrient targets
 # ---------------------------------------------------------------------------
-
-_HEALTHY_DAILY_TARGETS = {
-    "protein": 60.0, "carbs": 275.0, "fat": 65.0,
-    "sugar": 50.0, "sodium": 2000.0, "fiber": 25.0,
-}
 
 
 def _solver_targets_from_profile(profile: UserProfile) -> dict[str, float]:
-    targets = {
-        "calories": parse_float(profile.recommended_calories, 0.0),
-        "protein": parse_float(profile.recommended_protein, 0.0),
-        "carbs": parse_float(profile.recommended_carbs, 0.0),
-        "fat": parse_float(profile.recommended_fat, 0.0),
-    }
-    missing = [k for k, v in targets.items() if v <= 0]
-    if missing:
+    """Build solver nutrient targets by overlaying user demographics on
+    condition-aware limits from ``get_condition_targets()``.
+
+    Returns a dict with: calories, protein, carbs, fat, sodium, sugar, fiber.
+    """
+    # Start with condition-aware limits (no calories — those are per-person)
+    targets = get_condition_targets(profile.conditions)
+
+    # Overlay user's demographic-specific targets for the "big 4"
+    user_cal = parse_float(profile.recommended_calories, 0.0)
+    user_protein = parse_float(profile.recommended_protein, 0.0)
+    user_carbs = parse_float(profile.recommended_carbs, 0.0)
+    user_fat = parse_float(profile.recommended_fat, 0.0)
+
+    if user_cal <= 0 or user_protein <= 0 or user_carbs <= 0 or user_fat <= 0:
+        missing = [k for k, v in {"calories": user_cal, "protein": user_protein, "carbs": user_carbs, "fat": user_fat}.items() if v <= 0]
         raise ValueError(f"Missing or invalid target values for {profile.patient_id}: {missing}")
 
-    # Start with healthy defaults, then tighten based on active conditions
-    condition_targets = dict(_HEALTHY_DAILY_TARGETS)
-    for cond in profile.conditions:
-        cfg = CONDITION_CONFIG.get(cond)
-        if not cfg:
-            continue
-        ct = cfg["daily_targets"]
-        for key in ("fat", "sugar", "sodium"):
-            condition_targets[key] = min(condition_targets[key], ct[key])
-        condition_targets["fiber"] = max(condition_targets.get("fiber", 25.0), ct.get("fiber", 25.0))
-        condition_targets["protein"] = max(condition_targets["protein"], ct["protein"])
-        condition_targets["carbs"] = min(condition_targets["carbs"], ct["carbs"])
-
-    targets["sodium"] = condition_targets["sodium"]
-    targets["sugar"] = condition_targets["sugar"]
-    targets["fiber"] = condition_targets["fiber"]
-    if targets["fat"] > condition_targets["fat"]:
-        targets["fat"] = condition_targets["fat"]
+    targets["calories"] = user_cal
+    # For protein/carbs: use user value but don't exceed condition limit
+    targets["protein"] = max(user_protein, targets["protein"])
+    targets["carbs"] = min(user_carbs, targets["carbs"])
+    # For fat: take the stricter of user recommendation vs condition limit
+    targets["fat"] = min(user_fat, targets["fat"])
 
     return targets
 

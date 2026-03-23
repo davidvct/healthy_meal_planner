@@ -98,5 +98,44 @@ CONDITION_RULES = {
     for name, cfg in CONDITION_CONFIG.items()
 }
 
+# Healthy-adult baseline daily targets (no conditions).
+# The solver starts with these, then tightens per condition.
+HEALTHY_DAILY_TARGETS: dict[str, float] = {
+    "protein": 60.0,
+    "carbs": 275.0,
+    "fat": 65.0,
+    "sugar": 50.0,
+    "sodium": 2000.0,
+    "fiber": 25.0,
+}
+
+
+def get_condition_targets(conditions: list[str]) -> dict[str, float]:
+    """Return condition-aware daily nutrient targets.
+
+    Starts with ``HEALTHY_DAILY_TARGETS``, then for each active condition
+    takes the **stricter** limit (lower for undesirable nutrients like fat,
+    sugar, sodium; higher for desirable nutrients like protein, fiber).
+
+    Does NOT include calories — those come from the user's demographic
+    profile and should be overlaid by the caller.
+    """
+    targets = dict(HEALTHY_DAILY_TARGETS)
+    for cond in conditions:
+        cfg = CONDITION_CONFIG.get(cond)
+        if not cfg:
+            continue
+        ct = cfg["daily_targets"]
+        # Undesirable nutrients — take the lower (stricter) limit
+        for key in ("fat", "sugar", "sodium", "carbs"):
+            if key in ct:
+                targets[key] = min(targets[key], ct[key])
+        # Desirable nutrients — take the higher (more ambitious) target
+        for key in ("protein", "fiber"):
+            if key in ct:
+                targets[key] = max(targets[key], ct[key])
+    return targets
+
+
 MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"]
 MEAL_CUTOFF = {"breakfast": 10, "lunch": 14, "dinner": 20}

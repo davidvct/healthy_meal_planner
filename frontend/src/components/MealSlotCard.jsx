@@ -13,7 +13,7 @@ const MEAL_THEME = {
   dinner:    { accent: '#069B8E', bg: '#EFF6FF', border: '#BFDBFE', emoji: '🌙', label: 'Dinner' },
 };
 
-function DishRow({ entry, dishDetail, onBrowse, onServingsChange, userId, locked, isLast }) {
+function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, userId, locked, isLast, canRemove }) {
   const [fav, setFav] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const dishId = entry.dishId || entry.id;
@@ -159,6 +159,20 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, userId, locked
 
         {/* Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          {!locked && canRemove && onRemove && (
+            <button
+              onClick={e => { e.stopPropagation(); onRemove(entry); }}
+              title="Remove dish"
+              style={{
+                background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--r-xs)',
+                padding: '3px 7px', fontSize: 10, fontWeight: 600, color: 'var(--text3)',
+                cursor: 'pointer', fontFamily: 'var(--font)', lineHeight: 1,
+                transition: 'all 0.12s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--coral)'; e.currentTarget.style.borderColor = 'var(--coral)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >Remove</button>
+          )}
           {!locked && onBrowse && (
             <button className="mc-swap-inline" onClick={e => { e.stopPropagation(); onBrowse(); }}
               style={{ color: 'var(--teal)', padding: '4px 8px', fontSize: 11 }}>
@@ -245,7 +259,9 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, userId, locked
   );
 }
 
-export default function MealSlotCard({ mealType, entries, dishDetails, onBrowse, onServingsChange, userId, locked }) {
+const MAX_DISHES_PER_SLOT = 3;
+
+export default function MealSlotCard({ mealType, entries, dishDetails, onBrowse, onRemove, onServingsChange, userId, locked, dayIndex, weekStart }) {
   const theme = MEAL_THEME[mealType] || MEAL_THEME.lunch;
 
   // Compute slot totals
@@ -289,13 +305,35 @@ export default function MealSlotCard({ mealType, entries, dishDetails, onBrowse,
           key={entry.id}
           entry={entry}
           dishDetail={dishDetails[entry.dishId]}
-          onBrowse={locked ? undefined : () => onBrowse?.({ userId, dayIndex: entry.dayIndex, mealType, label: theme.label })}
+          onBrowse={locked ? undefined : () => onBrowse?.({ userId, dayIndex: dayIndex ?? entry.dayIndex, mealType, label: theme.label, weekStart })}
           onServingsChange={locked ? undefined : onServingsChange}
+          onRemove={locked ? undefined : onRemove}
+          canRemove={true}
           userId={userId}
           locked={locked}
-          isLast={i === entries.length - 1}
+          isLast={!locked && entries.length < MAX_DISHES_PER_SLOT ? true : i === entries.length - 1}
         />
       ))}
+
+      {/* Add dish button */}
+      {!locked && entries.length < MAX_DISHES_PER_SLOT && onBrowse && (
+        <button
+          onClick={() => onBrowse({ userId, dayIndex, mealType, label: theme.label, weekStart })}
+          style={{
+            width: '100%', padding: '10px 14px',
+            background: 'none', border: 'none', borderTop: '1px dashed var(--border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            fontSize: 12, fontWeight: 600, color: 'var(--teal)',
+            cursor: 'pointer', fontFamily: 'var(--font)',
+            transition: 'background 0.15s',
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--teal-xl)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'none'}
+        >
+          <span style={{ fontSize: 15, lineHeight: 1 }}>+</span>
+          Add dish ({MAX_DISHES_PER_SLOT - entries.length} remaining)
+        </button>
+      )}
     </div>
   );
 }

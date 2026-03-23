@@ -2,10 +2,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
-from ..constants import NUTRIENT_COLUMNS, NUTRIENT_COL_TO_KEY, RDA
+from ..constants import NUTRIENT_COLUMNS, NUTRIENT_COL_TO_KEY, RDA, HEALTHY_DAILY_TARGETS, get_condition_targets
 from ..db import get_db
 from ..schemas import SaveThresholdsBody
 from ..security import require_paid_tier
+from ..services.profile_loader import load_user_profile
 
 router = APIRouter(prefix="/thresholds", tags=["thresholds"])
 
@@ -36,6 +37,29 @@ def get_available_nutrients(conn: Any = Depends(get_db)) -> list[dict]:
             "defaultDaily": RDA.get(key),
         })
     return result
+
+
+@router.get("/{user_id}/recommended")
+def get_recommended_limits(user_id: str, conn: Any = Depends(get_db)) -> dict:
+    """Return condition-aware recommended nutrient limits for this user.
+
+    Includes the healthy baseline, the condition-tightened limits, and the
+    user's conditions so the frontend can show warnings when exceeding.
+    """
+    profile = load_user_profile(conn, user_id)
+    conditions = profile.conditions if profile else []
+    condition_limits = get_condition_targets(conditions)
+    healthy = dict(HEALTHY_DAILY_TARGETS)
+    # Add calories from profile
+    if profile:
+        from ..utils import parse_float
+        condition_limits["calories"] = parse_float(profile.recommended_calories, 2000.0)
+        healthy["calories"] = condition_limits["calories"]
+    return {
+        "conditions": conditions,
+        "healthy": healthy,
+        "recommended": condition_limits,
+    }
 
 
 @router.get("/{user_id}")
