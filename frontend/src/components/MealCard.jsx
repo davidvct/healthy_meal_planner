@@ -98,7 +98,7 @@ export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId
 
   const style = MEAL_STYLES[mealType] || MEAL_STYLES.lunch;
 
-  const kcal    = Math.round(dishDetail?.nutrients?.calories ?? dishDetail?.calories ?? entry.kcal ?? 0);
+  const kcal    = Math.round(entry.kcal ?? dishDetail?.nutrients?.calories ?? dishDetail?.calories ?? 0);
   const protein = Math.round(entry.protein ?? 0);
   const carbs   = Math.round(entry.carbs   ?? 0);
   const fat     = Math.round(entry.fat     ?? 0);
@@ -160,12 +160,17 @@ export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId
           </div>
 
           <div className="mc-info">
-            <div className="mc-pill-c" style={{ color: style.pillColor }}>
-              {style.label}
-            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
               <div className="mc-name-c">{entry.dishName || entry.name || 'Dish'}</div>
               {kcal > 0 && <span className="mc-kcal-badge">{kcal} kcal</span>}
+              {(entry.servingsQty || 0) > 1 && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 12,
+                  background: 'var(--blue-l)', color: 'var(--blue)', marginLeft: 4, whiteSpace: 'nowrap',
+                }}>
+                  ×{entry.servingsQty} servings
+                </span>
+              )}
             </div>
             {(healthTags.length > 0 || dietaryTags.length > 0) && (
               <div className="mc-tags">
@@ -202,10 +207,15 @@ export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId
         {/* Compact macro row + details toggle */}
         <div className="mc-zone-right">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text3)' }}>
+            <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--text3)', alignItems: 'center' }}>
               {macroData.map(x => (
                 <span key={x.l}><strong style={{ color: 'var(--text2)' }}>{x.v}</strong> {x.l}</span>
               ))}
+              {entry.recipeServings && (
+                <span style={{ fontSize: 9, color: 'var(--text3)', fontStyle: 'italic', marginLeft: 2 }}>
+                  per serving
+                </span>
+              )}
             </div>
             <div className="mc-more" onClick={() => setExpanded(e => !e)} style={{ marginTop: 0, borderTop: 'none', padding: '4px 0' }}>
               {expanded ? '− Less' : '+ More'}

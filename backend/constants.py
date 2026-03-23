@@ -52,22 +52,50 @@ NUTRIENT_COL_TO_KEY = {
     "total_carbs": "carbs",
 }
 
-CONDITION_RULES = {
+# Unified condition configuration — single source of truth for all three
+CONDITION_CONFIG: dict = {
     "High Blood Sugar": {
-        "limit": {"carbs": 60, "sugar": 15},
-        "warnNutrient": "carbs",
-        "warnLabel": "High Carbohydrate",
+        # DB column that holds the NLP-tagged suitability label for this condition
+        "category_column": "diabetes_category",
+        # Per-meal nutrient hard limits used by the filter and weekly warnings
+        "per_meal_limits": {"carbs": 60, "sugar": 15},
+        "warn_nutrient": "carbs",
+        "warn_label": "High Carbohydrate",
+        # Daily solver targets — more restrictive than healthy defaults
+        "daily_targets": {
+            "protein": 65.0, "carbs": 250.0, "fat": 55.0,
+            "sugar": 25.0, "sodium": 2000.0, "fiber": 30.0,
+        },
     },
     "High Cholesterol": {
-        "limit": {"cholesterol": 100, "fat": 25},
-        "warnNutrient": "cholesterol",
-        "warnLabel": "High Cholesterol",
+        "category_column": "cholesterol_category",
+        "per_meal_limits": {"cholesterol": 100, "fat": 25},
+        "warn_nutrient": "cholesterol",
+        "warn_label": "High Cholesterol",
+        "daily_targets": {
+            "protein": 60.0, "carbs": 275.0, "fat": 55.0,
+            "sugar": 50.0, "sodium": 2000.0, "fiber": 30.0,
+        },
     },
     "Hypertension": {
-        "limit": {"sodium": 700},
-        "warnNutrient": "sodium",
-        "warnLabel": "High Sodium",
+        "category_column": "hypertension_category",
+        "per_meal_limits": {"sodium": 700},
+        "warn_nutrient": "sodium",
+        "warn_label": "High Sodium",
+        "daily_targets": {
+            "protein": 60.0, "carbs": 250.0, "fat": 55.0,
+            "sugar": 50.0, "sodium": 1500.0, "fiber": 30.0,
+        },
     },
+}
+
+CONDITION_RULES = {
+    name: {
+        "limit": cfg["per_meal_limits"],
+        "warnNutrient": cfg["warn_nutrient"],
+        "warnLabel": cfg["warn_label"],
+    }
+    for name, cfg in CONDITION_CONFIG.items()
 }
 
 MEAL_TYPES = ["breakfast", "lunch", "dinner", "snack"]

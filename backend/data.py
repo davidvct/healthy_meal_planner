@@ -55,6 +55,23 @@ _CONDITION_TO_CATEGORY_COL = {
     "High Cholesterol": "cholesterol_category",
 }
 
+_SERVINGS_RE = re.compile(r"(\d+)")
+
+
+def _parse_servings_count(value: Any) -> int:
+    """Extract the integer serving count from text like '8', '6 servings', '4 slices'.
+
+    Returns 1 if the value is missing, unparseable, or <= 0.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return 1
+    m = _SERVINGS_RE.search(text)
+    if m:
+        n = int(m.group(1))
+        return max(1, n)
+    return 1
+
 
 def _find_dataset_dir() -> Path | None:
     for candidate in _DATASET_CANDIDATES:
@@ -401,6 +418,9 @@ def load_seed_data() -> dict[str, Any]:
             meal_types = _derive_meal_types(row.get("category", ""))
             name = (row.get("name") or "").strip() or f"Recipe {idx}"
 
+            # Parse serving count (stored as metadata, nutrients are already per-serving)
+            servings_count = _parse_servings_count(row.get("servings"))
+
             dish_record = {
                 "id": dish_id,
                 "name": name,
@@ -408,7 +428,8 @@ def load_seed_data() -> dict[str, Any]:
                 "tags": tags,
                 "ingredients": ingredients,
                 "recipeId": recipe_id,
-                "baseServings": 1,
+                "baseServings": servings_count,
+                "servingsCount": servings_count,
                 "description": (row.get("description") or "").strip(),
                 "sourceUrl": (row.get("url") or "").strip(),
                 "imageUrl": (row.get("image_url") or "").strip(),
@@ -444,6 +465,7 @@ def load_seed_data() -> dict[str, Any]:
                 "cookTime": int(_parse_float(row.get("cook_time"))),
                 "steps": _parse_steps(row.get("instructions", "")),
                 "ingredients": ingredients,
+                "servingsCount": servings_count,
                 "calories": _parse_float(row.get("calories")),
                 "protein": _parse_float(row.get("protein")),
                 "fat": _parse_float(row.get("fat")),

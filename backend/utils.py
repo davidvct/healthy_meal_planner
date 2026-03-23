@@ -64,5 +64,20 @@ def parse_ingredients_map(value: Any) -> dict[str, float]:
     return items
 
 
+def parse_servings_yield(value: Any) -> int:
+    """Extract the integer serving count from the ``servings`` column.
+
+    Handles values like ``'12 cookies'``, ``'4 frozen waffles'``, ``'6'``, ``'8 servings'``.
+    Returns 1 if the value is None, empty, or contains no digits.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return 1
+    m = re.search(r"(\d+)", text)
+    if m:
+        return max(1, int(m.group(1)))
+    return 1
+
+
 def iso_now() -> str:
     return datetime.utcnow().isoformat() + "Z"

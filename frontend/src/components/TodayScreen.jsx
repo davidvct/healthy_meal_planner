@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import DayStrip from './DayStrip';
-import MealCard from './MealCard';
+import MealSlotCard from './MealSlotCard';
 import NutritionPanel from './NutritionPanel';
-import AutofillSettingsModal, { loadAutofillSettings } from './AutofillSettingsModal';
-import ThresholdSettingsModal from './ThresholdSettingsModal';
+import PlanSettingsModal from './PlanSettingsModal';
 import UpgradePromptModal from './UpgradePromptModal';
 import * as api from '../services/api';
 
@@ -241,15 +240,6 @@ function getDishHealthClass(dishDetail, conditions) {
   return worst === 'alert' ? 'mc-alert' : worst === 'warn' ? 'mc-warn' : 'mc-safe';
 }
 
-function formatAutofillViolations(violations) {
-  if (!violations?.length) return '';
-  return violations
-    .map((v) => {
-      const slot = v.mealType ? `Day ${v.dayIndex + 1} ${v.mealType}` : `Day ${v.dayIndex + 1}`;
-      return `- ${slot}: ${v.title}`;
-    })
-    .join('\n');
-}
 
 export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset: weekOffsetProp = 0, onWeekOffsetChange, initialDayIndex = null, onDayIndexChange, userTier = 'paid' }) {
   const [weekOffsetLocal, setWeekOffsetLocal] = useState(weekOffsetProp);
@@ -286,11 +276,11 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   const [copyingPlan, setCopyingPlan] = useState(false);
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [genProgress, setGenProgress] = useState(0); // 0-7 days completed
+  const [showAiPlanModal, setShowAiPlanModal] = useState(false);
+  const [aiDishesPerMeal, setAiDishesPerMeal] = useState({ breakfast: 1, lunch: 1, dinner: 1 });
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
-  const [showAutofillSettings, setShowAutofillSettings] = useState(false);
-  const [showThresholds, setShowThresholds] = useState(false);
-  const [autofilling, setAutofilling] = useState(false);
+  const [showPlanSettings, setShowPlanSettings] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState(null);
 
   const monday   = getMonday(addDays(new Date(), weekOffset * 7));
@@ -435,23 +425,25 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   }, []);
 
   const handleGeneratePlan = async () => {
+    setShowAiPlanModal(false);
     setGeneratingPlan(true);
     setGenProgress(0);
-    let totalAdded = 0;
     try {
-      for (let day = 0; day < 7; day++) {
-        const result = await api.generateMealPlan(userId, { weekStart, dayIndex: day });
-        if (result.success === false) {
-          showToast(result.error || 'Could not generate plan');
-          break;
-        }
-        totalAdded += result.entriesWritten || 0;
-        setGenProgress(day + 1);
+      const result = await api.generateMealPlan(userId, {
+        weekStart,
+        numDays: 7,
+        timeLimitSeconds: 30,
+        maxDishesPerSlot: aiDishesPerMeal,
+      });
+      if (result.success === false) {
+        showToast(result.error || 'Could not generate plan');
+      } else {
         const plan = await loadPlan();
         if (plan) loadDishDetails(plan);
+        await loadNutrients();
+        const added = result.entriesWritten || 0;
+        if (added > 0) showToast(`Week planned! ${added} meals added`);
       }
-      await loadNutrients();
-      if (totalAdded > 0) showToast(`Week planned! ${totalAdded} meals added`);
     } catch (err) {
       console.error('Plan generation failed:', err);
       showToast('Failed to generate plan');
@@ -461,59 +453,12 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
     }
   };
 
-  const handleAutofill = useCallback(async () => {
-    setAutofilling(true);
-    try {
-      const raw = loadAutofillSettings();
-      const settings = {
-        maxDishesPerSlot: raw.maxDishesPerSlot || 2,
-        maxCalories: raw.maxCalories ? parseFloat(raw.maxCalories) : null,
-        maxCarbs: raw.maxCarbs ? parseFloat(raw.maxCarbs) : null,
-        maxFat: raw.maxFat ? parseFloat(raw.maxFat) : null,
-      };
-      const [availableNutrients, savedThresholds] = await Promise.all([
-        api.getAvailableNutrients(),
-        api.getThresholds(userId),
-      ]);
-      const requiredKeys = ['calories', 'protein', 'carbs', 'fat'];
-      const thresholdMap = new Map(savedThresholds.map((item) => [item.nutrientKey, item]));
-      for (const key of requiredKeys) {
-        const nutrient = availableNutrients.find((item) => item.key === key);
-        const dailyValue = nutrient?.defaultDaily ?? null;
-        const existing = thresholdMap.get(key);
-        const hasUsableValue = existing && ((existing.dailyValue ?? null) !== null || (existing.perMealValue ?? null) !== null);
-        if (hasUsableValue) continue;
-        thresholdMap.set(key, { nutrientKey: key, dailyValue, perMealValue: dailyValue ? Math.round(dailyValue / 3) : null });
-      }
-      const thresholds = Array.from(thresholdMap.values());
-      const validation = await api.validateAutofillPlan(userId, weekStart, settings, thresholds);
-      let allowConstraintRelaxation = false;
-      if (validation.violations?.length) {
-        const warning = [
-          'Some existing meals violate hard constraints.',
-          'If you proceed, autofill will relax those constraints for existing meals only.',
-          '', formatAutofillViolations(validation.violations), '', 'Proceed anyway?',
-        ].join('\n');
-        if (!window.confirm(warning)) return;
-        allowConstraintRelaxation = true;
-      }
-      await api.autofillPlan(userId, weekStart, settings, thresholds, allowConstraintRelaxation);
-      const plan = await loadPlan();
-      if (plan) loadDishDetails(plan);
-      await loadNutrients();
-      showToast('Auto-fill complete!');
-    } catch (err) {
-      console.error('Auto-fill failed:', err);
-      const message = err?.message || 'Auto-fill failed.';
-      if (message.includes('No feasible meal plan found.')) {
-        window.alert('No feasible meal plan was found for the selected week and current constraints.');
-      } else {
-        window.alert(message);
-      }
-    } finally {
-      setAutofilling(false);
-    }
-  }, [userId, weekStart, loadPlan, loadNutrients, showToast]);
+  const handlePlanGenerated = useCallback(async () => {
+    const plan = await loadPlan();
+    if (plan) loadDishDetails(plan);
+    await loadNutrients();
+    showToast('Plan generated!');
+  }, [loadPlan, loadNutrients, showToast]);
 
   const handleRemove = async (entry) => {
     try {
@@ -522,6 +467,17 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
       await loadNutrients();
     } catch (err) {
       console.error('Failed to remove dish:', err);
+    }
+  };
+
+  const handleServingsChange = async (entryId, newServings) => {
+    try {
+      await api.updateEntryServings(userId, entryId, newServings);
+      const plan = await loadPlan();
+      if (plan) loadDishDetails(plan);
+      await loadNutrients();
+    } catch (err) {
+      console.error('Failed to update servings:', err);
     }
   };
 
@@ -624,29 +580,14 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
           </button>
         </div>
 
-        {/* Auto-fill & Threshold action buttons */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {/* Plan week button */}
+        <div style={{ marginBottom: 12 }}>
           <button
             className="af-action-btn af-btn-primary"
-            onClick={userTier === 'paid' ? handleAutofill : () => setUpgradeFeature('Auto-fill Week')}
-            disabled={autofilling}
+            onClick={userTier === 'paid' ? () => setShowPlanSettings(true) : () => setUpgradeFeature('Plan Week')}
             style={userTier !== 'paid' ? { opacity: 0.6 } : undefined}
           >
-            {userTier !== 'paid' && '🔒 '}{autofilling ? 'Filling…' : '⚡ Auto-fill week'}
-          </button>
-          <button
-            className="af-action-btn af-btn-secondary"
-            onClick={userTier === 'paid' ? () => setShowAutofillSettings(true) : () => setUpgradeFeature('Auto-fill Settings')}
-            style={userTier !== 'paid' ? { opacity: 0.6 } : undefined}
-          >
-            {userTier !== 'paid' ? '🔒' : '⚙'} Auto-fill Settings
-          </button>
-          <button
-            className="af-action-btn af-btn-secondary"
-            onClick={userTier === 'paid' ? () => setShowThresholds(true) : () => setUpgradeFeature('Nutrient Thresholds')}
-            style={userTier !== 'paid' ? { opacity: 0.6 } : undefined}
-          >
-            {userTier !== 'paid' ? '🔒' : '🎯'} Thresholds
+            {userTier !== 'paid' ? '🔒 ' : '⚡ '}Plan week
           </button>
         </div>
 
@@ -720,18 +661,18 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                         <span className="ewc-meal">Personalised to your health profile</span>
                       </div>
                     </div>
-                    <button className="ewc-btn ewc-btn-navy" disabled={generatingPlan} onClick={handleGeneratePlan}
+                    <button className="ewc-btn ewc-btn-navy" disabled={generatingPlan} onClick={() => setShowAiPlanModal(true)}
                       style={{ position: 'relative', overflow: 'hidden' }}>
                       {generatingPlan && (
                         <div style={{
                           position: 'absolute', left: 0, top: 0, bottom: 0,
-                          width: `${(genProgress / 7) * 100}%`,
+                          width: generatingPlan ? '100%' : '0%',
                           background: 'rgba(255,255,255,.18)',
                           transition: 'width .4s ease',
                         }} />
                       )}
                       <span style={{ position: 'relative' }}>
-                        {generatingPlan ? `Planning day ${genProgress + 1} of 7…` : 'Plan with AI ✨'}
+                        {generatingPlan ? 'Planning 7 days…' : 'Plan with AI ✨'}
                       </span>
                     </button>
                   </div>
@@ -746,20 +687,19 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                   const locked   = isSlotLocked(activeDate, mt);
 
                   if (entries.length > 0) {
-                    // Only show 1 meal card per slot (safety net)
-                    return entries.slice(0, 1).map(entry => (
-                      <MealCard
-                        key={entry.id}
-                        entry={entry}
+                    return (
+                      <MealSlotCard
+                        key={mt}
                         mealType={mt}
+                        entries={entries}
+                        dishDetails={dishDetails}
                         onRemove={locked ? undefined : handleRemove}
-                        onBrowse={locked ? undefined : () => onBrowse({ userId, dayIndex: activeDayIndex, mealType: mt, label: MEAL_LABELS[mt], weekStart })}
-                        dishDetail={dishDetails[entry.dishId]}
-                        healthClass={getDishHealthClass(dishDetails[entry.dishId], activeDiner?.conditions)}
+                        onBrowse={locked ? undefined : (ctx) => onBrowse({ ...ctx, weekStart })}
+                        onServingsChange={locked ? undefined : handleServingsChange}
                         userId={userId}
                         locked={locked}
                       />
-                    ));
+                    );
                   }
 
                   if (locked) {
@@ -813,9 +753,99 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
       )}
 
       {/* Modals */}
-      {showAutofillSettings && <AutofillSettingsModal onClose={() => setShowAutofillSettings(false)} />}
-      {showThresholds && <ThresholdSettingsModal userId={userId} onClose={() => setShowThresholds(false)} />}
+      {showPlanSettings && (
+        <PlanSettingsModal
+          userId={userId}
+          weekStart={weekStart}
+          onClose={() => setShowPlanSettings(false)}
+          onGenerated={handlePlanGenerated}
+        />
+      )}
       {upgradeFeature && <UpgradePromptModal featureName={upgradeFeature} onClose={() => setUpgradeFeature(null)} />}
+
+      {/* AI Plan — dishes per meal popout */}
+      {showAiPlanModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowAiPlanModal(false)}>
+          <div style={{
+            background: 'var(--coral-l)', borderRadius: 16, width: 380, maxWidth: '92vw',
+            boxShadow: '0 8px 32px rgba(6,155,142,0.25)', fontFamily: 'var(--font)',
+            overflow: 'hidden',
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{
+              background: 'var(--navy)', padding: '16px 20px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 2 }}>
+                  AI Planner
+                </div>
+                <div style={{ color: '#fff', fontSize: 16, fontWeight: 800 }}>
+                  Dishes per meal
+                </div>
+              </div>
+              <button onClick={() => setShowAiPlanModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', lineHeight: 1 }}>×</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '20px 20px 24px' }}>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 16, lineHeight: 1.4 }}>
+                Choose how many dishes the AI picks for each meal. Lunch and dinner with 2+ dishes will include 1 main course plus sides, soup, salad, or dessert.
+              </div>
+
+              {[
+                { key: 'breakfast', label: 'Breakfast', icon: '☀️' },
+                { key: 'lunch',     label: 'Lunch',     icon: '🌿' },
+                { key: 'dinner',    label: 'Dinner',    icon: '🌙' },
+              ].map(({ key, label, icon }) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <span style={{ width: 90, fontSize: 13, fontWeight: 700, color: 'var(--navy)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span>{icon}</span> {label}
+                  </span>
+                  <div style={{ display: 'flex', gap: 6, flex: 1 }}>
+                    {[1, 2, 3].map(n => (
+                      <button
+                        key={n}
+                        onClick={() => setAiDishesPerMeal(prev => ({ ...prev, [key]: n }))}
+                        style={{
+                          flex: 1, padding: '8px 0', borderRadius: 'var(--r-sm)', textAlign: 'center',
+                          border: `1.5px solid ${aiDishesPerMeal[key] === n ? 'var(--teal)' : 'var(--border)'}`,
+                          background: aiDishesPerMeal[key] === n ? 'var(--teal)' : 'var(--white)',
+                          color: aiDishesPerMeal[key] === n ? '#fff' : 'var(--text2)',
+                          fontWeight: 700, fontSize: 13, fontFamily: 'var(--font)', cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Generate button */}
+              <button
+                onClick={handleGeneratePlan}
+                disabled={generatingPlan}
+                style={{
+                  width: '100%', padding: 14, borderRadius: 'var(--r-sm)', border: 'none',
+                  background: generatingPlan ? 'var(--border)' : 'var(--navy)',
+                  color: generatingPlan ? 'var(--text3)' : '#fff',
+                  fontWeight: 800, fontSize: 14, fontFamily: 'var(--font)',
+                  cursor: generatingPlan ? 'default' : 'pointer',
+                  marginTop: 14, transition: 'all 0.15s',
+                }}
+              >
+                {generatingPlan ? 'Planning 7 days…' : 'Plan with AI ✨'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

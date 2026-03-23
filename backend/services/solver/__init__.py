@@ -1,23 +1,48 @@
-from .core import generate_meal_plan_for_week, solve_meal_plan, summarize_plan
+from .core import (
+    build_candidate_pools,
+    generate_meal_plan_for_week,
+    plan_result_to_entries,
+    solve_meal_plan,
+    summarize_plan,
+    _compute_recency_penalties,
+)
+from .inputs import load_solver_inputs_from_db
 from .models import (
+    DEFAULT_MEAL_CALORIE_RATIO,
+    DEFAULT_MEAL_SATIETY_RATIO,
     FixedMealAssignment,
     GeneratedMealPlanEntry,
+    MEALS,
+    MAX_RECIPES_PER_MEAL,
     MealGenerationResult,
     PlanResult,
+    PlannedRecipe,
     SolverConfig,
     SolverInputBundle,
+    SolverInputDiagnostics,
     SolverRecipe,
+    normalize_recipe,
 )
 
 __all__ = [
+    "DEFAULT_MEAL_CALORIE_RATIO",
+    "DEFAULT_MEAL_SATIETY_RATIO",
     "FixedMealAssignment",
     "GeneratedMealPlanEntry",
+    "MEALS",
+    "MAX_RECIPES_PER_MEAL",
     "MealGenerationResult",
     "PlanResult",
+    "PlannedRecipe",
     "SolverConfig",
     "SolverInputBundle",
+    "SolverInputDiagnostics",
     "SolverRecipe",
+    "build_candidate_pools",
     "generate_meal_plan_for_week",
+    "load_solver_inputs_from_db",
+    "normalize_recipe",
+    "plan_result_to_entries",
     "solve_meal_plan",
     "summarize_plan",
 ]

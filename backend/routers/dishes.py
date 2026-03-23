@@ -12,8 +12,9 @@ from ..services.nutrient_calculator import (
     get_dish_nutrients,
     load_ingredient_cache,
 )
+from ..services.profile_loader import load_user_profile
 from ..services.recommendation_engine import filter_dishes, get_warnings, score_dish
-from ..utils import get_current_week_start, parse_ingredients_map, parse_json, parse_float
+from ..utils import get_current_week_start, parse_ingredients_map, parse_json, parse_float, parse_servings_yield
 
 router = APIRouter(prefix="/dishes", tags=["dishes"])
 
@@ -23,6 +24,8 @@ def _norm_text(value: str) -> str:
 
 
 def _derive_meal_types(category: str) -> list[str]:
+    # Canonical implementation lives in services/dish_candidate.py; keep this
+    # local alias so existing callers in this file don't need updating.
     c = (category or "").lower()
     meal_types: list[str] = []
     if "breakfast" in c:
@@ -91,7 +94,6 @@ def _recipe_to_dish_row(recipe: dict[str, Any]) -> dict[str, Any]:
     recipe_id = str(recipe.get("id"))
     ingredients_map = parse_ingredients_map(recipe.get("ingredients"))
     allergies = _parse_csv_words(recipe.get("allergies") or "")
-
     return {
         "id": recipe_id,
         "name": recipe.get("name") or f"Recipe {recipe_id}",
@@ -147,25 +149,14 @@ def _dish_payload(row: dict[str, Any]) -> dict:
 
 
 def _load_user_profile(conn: Any, user_id: str) -> dict[str, Any] | None:
-    uid = str(user_id or "")
-    if uid.startswith("fm:"):
-        member_id = uid[3:]
-        member = conn.execute("SELECT * FROM family_members WHERE id::text = ?", (member_id,)).fetchone()
-        if not member:
-            return None
-        return {
-            "conditions": parse_json(member.get("conditions"), []),
-            "diet": member.get("dietary_prefs") or "none",
-            "allergies": parse_json(member.get("allergies"), []),
-        }
-
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-    if not user:
+    """Thin wrapper around the shared profile_loader for backward compat."""
+    profile = load_user_profile(conn, user_id)
+    if not profile:
         return None
     return {
-        "conditions": parse_json(user.get("conditions"), []),
-        "diet": user.get("diet") or user.get("dietary_habits") or "none",
-        "allergies": parse_json(user.get("allergies"), []),
+        "conditions": profile.conditions,
+        "diet": profile.diet,
+        "allergies": profile.allergies,
     }
 
 

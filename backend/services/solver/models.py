@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from ...utils import parse_float, parse_json
+from ...utils import parse_float, parse_json, parse_servings_yield
 
 MEALS = ("breakfast", "lunch", "dinner")
 SATIETY_NUTRIENTS = ("protein", "fiber")
@@ -38,7 +38,11 @@ def _derive_meal_types(category: str) -> tuple[str, ...]:
         meal_types.append("dinner")
     if any(token in text for token in ("main", "entree", "soup", "salad", "side")):
         meal_types.extend(["lunch", "dinner"])
-    if any(token in text for token in ("snack", "dessert", "drink", "beverage", "appetizer")):
+    # Appetizers, desserts, and beverages are valid for both lunch/dinner
+    # (as complementary items) and snack slots.
+    if any(token in text for token in ("appetizer", "dessert", "beverage", "drink")):
+        meal_types.extend(["lunch", "dinner", "snack"])
+    if "snack" in text:
         meal_types.append("snack")
     if not meal_types:
         meal_types = ["lunch", "dinner"]
@@ -108,7 +112,14 @@ class SolverRecipe:
     cholesterol: float = 0.0
     is_main_course: bool = False
     is_side_dish: bool = False
+    is_soup: bool = False
+    is_salad: bool = False
+    is_appetizer: bool = False
+    is_dessert: bool = False
+    is_snack: bool = False
+    is_beverage: bool = False
     is_favourite: bool = False
+    servings_yield: int = 1
 
 
 @dataclass(frozen=True)
@@ -121,9 +132,26 @@ class SolverConfig:
     main_course_min_servings: int = DEFAULT_MAIN_COURSE_MIN_SERVINGS
     main_course_max_servings: int = DEFAULT_MAIN_COURSE_MAX_SERVINGS
     time_limit_seconds: int = DEFAULT_SOLVER_TIME_LIMIT_SECONDS
-    max_recipes_per_meal: int = MAX_RECIPES_PER_MEAL
+    max_recipes_per_meal: int | dict[str, int] = MAX_RECIPES_PER_MEAL
     per_meal_nutrient_caps: dict[str, float] = field(default_factory=dict)
     favourite_boost: int = 50000
+    # Pre-computed health-aware preference weights keyed by recipe_id.
+    # Negative = preferred; positive = penalised.  Replaces the pure-random
+    # perturbation term when populated by load_solver_inputs_from_db().
+    preference_weights: dict[str, int] = field(default_factory=dict)
+    # Graduated soft penalties for "caution"/"moderation" dishes keyed by recipe_id.
+    # Added to the objective on top of preference_weights so the solver can still
+    # pick a caution dish when no better option exists, but prefers to avoid it.
+    condition_penalties: dict[str, int] = field(default_factory=dict)
+    # Cross-week recency penalties keyed by recipe_id.
+    # Penalises dishes used in recent weeks so plans vary over time.
+    recency_penalties: dict[str, int] = field(default_factory=dict)
+
+    def get_max_recipes(self, meal: str) -> int:
+        """Return the per-meal dish limit, resolving int or dict."""
+        if isinstance(self.max_recipes_per_meal, dict):
+            return max(1, self.max_recipes_per_meal.get(meal, MAX_RECIPES_PER_MEAL))
+        return max(1, self.max_recipes_per_meal)
 
     def __post_init__(self) -> None:
         if self.num_days < 1:
@@ -184,6 +212,9 @@ class SolverInputBundle:
     targets: dict[str, float]
     recipes: tuple[SolverRecipe, ...]
     candidates: dict[str, tuple[SolverRecipe, ...]]
+    # Profile-derived config carrying preference_weights / condition_penalties.
+    # generate_meal_plan_for_week() merges this with any caller-supplied config.
+    config: SolverConfig | None = None
     diagnostics: SolverInputDiagnostics | None = None
 
 
@@ -239,6 +270,17 @@ def normalize_recipe(record: dict[str, Any]) -> SolverRecipe:
     is_side_dish = bool(record.get("is_side_dish")) or _contains_any(
         category_lc, ("side dish", "side")
     ) or any(tag in {"side_dish", "side"} for tag in tags)
+    is_soup = _contains_any(category_lc, ("soup", "stew", "broth", "chowder"))
+    is_salad = _contains_any(category_lc, ("salad",))
+    is_appetizer = _contains_any(category_lc, ("appetizer", "starter"))
+    is_dessert = _contains_any(category_lc, ("dessert", "sweet", "cake", "pastry", "pie"))
+    is_snack = _contains_any(category_lc, ("snack",))
+    is_beverage = _contains_any(category_lc, ("beverage", "drink", "smoothie", "juice"))
+
+    # Parse servings yield (metadata only — nutrients are already per-serving)
+    servings_yield = parse_servings_yield(
+        record.get("servings_yield") or record.get("servingsCount") or record.get("servings")
+    )
 
     return SolverRecipe(
         recipe_id=recipe_id,
@@ -255,5 +297,12 @@ def normalize_recipe(record: dict[str, Any]) -> SolverRecipe:
         cholesterol=parse_float(record.get("cholesterol"), 0.0),
         is_main_course=is_main_course,
         is_side_dish=is_side_dish,
+        is_soup=is_soup,
+        is_salad=is_salad,
+        is_appetizer=is_appetizer,
+        is_dessert=is_dessert,
+        is_snack=is_snack,
+        is_beverage=is_beverage,
         is_favourite=bool(record.get("is_favourite")),
+        servings_yield=servings_yield,
     )

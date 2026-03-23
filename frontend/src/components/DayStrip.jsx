@@ -48,7 +48,11 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
           const isToday = new Date(date).setHours(0,0,0,0) === today.getTime();
           const past = isDayPast(date);
           const dayMeals = mealPlan?.[di] || {};
-          const dayKcal = Object.values(dayMeals).flat().reduce((s, e) => s + (e.kcal || 0), 0);
+          const dayKcal = Object.values(dayMeals).flat().reduce((s, e) => {
+            const perServing = e.kcal || 0;
+            const qty = e.servingsQty || 1;
+            return s + perServing * qty;
+          }, 0);
 
           return (
             <div
@@ -72,17 +76,40 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
                   const entries   = dayMeals[sl.key] || [];
                   const filled    = entries.length > 0;
                   const locked    = isSlotLocked(date, sl.key);
-                  const firstName = filled ? entries[0].dishName : null;
+                  const allNames  = entries.map(e => e.dishName).filter(Boolean);
+                  const tooltip   = allNames.join('\n');
                   return (
                     <div
                       key={sl.key}
                       className={`ds-slot ${sl.cls}${filled ? ' ds-filled' : ''}${locked && !filled ? ' ds-locked' : ''}`}
-                      title={filled ? firstName : locked ? 'Past deadline' : ''}
+                      title={filled ? tooltip : locked ? 'Past deadline' : ''}
                     >
                       <div className="ds-slot-ic">{locked && !filled ? '🔒' : sl.label}</div>
-                      <div className="ds-slot-name">
-                        {filled ? firstName : locked ? 'Closed' : 'Not planned'}
+                      <div className="ds-slot-name" style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {filled ? (
+                          <>
+                            {allNames.slice(0, 2).map((name, i) => (
+                              <span key={i} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', lineHeight: 1.2 }}>
+                                {name}
+                              </span>
+                            ))}
+                            {allNames.length > 2 && (
+                              <span style={{ fontSize: 8, opacity: 0.6, lineHeight: 1 }}>
+                                +{allNames.length - 2} more
+                              </span>
+                            )}
+                          </>
+                        ) : locked ? 'Closed' : 'Not planned'}
                       </div>
+                      {filled && entries.length > 1 && (
+                        <span style={{
+                          fontSize: 8, fontWeight: 700, background: 'rgba(0,0,0,0.08)',
+                          borderRadius: 6, padding: '0 4px', lineHeight: '14px',
+                          flexShrink: 0, marginLeft: 'auto',
+                        }}>
+                          {entries.length}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -90,7 +117,7 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
 
               {/* Footer kcal */}
               <div className="ds-card-footer">
-                {dayKcal ? `${dayKcal} kcal` : '—'}
+                {dayKcal ? `${Math.round(dayKcal)} kcal` : '—'}
               </div>
             </div>
           );

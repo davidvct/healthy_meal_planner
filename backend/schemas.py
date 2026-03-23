@@ -42,10 +42,11 @@ class NutrientThresholdItem(BaseModel):
 
 
 class AutofillSettings(BaseModel):
-    maxDishesPerSlot: int = 2
+    maxDishesPerSlot: int | dict[str, int] = 2
     maxCalories: float | None = None
     maxCarbs: float | None = None
     maxFat: float | None = None
+    mealCalorieRatio: dict[str, float] | None = None
 
 
 class AutofillBody(BaseModel):
@@ -111,3 +112,4 @@ class GeneratePlanBody(BaseModel):
     numDays: int = 7
     timeLimitSeconds: int = 10
     dayIndex: int | None = None  # generate for a single day only
+    maxDishesPerSlot: int | dict[str, int] = 1

@@ -608,11 +608,11 @@ def _seed_from_dataset(conn: DBConnection) -> None:
         """
         INSERT INTO recipes (
             id, name, prep_time, cook_time, category, keywords, ingredients, instructions,
-            description, url, image_url, calories, protein, fat, total_carbs, fiber, sugar, cholesterol, sodium,
+            description, url, image_url, servings, calories, protein, fat, total_carbs, fiber, sugar, cholesterol, sodium,
             is_vegetarian, is_vegan, is_low_carb, is_high_protein, is_spicy, is_sweet, is_salty,
             allergies, dietary_habits, hypertension_category, diabetes_category, cholesterol_category, gout_category
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -627,6 +627,7 @@ def _seed_from_dataset(conn: DBConnection) -> None:
                 "",
                 "",
                 r.get("imageUrl") or "",
+                str(r.get("servingsCount") or 1),
                 str(r.get("calories") or 0),
                 str(r.get("protein") or 0),
                 str(r.get("fat") or 0),

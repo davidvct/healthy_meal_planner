@@ -2,18 +2,28 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..constants import CONDITION_RULES, NUTRIENT_KEYS, RDA
+from ..constants import CONDITION_CONFIG, CONDITION_RULES, NUTRIENT_KEYS, RDA
 from ..utils import parse_json
 from .nutrient_calculator import get_day_nutrients, get_entry_nutrients, get_row_nutrients
 
-_CONDITION_CATEGORY_COLUMN = {
-    "Hypertension": "hypertension_category",
-    "High Blood Sugar": "diabetes_category",
-    "High Cholesterol": "cholesterol_category",
-}
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _dish_get(dish: Any, key: str, default: Any = None) -> Any:
+    """Unified field accessor that works for both dict rows and DishCandidate."""
+    if isinstance(dish, dict):
+        return dish.get(key, default)
+    return getattr(dish, key, default)
 
 
-def _condition_category_score(value: str | None) -> float:
+def condition_category_score(value: str | None) -> float:
+    """Map an NLP suitability label to a numeric score contribution.
+
+    ``"avoid"`` → −30, ``"caution"`` → −12, ``"moderation"`` → −6,
+    ``"suitable"`` → +6, unknown/None → 0.
+    """
     text = (value or "").strip().lower()
     if "avoid" in text:
         return -30.0
@@ -26,16 +36,21 @@ def _condition_category_score(value: str | None) -> float:
     return 0.0
 
 
+# Keep the private name for backward compat with any internal callers
+_condition_category_score = condition_category_score
+
+
 def get_warnings(
     nutrients: dict[str, float],
     conditions: list[str],
-    dish: dict[str, Any] | None = None,
+    dish: Any | None = None,
 ) -> list[str]:
     warnings: list[str] = []
     for condition in conditions:
-        category_col = _CONDITION_CATEGORY_COLUMN.get(condition)
-        if dish and category_col:
-            value = dish[category_col] if isinstance(dish, dict) else dish.get(category_col)
+        cfg = CONDITION_CONFIG.get(condition)
+        if dish and cfg:
+            category_col = cfg["category_column"]
+            value = _dish_get(dish, category_col)
             category_text = (value or "").strip().lower()
             if "avoid" in category_text or "caution" in category_text:
                 warnings.append(f"{condition}: {value}")
@@ -51,7 +66,7 @@ def get_warnings(
 
 
 def score_dish(
-    dish: dict[str, Any],
+    dish: Any,
     user_conditions: list[str],
     day_entries: list[dict[str, Any]],
     meal_type: str,
@@ -59,22 +74,23 @@ def score_dish(
     ingredient_cache: dict[str, list[float]],
     favourite_ids: set[str] | None = None,
 ) -> dict[str, int]:
-    dish_id = str(dish["id"] if isinstance(dish, dict) else dish.get("id"))
+    dish_id = str(_dish_get(dish, "id") or "")
     dish_id_alt = f"r{dish_id}" if not dish_id.startswith("r") else dish_id[1:]
-    meal_types = parse_json(
-        dish["meal_types"] if isinstance(dish, dict) else (dish.get("meal_types") or dish.get("mealTypes")),
-        [],
-    )
+
+    # meal_types may be a list, tuple, or JSON string
+    raw_meal_types = _dish_get(dish, "meal_types") or _dish_get(dish, "mealTypes")
+    meal_types = parse_json(raw_meal_types, []) if isinstance(raw_meal_types, (str, bytes)) else (raw_meal_types or [])
 
     dn = get_row_nutrients(dish)
     day_n = get_day_nutrients(day_entries, ingredient_cache)
 
     health_score = 60.0
     for condition in user_conditions:
-        category_col = _CONDITION_CATEGORY_COLUMN.get(condition)
-        if category_col:
-            category_val = dish[category_col] if isinstance(dish, dict) else dish.get(category_col)
-            health_score += _condition_category_score(category_val)
+        cfg = CONDITION_CONFIG.get(condition)
+        if cfg:
+            category_col = cfg["category_column"]
+            category_val = _dish_get(dish, category_col)
+            health_score += condition_category_score(category_val)
 
         rule = CONDITION_RULES.get(condition)
         if not rule:
@@ -105,13 +121,10 @@ def score_dish(
     nutrient_score = max(0, min(30, nutrient_score))
 
     pref_score = 0.0
-    count = len(
-        [
-            entry
-            for entry in all_week_entries
-            if str(entry["dish_id"]) in {dish_id, dish_id_alt}
-        ]
-    )
+    count = len([
+        entry for entry in all_week_entries
+        if str(entry["dish_id"]) in {dish_id, dish_id_alt}
+    ])
     pref_score += max(0, 5 - count * 2)
     pref_score += 5 if meal_type in meal_types else 1
     if favourite_ids and dish_id in favourite_ids:
@@ -128,14 +141,13 @@ def score_dish(
 
 _MEAL_TYPE_CATEGORY_MAP = {
     "breakfast": {"breakfast"},
-    "lunch":     {"main course", "soup", "salad", "side dish", "sauce", "basics", "condiment"},
-    "dinner":    {"main course", "soup", "salad", "side dish", "sauce", "basics", "condiment"},
+    "lunch":     {"main course", "soup", "salad", "side dish", "appetizer", "dessert", "beverage", "drink", "sauce", "basics", "condiment"},
+    "dinner":    {"main course", "soup", "salad", "side dish", "appetizer", "dessert", "beverage", "drink", "sauce", "basics", "condiment"},
     "snack":     {"snack", "dessert", "appetizer", "beverage", "drink", "smoothie", "dip"},
 }
 
 
 def _category_matches_meal_type(category: str, meal_type: str) -> bool:
-    """Check if a recipe's raw category matches the requested meal type."""
     allowed = _MEAL_TYPE_CATEGORY_MAP.get(meal_type)
     if not allowed:
         return True
@@ -144,7 +156,7 @@ def _category_matches_meal_type(category: str, meal_type: str) -> bool:
 
 
 def filter_dishes(
-    dishes: list[dict[str, Any]],
+    dishes: list[Any],
     user_profile: dict[str, Any],
     meal_type: str,
     ingredient_cache: dict[str, list[float]],
@@ -154,14 +166,36 @@ def filter_dishes(
     filter_allergies: bool = True,
     filter_conditions: bool = True,
     sub_category: str | None = None,
-) -> list[dict[str, Any]]:
-    filtered: list[dict[str, Any]] = []
+) -> list[Any]:
+    """Filter a list of dish dicts or DishCandidate objects.
+
+    Accepts both legacy dict rows (from ``dishes.py``) and the new
+    ``DishCandidate`` objects (from ``solver/inputs.py``).  Field access is
+    normalised through ``_dish_get`` so both shapes work transparently.
+    """
+    filtered: list[Any] = []
 
     for dish in dishes:
-        ingredients = parse_json(dish["ingredients"], {})
-        tags = parse_json(dish["tags"], [])
-        dish_allergies = parse_json(dish["allergies"], [])
+        # --- Resolve fields (dict or DishCandidate) ---
+        raw_ingredients = _dish_get(dish, "ingredients", {})
+        ingredients: dict[str, float] = (
+            parse_json(raw_ingredients, {}) if isinstance(raw_ingredients, (str, bytes))
+            else (raw_ingredients or {})
+        )
+        raw_tags = _dish_get(dish, "tags", [])
+        tags: list[str] = (
+            parse_json(raw_tags, []) if isinstance(raw_tags, (str, bytes))
+            else list(raw_tags or [])
+        )
+        raw_allergies = _dish_get(dish, "allergies", [])
+        dish_allergies: list[str] = (
+            parse_json(raw_allergies, []) if isinstance(raw_allergies, (str, bytes))
+            else list(raw_allergies or [])
+        )
+        diet_label = str(_dish_get(dish, "diet_label", "none") or "none")
+        category = str(_dish_get(dish, "category", "") or "")
 
+        # --- Allergy filter ---
         if filter_allergies and user_profile.get("allergies"):
             allergies = [a.strip().lower() for a in user_profile.get("allergies", []) if str(a).strip()]
             ingredient_hits = [ing.strip().lower() for ing in ingredients.keys()]
@@ -178,34 +212,41 @@ def filter_dishes(
             if blocked:
                 continue
 
+        # --- Diet filter ---
         if filter_diet and user_profile.get("diet") != "none":
             diet = (user_profile.get("diet") or "none").strip().lower()
-            dish_diet = (dish["diet_label"] or "none").strip().lower()
+            dish_diet = diet_label.strip().lower()
             if diet == "vegetarian" and "vegetarian" not in tags and dish_diet not in {"vegetarian", "vegan"}:
                 continue
             if diet == "vegan" and "vegan" not in tags and dish_diet != "vegan":
                 continue
 
-            # Check ingredient keys for substring matches (keys are full strings like "8-10 slices bacon")
             ing_keys_lower = " ".join(k.lower() for k in ingredients.keys())
-            if diet == "pescatarian" and any(x in ing_keys_lower for x in ["beef", "pork", "chicken", "lamb", "turkey", "duck", "veal"]):
+            if diet == "pescatarian" and any(
+                x in ing_keys_lower for x in ["beef", "pork", "chicken", "lamb", "turkey", "duck", "veal"]
+            ):
                 continue
-            if diet == "halal" and any(x in ing_keys_lower for x in ["pork", "ham", "bacon", "lard", "prosciutto", "pancetta", "chorizo"]):
+            if diet == "halal" and any(
+                x in ing_keys_lower for x in ["pork", "ham", "bacon", "lard", "prosciutto", "pancetta", "chorizo"]
+            ):
                 continue
 
-        if filter_meal_type and not _category_matches_meal_type(dish.get("category") or "", meal_type):
+        # --- Meal-type filter ---
+        if filter_meal_type and not _category_matches_meal_type(category, meal_type):
             continue
 
-        if sub_category and sub_category.lower() not in (dish.get("category") or "").lower():
+        if sub_category and sub_category.lower() not in category.lower():
             continue
 
+        # --- Condition filter ---
         if filter_conditions and user_profile.get("conditions"):
             blocked = False
             for condition in user_profile["conditions"]:
-                category_col = _CONDITION_CATEGORY_COLUMN.get(condition)
-                if not category_col:
+                cfg = CONDITION_CONFIG.get(condition)
+                if not cfg:
                     continue
-                category_text = (dish[category_col] or "").strip().lower()
+                category_col = cfg["category_column"]
+                category_text = str(_dish_get(dish, category_col) or "").strip().lower()
                 if "avoid" in category_text:
                     blocked = True
                     break
@@ -214,7 +255,7 @@ def filter_dishes(
 
             nutrients = get_row_nutrients(dish)
             if get_warnings(nutrients, user_profile["conditions"], dish):
-                # Keep "caution" dishes but remove extreme offenders by nutrient threshold.
+                # Keep "caution" dishes; only drop severe nutrient offenders.
                 severe = False
                 for condition in user_profile["conditions"]:
                     rule = CONDITION_RULES.get(condition)
@@ -242,5 +283,3 @@ def get_entry_warnings(
 ) -> list[str]:
     nutrients = get_entry_nutrients(entry, ingredient_cache)
     return get_warnings(nutrients, conditions)
-
-

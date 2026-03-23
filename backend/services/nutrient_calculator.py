@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..constants import NUTRIENT_KEYS, RDA
-from ..utils import parse_float, parse_json
+from ..utils import parse_float, parse_json, parse_servings_yield
 
 
 def _blank_nutrients() -> dict[str, float]:
@@ -41,25 +41,39 @@ def get_nutrients_from_ingredients(
     return {k: round(v, 1) for k, v in nutrients.items()}
 
 
-def get_row_nutrients(row: dict[str, Any], servings: float = 1.0) -> dict[str, float]:
-    # Uses direct per-dish nutrients loaded from recipes_nlp_tagged.csv.
+def get_row_nutrients(row: Any, servings: float = 1.0) -> dict[str, float]:
+    """Compute per-entry nutrients from a recipe/meal-plan row.
+
+    DB nutrient values are total-recipe.  We divide by the recipe yield
+    (``recipe_servings`` column from JOIN, or ``servings`` on standalone
+    recipe rows) to get *per-serving*, then multiply by ``servings``
+    (the meal-plan portion count) to get the entry total.
+    """
     s = float(servings)
 
     def _get(name: str) -> float:
         if isinstance(row, dict):
             val = row[name] if name in row.keys() else 0
             return parse_float(val, 0.0)
-        return parse_float(row.get(name, 0), 0.0)
+        return parse_float(getattr(row, name, 0), 0.0)
+
+    # recipe_servings comes from the JOIN (r.servings AS recipe_servings).
+    # Fall back to servings for standalone recipe rows (where servings IS the yield).
+    if isinstance(row, dict):
+        rs_raw = row.get("recipe_servings")
+    else:
+        rs_raw = getattr(row, "recipe_servings", None)
+    recipe_yield = float(parse_servings_yield(rs_raw))
 
     nutrients = {
-        "calories": _get("calories") * s,
-        "protein": _get("protein") * s,
-        "carbs": _get("carbs") * s,
-        "fat": _get("fat") * s,
-        "fiber": _get("fiber") * s,
-        "sodium": _get("sodium") * s,
-        "cholesterol": _get("cholesterol") * s,
-        "sugar": _get("sugar") * s,
+        "calories": _get("calories") / recipe_yield * s,
+        "protein": _get("protein") / recipe_yield * s,
+        "carbs": _get("carbs") / recipe_yield * s,
+        "fat": _get("fat") / recipe_yield * s,
+        "fiber": _get("fiber") / recipe_yield * s,
+        "sodium": _get("sodium") / recipe_yield * s,
+        "cholesterol": _get("cholesterol") / recipe_yield * s,
+        "sugar": _get("sugar") / recipe_yield * s,
     }
     return {k: round(v, 1) for k, v in nutrients.items()}
 

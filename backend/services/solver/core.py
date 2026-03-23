@@ -125,12 +125,18 @@ def _apply_constraints(
                     key = (day, meal, recipe.recipe_id)
                     model.Add(servings[key] <= MAX_SERVINGS_PER_RECIPE * x[key])
                     model.Add(servings[key] >= MIN_SERVINGS_PER_SELECTED * x[key])
-                model.Add(sum(x[(day, meal, r.recipe_id)] for r in meal_recipes) <= config.max_recipes_per_meal)
+                meal_max = config.get_max_recipes(meal)
+                model.Add(sum(x[(day, meal, r.recipe_id)] for r in meal_recipes) <= meal_max)
                 model.Add(sum(x[(day, meal, r.recipe_id)] for r in meal_recipes) >= 1)
 
                 main_ids = [r.recipe_id for r in meal_recipes if r.is_main_course]
                 if meal in ("lunch", "dinner") and main_ids:
+                    # At least 1 main course required for lunch/dinner
                     model.Add(sum(x[(day, meal, rid)] for rid in main_ids) >= 1)
+                    # When multiple dishes per meal, cap main courses at 1 so
+                    # remaining slots go to sides/soup/salad/appetizer/dessert
+                    if meal_max >= 2:
+                        model.Add(sum(x[(day, meal, rid)] for rid in main_ids) <= 1)
 
 
 def _build_objective(
@@ -258,24 +264,77 @@ def _build_objective(
         model.Add(total_uses - 1 <= excess)
         terms.append(excess * 300000)
 
-    # --- Random perturbation per recipe for variety across solves ---
-    seen_perturbed: set[str] = set()
+    # --- Preference weights (health score, favourites, small variety noise) ---
+    # When preference_weights are provided by load_solver_inputs_from_db(), they
+    # encode condition-category health scores × 3000 plus favourite boost −50 000
+    # plus a small noise ±5 000.  This replaces the old pure-random ±500 000
+    # perturbation while keeping a weaker randomness signal for variety.
+    # Falls back to pure-random + favourite_boost when weights are absent (e.g.
+    # when SolverConfig is built manually without calling load_solver_inputs_from_db).
+    seen_weighted: set[str] = set()
     for day in range(config.num_days):
         for meal in MEALS:
             for r in candidates[meal]:
-                if r.recipe_id not in seen_perturbed:
-                    seen_perturbed.add(r.recipe_id)
-                    # Random bonus/penalty per recipe — large enough to swap
-                    # between similarly-scored alternatives (~30% of objective)
-                    perturbation = random.randint(-500000, 500000)
-                    terms.append(perturbation * x[(day, meal, r.recipe_id)])
+                if r.recipe_id not in seen_weighted:
+                    seen_weighted.add(r.recipe_id)
+                    if config.preference_weights:
+                        weight = config.preference_weights.get(r.recipe_id, 0)
+                    else:
+                        # Backward-compat: pure random + favourite boost
+                        weight = random.randint(-500000, 500000)
+                        if r.is_favourite:
+                            weight -= config.favourite_boost
+                    terms.append(weight * x[(day, meal, r.recipe_id)])
 
-    # --- Favourite boost ---
-    for day in range(config.num_days):
-        for meal in MEALS:
-            for r in candidates[meal]:
-                if r.is_favourite:
-                    terms.append(-config.favourite_boost * x[(day, meal, r.recipe_id)])
+    # --- Condition penalties for caution / moderation dishes ---
+    # These are soft costs; the solver may still pick penalised dishes when no
+    # unpenalised candidate satisfies the hard nutrient constraints.
+    if config.condition_penalties:
+        seen_penalized: set[str] = set()
+        for day in range(config.num_days):
+            for meal in MEALS:
+                for r in candidates[meal]:
+                    if r.recipe_id not in seen_penalized and r.recipe_id in config.condition_penalties:
+                        seen_penalized.add(r.recipe_id)
+                        terms.append(config.condition_penalties[r.recipe_id] * x[(day, meal, r.recipe_id)])
+
+    # --- Cross-week recency penalty: discourage dishes used in recent weeks ---
+    if config.recency_penalties:
+        seen_recency: set[str] = set()
+        for day in range(config.num_days):
+            for meal in MEALS:
+                for r in candidates[meal]:
+                    if r.recipe_id not in seen_recency and r.recipe_id in config.recency_penalties:
+                        seen_recency.add(r.recipe_id)
+                        terms.append(config.recency_penalties[r.recipe_id] * x[(day, meal, r.recipe_id)])
+
+    # --- Sub-category variety bonus (multi-dish meals) ---
+    # When max_recipes_per_meal >= 2, reward picking dishes from different
+    # sub-categories within the same slot to encourage balanced meals
+    # (e.g. main + soup, main + salad, main + side, main + dessert).
+    if any(config.get_max_recipes(m) >= 2 for m in ("lunch", "dinner")):
+        _SUB_CATS = {
+            "side": lambda r: r.is_side_dish,
+            "soup": lambda r: r.is_soup,
+            "salad": lambda r: r.is_salad,
+            "appetizer": lambda r: r.is_appetizer,
+            "dessert": lambda r: r.is_dessert,
+            "snack": lambda r: r.is_snack,
+            "beverage": lambda r: r.is_beverage,
+        }
+        for day in range(config.num_days):
+            for meal in ("lunch", "dinner"):
+                cats_present: list[Any] = []
+                for cat_name, cat_fn in _SUB_CATS.items():
+                    cat_ids = [r.recipe_id for r in candidates[meal] if cat_fn(r)]
+                    if cat_ids:
+                        has_cat = model.NewBoolVar(f"has_{cat_name}_d{day}_{meal}")
+                        model.Add(sum(x[(day, meal, rid)] for rid in cat_ids) >= 1).OnlyEnforceIf(has_cat)
+                        model.Add(sum(x[(day, meal, rid)] for rid in cat_ids) == 0).OnlyEnforceIf(has_cat.Not())
+                        cats_present.append(has_cat)
+                # Reward variety: more distinct sub-categories = better
+                if cats_present:
+                    terms.append(-sum(cats_present) * 25000)
 
     # --- Satiety (protein + fiber) maximization ---
     satiety_terms: list[Any] = []
@@ -414,17 +473,73 @@ def plan_result_to_entries(
     return tuple(entries)
 
 
+def _compute_recency_penalties(
+    conn: Any,
+    patient_id: str,
+    current_week_start: str | None,
+    lookback_weeks: int = 3,
+) -> dict[str, int]:
+    """Query dishes used in recent weeks and return recency penalties.
+
+    More recent usage → higher penalty.  Week-1 = 150k, Week-2 = 100k, Week-3 = 50k.
+    """
+    if not current_week_start:
+        return {}
+    from datetime import date, timedelta
+
+    try:
+        ws_date = date.fromisoformat(current_week_start)
+    except (ValueError, TypeError):
+        return {}
+
+    penalties: dict[str, int] = {}
+    for weeks_ago in range(1, lookback_weeks + 1):
+        past_ws = (ws_date - timedelta(weeks=weeks_ago)).isoformat()
+        rows = conn.execute(
+            "SELECT DISTINCT dish_id FROM meal_plans WHERE user_id = ? AND week_start = ?",
+            (patient_id, past_ws),
+        ).fetchall()
+        # Closer weeks get a heavier penalty
+        weight = int(150000 / weeks_ago)
+        for row in rows:
+            rid = str(row["dish_id"]).removeprefix("r")
+            penalties[rid] = penalties.get(rid, 0) + weight
+    return penalties
+
+
 def generate_meal_plan_for_week(
     conn: Any,
     *,
     patient_id: str,
     week_start: str | None = None,
     config: SolverConfig | None = None,
-    fixed_assignments: list[FixedMealAssignment] | None = None,
+    fixed_assignments: list[FixedMealAssignment] | tuple[FixedMealAssignment, ...] | None = None,
     exclude_recipe_ids: set[str] | None = None,
+    targets_override: dict[str, float] | None = None,
 ) -> MealGenerationResult:
     inputs = load_solver_inputs_from_db(conn, patient_id)
-    solver_targets = dict(inputs.targets)
+    solver_targets = dict(targets_override or inputs.targets)
+
+    # Compute cross-week recency penalties
+    recency_penalties = _compute_recency_penalties(conn, patient_id, week_start)
+
+    # Merge preference weights from the profile-derived config with any
+    # caller-supplied config overrides.  Caller config takes precedence for
+    # structural settings (num_days, time_limit, etc.) while the profile-derived
+    # weights always provide the health-aware preference signal.
+    if config is not None and inputs.config is not None:
+        from dataclasses import replace
+        effective_config = replace(
+            config,
+            preference_weights=inputs.config.preference_weights,
+            condition_penalties=inputs.config.condition_penalties,
+            recency_penalties=recency_penalties,
+        )
+    else:
+        effective_config = config or inputs.config
+        if effective_config and recency_penalties:
+            from dataclasses import replace
+            effective_config = replace(effective_config, recency_penalties=recency_penalties)
 
     # Filter out recipes already used on other days (single-day mode)
     recipes = list(inputs.recipes)
@@ -437,7 +552,7 @@ def generate_meal_plan_for_week(
         patient_id=inputs.patient_id,
         targets=solver_targets,
         recipes=recipes,
-        config=config,
+        config=effective_config,
         fixed_assignments=fixed_assignments,
     ))
     selected_plan = plans[0]

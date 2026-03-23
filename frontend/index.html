@@ -82,11 +82,11 @@
     .ds-card.on .ds-card-day{color:rgba(255,255,255,.5)}
     .ds-card-date{font-size:18px;font-weight:800;color:var(--text);line-height:1}
     .ds-card.on .ds-card-date{color:#fff}
-    .ds-card-body{padding:3px 0}
+    .ds-card-body{padding:4px 0}
     /* Meal slots */
-    .ds-slot{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--border)}
+    .ds-slot{display:flex;align-items:flex-start;gap:6px;padding:9px 10px;border-bottom:1px solid var(--border);min-height:36px}
     .ds-slot:last-child{border-bottom:none}
-    .ds-slot-ic{font-size:9px;font-weight:800;width:12px;flex-shrink:0;text-transform:uppercase;color:var(--text2)}
+    .ds-slot-ic{font-size:9px;font-weight:800;width:12px;flex-shrink:0;text-transform:uppercase;color:var(--text2);margin-top:2px}
     .ds-slot-name{font-size:11px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;flex:1;font-style:italic;line-height:1.35;color:var(--text3)}
     .ds-slot.ds-filled .ds-slot-ic{color:var(--teal)}
     .ds-slot.ds-filled .ds-slot-name{font-style:normal;font-weight:500;color:var(--text2)}
@@ -101,7 +101,7 @@
     .ds-l.ds-filled .ds-slot-name{color:#064E3B}
     .ds-d.ds-filled .ds-slot-name{color:#1E3A8A}
     .ds-b.ds-filled .ds-slot-ic,.ds-l.ds-filled .ds-slot-ic,.ds-d.ds-filled .ds-slot-ic{color:var(--teal)}
-    .ds-card-footer{padding:4px 9px;border-top:1px solid var(--border);font-size:10px;font-weight:600;color:var(--text2);text-align:right}
+    .ds-card-footer{padding:6px 9px;border-top:1px solid var(--border);font-size:10px;font-weight:600;color:var(--text2);text-align:right}
     /* Past days — grayed out */
     .ds-card.ds-past{opacity:.5;pointer-events:auto}
     .ds-card.ds-past .ds-card-hdr{background:var(--bg)}
@@ -143,7 +143,7 @@
     .mpb-label{font-size:11px;font-weight:500;color:var(--text2)}
     .today-grid{display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start;transition:grid-template-columns .3s ease}
     .today-grid.nut-collapsed{grid-template-columns:1fr 0px}
-    .meal-cards{display:flex;flex-direction:column;gap:10px}
+    .meal-cards{display:flex;flex-direction:column;gap:12px}
     .nut-panel-wrap{display:flex;flex-direction:column;gap:14px;transition:opacity .25s ease,transform .25s ease}
     .nut-panel-wrap.collapsed{opacity:0;pointer-events:none;transform:translateX(12px)}
     .nut-toggle-col{display:flex;flex-direction:column;gap:14px;min-width:0;overflow:hidden}

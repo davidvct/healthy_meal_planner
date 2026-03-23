@@ -164,15 +164,22 @@ export async function removeDishFromPlan(userId, entryId) {
   return request(`/mealplan/${userId}/remove/${entryId}`, { method: "DELETE" });
 }
 
+export async function updateEntryServings(userId, entryId, servings) {
+  return request(`/mealplan/${userId}/entry/${entryId}/servings`, {
+    method: "PATCH",
+    body: JSON.stringify({ servings }),
+  });
+}
+
 export async function clearWeekMealPlan(userId, weekStart) {
   const params = weekStart ? `?weekStart=${encodeURIComponent(weekStart)}` : "";
   return request(`/mealplan/${userId}/clear${params}`, { method: "DELETE" });
 }
 
-export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLimitSeconds = 10, dayIndex } = {}) {
+export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLimitSeconds = 10, dayIndex, maxDishesPerSlot } = {}) {
   return request(`/mealplan/${userId}/generate`, {
     method: "POST",
-    body: JSON.stringify({ weekStart, numDays, timeLimitSeconds, dayIndex: dayIndex ?? null }),
+    body: JSON.stringify({ weekStart, numDays, timeLimitSeconds, dayIndex: dayIndex ?? null, maxDishesPerSlot: maxDishesPerSlot ?? 1 }),
   });
 }
 
