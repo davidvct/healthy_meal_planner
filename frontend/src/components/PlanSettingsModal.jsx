@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import * as api from "../services/api";
+import { trackPlanRejectedConstraint } from "../services/analytics";
 
 /* ─── constants ─────────────────────────────────────────────────── */
 
@@ -246,7 +247,7 @@ export default function PlanSettingsModal({ userId, weekStart, onClose, onGenera
           "",
           "Relax these constraints for existing meals and proceed?",
         ].join("\n");
-        if (!window.confirm(msg)) { setGenerating(false); return; }
+        if (!window.confirm(msg)) { trackPlanRejectedConstraint(validation.violations); setGenerating(false); return; }
         allowRelaxation = true;
       }
 
@@ -270,7 +271,7 @@ export default function PlanSettingsModal({ userId, weekStart, onClose, onGenera
       display: "flex", alignItems: "center", justifyContent: "center",
     },
     card: {
-      background: "var(--coral-l)", borderRadius: 16, padding: 0, width: 460, maxWidth: "94vw",
+      background: "var(--white)", borderRadius: 16, padding: 0, width: "min(460px, 94vw)",
       maxHeight: "90vh", overflowY: "auto",
       boxShadow: "0 8px 32px rgba(6,155,142,0.25)", fontFamily: "var(--font)",
     },

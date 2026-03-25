@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import * as api from "../services/api";
+import { trackSignUpCompleted } from "../services/analytics";
 
 function hasUppercase(password) { return /[A-Z]/.test(password); }
 function hasNumber(password) { return /\d/.test(password); }
@@ -75,6 +76,7 @@ export default function AuthScreen({ onAuthenticated }) {
     setError(""); setMessage(""); setLoading(true);
     try {
       await api.registerWithOtp(email, verificationToken, password);
+      trackSignUpCompleted();
       setMode("login"); setLoginPassword("");
       setMessage("Registration successful. Please log in with your password.");
     } catch (err) {
@@ -94,7 +96,7 @@ export default function AuthScreen({ onAuthenticated }) {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", justifyContent: "center", alignItems: "center", padding: 20 }}>
-      <div style={{ width: "100%", maxWidth: 460 }}>
+      <div style={{ width: "min(460px, 92vw)" }}>
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, marginBottom: 6 }}>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../services/api';
+import { trackFilterApplied, trackDishAdded } from '../services/analytics';
 
 const DIET_FILTERS = [
   { id: 'any',          label: 'All' },
@@ -366,6 +367,7 @@ export default function DiscoverScreen({ slotCtx, userId, activeDiner, onBack, o
         servings:  1,
         weekStart: slotCtx.weekStart,
       });
+      trackDishAdded(slotCtx.mealType, dish.name || dishId);
       onAdded();
     } catch (err) {
       console.error('Failed to add dish:', err);
@@ -458,7 +460,7 @@ export default function DiscoverScreen({ slotCtx, userId, activeDiner, onBack, o
         )}
 
         {/* 4-column filter grid with visual grouping */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, alignItems: 'start' }}>
+        <div className="disc-filter-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, alignItems: 'start' }}>
 
           {/* Col 1: Diet */}
           <div style={{ background: 'var(--bg)', borderRadius: 8, padding: '8px 10px' }}>
@@ -470,7 +472,7 @@ export default function DiscoverScreen({ slotCtx, userId, activeDiner, onBack, o
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
               {DIET_FILTERS.filter(d => d.id !== 'any').map(d => (
                 <div key={d.id} className={`disc-fchip${dietFilter === d.id ? ' diet-active' : ''}`}
-                  onClick={() => setDietFilter(dietFilter === d.id ? 'any' : d.id)}
+                  onClick={() => { const next = dietFilter === d.id ? 'any' : d.id; setDietFilter(next); if (next !== 'any') trackFilterApplied('diet', next); }}
                   style={{ fontSize: 11, padding: '4px 8px' }}>{d.label}</div>
               ))}
             </div>

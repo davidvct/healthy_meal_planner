@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import NutritionChart from './NutritionChart';
 import DateRangePicker from './DateRangePicker';
 import * as api from '../services/api';
+import { trackProfileSaved, trackConditionChanged, trackDinerAdded, trackDinerRemoved } from '../services/analytics';
 
 const AV_CLASSES = ['dcav-t', 'dcav-p', 'dcav-b'];
 
@@ -242,6 +243,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
     if (!confirm(`Delete ${diner.name}? This cannot be undone.`)) return;
     try {
       await api.deleteDiner(diner.userId);
+      trackDinerRemoved();
       onDinersChanged();
     } catch (err) {
       console.error('Delete failed:', err);

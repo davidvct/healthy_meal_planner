@@ -61,11 +61,10 @@ export default function AutofillSettingsModal({ onClose }) {
     >
       <div
         style={{
-          background: "#FEF0EB",
+          background: "var(--white)",
           borderRadius: 16,
-          padding: 28,
-          width: 380,
-          maxWidth: "90vw",
+          padding: "clamp(16px, 4vw, 28px)",
+          width: "min(380px, 92vw)",
           boxShadow: "0 8px 32px rgba(6,155,142,0.25)",
           fontFamily: "var(--font)",
         }}

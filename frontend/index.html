@@ -554,6 +554,194 @@
     .fv-d4{background:linear-gradient(135deg,#FCE7F3,#FBCFE8)}
     .fv-d5{background:linear-gradient(135deg,#EDE9FE,#DDD6FE)}
     .fv-d6{background:linear-gradient(135deg,#FEF3C7,#FCA5A5)}
+
+    /* ══════════════════════════════════════════════════
+       RESPONSIVE DESIGN — Mobile-first overrides
+       ══════════════════════════════════════════════════ */
+
+    /* ── Tablet (≤ 1024px) ── */
+    @media (max-width: 1024px) {
+      /* Today layout: narrower nutrition sidebar */
+      .today-grid { grid-template-columns: 1fr 280px; gap: 12px }
+      .today-grid.nut-collapsed { grid-template-columns: 1fr 0px }
+
+      /* Shopping: narrower sidebar */
+      .shop-layout { grid-template-columns: 130px 1fr }
+
+      /* Day strip cards: more compact */
+      .ds-card-hdr { padding: 8px 8px 6px }
+      .ds-slot { padding: 5px 7px; min-height: 36px }
+      .ds-slot-name { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+
+      /* Recipe grid: smaller minimum */
+      .recipe-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px }
+    }
+
+    /* ── Small tablet / landscape phone (≤ 820px) ── */
+    @media (max-width: 820px) {
+      /* Stack main layout to single column */
+      .today-grid { grid-template-columns: 1fr !important; gap: 10px }
+      .nut-panel-wrap.collapsed { display: none }
+
+      /* Calendar: horizontal scroll instead of cramped 7-col grid */
+      .ds-scroll { grid-template-columns: repeat(7, 140px); overflow-x: auto; -webkit-overflow-scrolling: touch; gap: 6px; padding-bottom: 4px }
+      .ds-scroll::-webkit-scrollbar { height: 3px }
+      .ds-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px }
+      .ds-wrap { padding: 12px; margin-bottom: 12px }
+
+      /* Compact day strip header */
+      .ds-hdr { flex-direction: column; gap: 8px }
+      .ds-nav { align-self: stretch; justify-content: space-between }
+      .ds-week-pill { min-width: auto; flex: 1; justify-content: center }
+
+      /* Shopping sidebar: horizontal tabs */
+      .shop-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr }
+      .shop-sidebar { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border) }
+      .shop-sidebar-item { border-left: none; border-bottom: 3px solid transparent; padding: 8px 10px; white-space: nowrap; flex-shrink: 0 }
+      .shop-sidebar-item.active { border-left-color: transparent; border-bottom-color: var(--teal) }
+      .shop-si-bar { display: none }
+    }
+
+    /* ── Mobile (≤ 600px) ── */
+    @media (max-width: 600px) {
+      /* Body: allow scrolling */
+      html, body { overflow: auto; overflow-x: hidden }
+
+      /* --- Layout: stack everything vertically --- */
+      .today-grid { grid-template-columns: 1fr !important; gap: 10px }
+      .nut-panel-wrap { order: -1 }  /* Nutrition summary above meals */
+      .nut-panel-wrap.collapsed { display: none }  /* Truly hide, don't just fade */
+
+      /* Shopping: stack sidebar above items */
+      .shop-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr }
+      .shop-sidebar { flex-direction: row; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border) }
+      .shop-sidebar-item { border-left: none; border-bottom: 3px solid transparent; padding: 8px 10px; white-space: nowrap; flex-shrink: 0 }
+      .shop-sidebar-item.active { border-left-color: transparent; border-bottom-color: var(--teal) }
+      .shop-si-bar { display: none }
+
+      /* --- Day strip: horizontal scroll --- */
+      .ds-scroll { grid-template-columns: repeat(7, 120px); overflow-x: auto; gap: 6px; padding-bottom: 6px; -webkit-overflow-scrolling: touch }
+      .ds-scroll::-webkit-scrollbar { height: 3px }
+      .ds-scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px }
+      .ds-wrap { padding: 12px; margin-bottom: 12px }
+      .ds-card { min-width: 0 }
+      .ds-slot { min-height: 36px; padding: 5px 7px }
+      .ds-slot-name { font-size: 10px }
+
+      /* Header/nav */
+      .ds-hdr { flex-direction: column; gap: 8px }
+      .ds-nav { align-self: stretch; justify-content: space-between }
+      .ds-week-pill { min-width: auto; flex: 1; justify-content: center }
+      .ds-date { font-size: 18px }
+
+      /* --- Font sizes: minimum 12px --- */
+      .ds-card-day { font-size: 11px }
+      .ds-card-footer { font-size: 11px }
+      .ds-slot-ic { font-size: 10px }
+      .mc-macro-pill-l { font-size: 10px }
+      .td-tip { width: 18px; height: 18px; font-size: 10px }
+      .td-tip-bubble { font-size: 11px; width: 180px }
+      .msr-name { font-size: 12px; width: auto; min-width: 45px }
+      .msr-fill-lbl { font-size: 10px }
+      .nd-tab { padding: 9px 10px; font-size: 12px }
+      .nd-sum-lbl { font-size: 11px }
+      .sugg-hkcal { font-size: 10px }
+      .cp-rule { font-size: 10px }
+      .mc-pill-c { font-size: 12px }
+      .mc-name-c { font-size: 14px }
+      .mc-ml { font-size: 11px }
+      .mc-mv { font-size: 12px }
+
+      /* --- Touch targets: minimum 44px --- */
+      .ds-nav-btn { width: 36px; height: 36px; font-size: 16px }
+      .overlay-close { width: 40px; height: 40px; font-size: 18px }
+      .nd-range-nav-btn { width: 36px; height: 36px }
+      .btn { padding: 10px 16px; font-size: 13px }
+      .af-action-btn { padding: 10px 16px; font-size: 13px }
+      .mc-swap-inline { padding: 6px 12px; font-size: 11px }
+      .mc-fav-btn { font-size: 18px; padding: 4px 8px }
+
+      /* --- Meal card compact on mobile --- */
+      .mc-zone-left { padding: 10px 12px; gap: 8px }
+      .mc-thumb { width: 56px; height: 56px; border-radius: 8px }
+      .mc-macros { grid-template-columns: repeat(3, 1fr) }
+      .mc-macros .mc-m:nth-child(n+4) { border-top: 1px solid var(--border) }
+
+      /* --- Grids: reduce columns --- */
+      .cond-grid { grid-template-columns: 1fr }
+      .allerg-grid { grid-template-columns: repeat(2, 1fr) }
+      .recipe-grid { grid-template-columns: 1fr; gap: 10px }
+      .dc-hda { grid-template-columns: 1fr }
+      .dc-hda-col + .dc-hda-col { border-left: none; border-top: 1px solid var(--border) }
+      .nd-sumrow { grid-template-columns: repeat(3, 1fr) }
+      .nd-sum-cell:nth-child(4), .nd-sum-cell:nth-child(5) { border-top: 1px solid var(--border) }
+
+      /* --- Empty week split card: stack --- */
+      .ewc-wrap { grid-template-columns: 1fr; }
+      .ewc-divider { width: auto; height: 1px }
+
+      /* --- Suggestion cards: smaller --- */
+      .sugg-hcard { width: 120px; height: 140px }
+
+      /* --- Tooltip overflow fix --- */
+      .td-tip-bubble, .nd-tip-bubble { max-width: calc(100vw - 40px) }
+
+      /* --- Toast: full width on mobile --- */
+      .toast { left: 12px; right: 12px; transform: none; text-align: center; justify-content: center; white-space: normal; font-size: 12px }
+
+      /* --- Nutrition panel: compact --- */
+      .nut-card { padding: 12px }
+      .donut-wrap { gap: 10px }
+      .dsw { width: 64px; height: 64px }
+      .dcval { font-size: 13px }
+      .di-pct { font-size: 18px }
+
+      /* --- Profile chips: scroll horizontally --- */
+      .prof-panel { gap: 6px }
+      .prof-card { border-radius: var(--r-sm) }
+      .gpills { gap: 5px }
+      .gpill { padding: 8px 6px; font-size: 12px }
+      .diet-pills { gap: 5px }
+      .dpill { padding: 6px 12px; font-size: 11px }
+
+      /* --- Onboarding wizard: compact --- */
+      .overlay-body { padding: 14px 16px }
+      .onb-stepbar { padding: 0 12px }
+      .onb-stxt { display: none }  /* Hide step labels on mobile, just show bubbles */
+      .field-input { padding: 9px 11px; font-size: 15px }
+
+      /* --- Discover filter grid: 2×2 on mobile --- */
+      .disc-filter-grid { grid-template-columns: 1fr 1fr !important }
+
+      /* --- Onboarding name/age/weight: stack --- */
+      .onb-name-row { grid-template-columns: 1fr !important }
+
+      /* --- Content paddings: tighter on mobile --- */
+      .shop-panel-body { padding: 10px 14px }
+      .nd-chart-section { padding: 10px 14px }
+
+      /* --- Nav header: compact --- */
+      .nav-tile-lbl { font-size: 10px }
+      .nav-tile { padding: 7px 4px 6px }
+
+      /* --- Qty stepper: enlarge on touch screens --- */
+      .qty-stepper-btn { min-width: 44px !important; min-height: 44px !important; font-size: 20px !important }
+      .qty-stepper span { min-width: 40px !important; min-height: 44px !important; font-size: 15px !important }
+      .mc-swap-inline { min-height: 36px; padding: 8px 12px !important; font-size: 12px !important }
+    }
+
+    /* ── Small phones (≤ 380px) ── */
+    @media (max-width: 380px) {
+      .ds-scroll { grid-template-columns: repeat(7, 100px) }
+      .ds-date { font-size: 16px }
+      .mc-thumb { width: 44px; height: 44px }
+      .mc-name-c { font-size: 13px }
+      .sugg-hcard { width: 110px; height: 130px }
+      .allerg-grid { grid-template-columns: 1fr 1fr }
+      .mc-macros { grid-template-columns: repeat(2, 1fr) }
+      /* Extra tight: stack discover filters vertically */
+      .disc-filter-grid { grid-template-columns: 1fr !important }
+    }
   </style>
 </head>
 <body>

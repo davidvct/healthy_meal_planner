@@ -5,6 +5,7 @@ import NutritionPanel from './NutritionPanel';
 // PlanSettingsModal replaced by unified AI planner modal
 import UpgradePromptModal from './UpgradePromptModal';
 import * as api from '../services/api';
+import { trackMealPlanGenerated, trackMealPlanDayGenerated, trackPlanRejectedInfeasible, trackThresholdWarningShown, trackThresholdsCustomized } from '../services/analytics';
 
 const MEAL_TYPES  = ['breakfast', 'lunch', 'dinner'];
 const MEAL_LABELS = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' };
@@ -443,6 +444,11 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   };
 
   const handleGeneratePlan = async () => {
+    // Track if user proceeds despite threshold warnings
+    const LIMIT_KEYS = ['fat', 'sodium', 'sugar'];
+    const exceeded = LIMIT_KEYS.filter(k => aiRecommended[k] && aiLimits[k] && aiLimits[k] > aiRecommended[k] * 1.1);
+    if (exceeded.length > 0) trackThresholdWarningShown(exceeded);
+
     const mode = aiPlanMode;
     setShowAiPlanModal(false);
     setGeneratingPlan(true);
@@ -488,11 +494,18 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
       if (plan) loadDishDetails(plan);
       await loadNutrients();
       const label = mode === 'day' ? 'Today planned' : 'Week planned';
-      if (totalAdded > 0) showToast(`${label}! ${totalAdded} meals added`);
-      else showToast('Could not generate plan. Try fewer dishes per meal.');
+      if (totalAdded > 0) {
+        showToast(`${label}! ${totalAdded} meals added`);
+        if (mode === 'day') trackMealPlanDayGenerated(activeDayIndex);
+        else trackMealPlanGenerated({ dishesPerMeal: aiDishesPerMeal, numDays: 7 });
+      } else {
+        showToast('Could not generate plan. Try fewer dishes per meal.');
+        trackPlanRejectedInfeasible('no_entries_written');
+      }
     } catch (err) {
       console.error('Plan generation failed:', err);
       showToast('Failed to generate plan');
+      trackPlanRejectedInfeasible(err.message || 'unknown');
     } finally {
       setGeneratingPlan(false);
       setGenProgress(0);
@@ -817,7 +830,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }} onClick={() => setShowAiPlanModal(false)}>
           <div style={{
-            background: 'var(--white)', borderRadius: 16, width: 380, maxWidth: '92vw',
+            background: 'var(--white)', borderRadius: 16, width: 'min(380px, 92vw)',
             boxShadow: '0 8px 32px rgba(6,155,142,0.25)', fontFamily: 'var(--font)',
             overflow: 'hidden',
           }} onClick={e => e.stopPropagation()}>
@@ -844,14 +857,14 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
             </div>
 
             {/* Body */}
-            <div style={{ padding: '16px 20px 20px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div style={{ padding: 'clamp(12px, 3vw, 20px)', maxHeight: '70vh', overflowY: 'auto' }}>
 
               {/* Dishes per meal — compact table */}
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
                 Dishes per meal
               </div>
               <div style={{
-                display: 'grid', gridTemplateColumns: '80px 1fr', gap: '4px 8px',
+                display: 'grid', gridTemplateColumns: 'minmax(70px, 80px) 1fr', gap: '4px 8px',
                 marginBottom: 16, alignItems: 'center',
               }}>
                 {[

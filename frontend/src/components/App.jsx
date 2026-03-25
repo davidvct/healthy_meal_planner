@@ -7,6 +7,7 @@ import ShoppingScreen from "./ShoppingScreen";
 import ProfilesScreen from "./ProfilesScreen";
 import DiscoverScreen from "./DiscoverScreen";
 import * as api from "../services/api";
+import { initGA, trackPageView, setUserProperties, trackShoppingListViewed, trackProfileSaved, trackConditionChanged, trackDinerAdded } from "../services/analytics";
 
 const VIEWS = { AUTH: 'auth', SETUP: 'setup', APP: 'app' };
 const TABS = { TODAY: 'today', SHOP: 'shop', PROFILES: 'profiles', DISCOVER: 'discover' };
@@ -49,6 +50,27 @@ export default function App() {
   const [todayDayIndex, setTodayDayIndex] = useState(null); // null = use today's day
   // editingDiner: undefined = closed, null = new diner, object = editing existing
   const [editingDiner, setEditingDiner] = useState(undefined);
+
+  // Initialize Google Analytics
+  useEffect(() => { initGA(); }, []);
+
+  // Track page views on tab change
+  useEffect(() => {
+    trackPageView(`/${activeTab}`);
+    if (activeTab === TABS.SHOP) trackShoppingListViewed();
+  }, [activeTab]);
+
+  // Set user properties for GA segmentation
+  useEffect(() => {
+    if (activeDiner) {
+      setUserProperties({
+        user_conditions: (activeDiner.conditions || []).join(",") || "none",
+        user_diet: activeDiner.diet || "none",
+        user_tier: userTier,
+        num_diners: diners.length,
+      });
+    }
+  }, [activeDiner, userTier, diners.length]);
 
   // Persist auth state
   useEffect(() => {
@@ -132,9 +154,14 @@ export default function App() {
         diet: profile.diet,
         allergies: profile.allergies,
       });
+      const isNew = !editingDiner?.userId;
       await loadDiners();
       if (!activeDiner) setActiveDiner(result);
       setEditingDiner(undefined);
+      // Analytics
+      trackProfileSaved();
+      if (isNew) trackDinerAdded();
+      if (profile.conditions?.length) trackConditionChanged(profile.conditions);
     } catch (err) {
       console.error("Failed to save diner:", err);
     }
