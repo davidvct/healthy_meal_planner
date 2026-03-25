@@ -67,11 +67,15 @@ function getRangeDays(range, monday) {
   return [0, 1, 2, 3, 4, 5, 6];
 }
 
-function fmtQty(grams) {
-  if (!grams || grams <= 0) return null;
-  if (grams >= 1000) return `${(grams / 1000).toFixed(1)}kg`;
-  if (grams >= 100) return `${Math.round(grams / 10) * 10}g`;
-  return `${Math.round(grams)}g`;
+function fmtQty(amount, unit = 'g') {
+  if (!amount || amount <= 0) return null;
+  if (unit === 'ml') {
+    if (amount >= 1000) return `${(amount / 1000).toFixed(1)}L`;
+    return `${Math.round(amount)}ml`;
+  }
+  if (amount >= 1000) return `${(amount / 1000).toFixed(1)}kg`;
+  if (amount >= 100) return `${Math.round(amount / 10) * 10}g`;
+  return `${Math.round(amount)}g`;
 }
 
 // localStorage key for checked state
@@ -189,7 +193,7 @@ export default function ShoppingScreen({ diners, activeDiner, onGoToPlan }) {
       if (!catItems?.length) return;
       lines.push(`${CATEGORY_ICONS[cat]} ${cat.charAt(0).toUpperCase() + cat.slice(1)}`);
       catItems.forEach(it => {
-        const qty = fmtQty(it.grams);
+        const qty = fmtQty(it.amount, it.unit);
         const mark = checked.has(it.name) ? '✓' : '○';
         lines.push(`  ${mark} ${it.name}${qty ? ` (${qty})` : ''}`);
       });
@@ -337,7 +341,7 @@ export default function ShoppingScreen({ diners, activeDiner, onGoToPlan }) {
                         <button key={item.name} className="shop-token" onClick={() => toggleCheck(item.name)}>
                           <span className="shop-tok-dot" />
                           <span className="shop-tok-name">{item.name}</span>
-                          {fmtQty(item.grams) && <span className="shop-tok-qty">{fmtQty(item.grams)}</span>}
+                          {fmtQty(item.amount, item.unit) && <span className="shop-tok-qty">{fmtQty(item.amount, item.unit)}</span>}
                         </button>
                       ))}
                     </div>

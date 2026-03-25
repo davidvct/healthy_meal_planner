@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 from ..constants import MEAL_CUTOFF
 from ..utils import get_current_week_start, parse_ingredients_map, parse_json
-from .ingredient_categories import categorise_ingredient
+from .ingredient_categories import categorise_ingredient, normalize_ingredient
 
 
 def is_slot_expired(week_start: str, day_index: int, meal_type: str) -> bool:
@@ -60,11 +60,26 @@ def get_shopping_list(
         }
 
         for ingredient, amount in ingredients.items():
-            totals[ingredient] = totals.get(ingredient, 0) + float(amount)
+            normalized = normalize_ingredient(ingredient)
+            totals[normalized] = totals.get(normalized, 0) + float(amount)
+
+    _LIQUID_KEYWORDS = {
+        "oil", "milk", "water", "broth", "stock", "juice", "sauce", "vinegar",
+        "cream", "wine", "beer", "syrup", "honey", "extract", "buttermilk", "condensed",
+    }
+
+    def _unit_for(name: str) -> str:
+        n = name.lower()
+        return "ml" if any(kw in n for kw in _LIQUID_KEYWORDS) else "g"
 
     return [
-        {"name": ingredient, "grams": int(round(grams)), "category": categorise_ingredient(ingredient)}
-        for ingredient, grams in sorted(totals.items(), key=lambda kv: kv[0])
+        {
+            "name": ingredient,
+            "amount": int(round(amount)),
+            "unit": _unit_for(ingredient),
+            "category": categorise_ingredient(ingredient),
+        }
+        for ingredient, amount in sorted(totals.items(), key=lambda kv: kv[0])
     ]
 
 

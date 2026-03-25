@@ -210,7 +210,9 @@ export default function ShoppingListPanel({ userId, weekStart, mealPlan, weekDat
                 }}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: COLORS.navy, textTransform: "capitalize" }}>{item.name}</span>
                   <span style={{ fontSize: 14, color: COLORS.gray, fontWeight: 600 }}>
-                    {item.grams >= 1000 ? `${(item.grams / 1000).toFixed(1)} kg` : `${item.grams}g`}
+                    {item.unit === 'ml'
+                      ? (item.amount >= 1000 ? `${(item.amount / 1000).toFixed(1)}L` : `${Math.round(item.amount)}ml`)
+                      : (item.amount >= 1000 ? `${(item.amount / 1000).toFixed(1)}kg` : `${Math.round(item.amount)}g`)}
                   </span>
                 </div>
               ))}

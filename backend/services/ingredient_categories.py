@@ -6,12 +6,15 @@ fruits, dairy, pantry, other.
 
 from __future__ import annotations
 
+import re as _re
+
 # Order matters: first match wins.  Each tuple is (category, keywords).
 # Keywords are checked against the lowercased ingredient name.
 # More specific compound terms come before broad single-word matches.
 _RULES: list[tuple[str, list[str]]] = [
     # ── overrides for compound terms that would otherwise be miscategorised ──
     ("vegetables", ["butternut squash"]),
+    ("dairy", ["unsalted butter", "salted butter"]),
     # ── pantry (checked first so compound terms like "coconut oil", "apple
     #    cider vinegar", "peanut butter" don't fall into fruits/dairy) ──
     ("pantry", [
@@ -139,3 +142,80 @@ def categorise_ingredient(name: str) -> str:
             if kw in low:
                 return category
     return "other"
+
+
+def normalize_ingredient(name: str) -> str:
+    """Clean an ingredient key for shopping-list aggregation.
+
+    Strips leading quantities, measurements, and prep words so that
+    variants like ``"2 tablespoons olive oil"`` and ``"olive oil"``
+    merge under the same name.  Product-form words (dried, frozen,
+    canned) are preserved because they affect what you buy.
+    """
+    low = name.lower().strip()
+
+    # HTML entities
+    low = low.replace("&amp;", "&").replace("&#39;", "'").replace("&#039;", "'")
+
+    # Leading / trailing punctuation artifacts
+    low = low.strip(" ,;:()&+")
+
+    # Leading quantity + measurement: "2 tablespoons of", "1/2 cups", etc.
+    low = _re.sub(
+        r"^[\d/½¼¾⅓⅔.,\s%]+\b(?!-)"
+        r"(?:"
+        r"cups?|tablespoons?|tbsp|teaspoons?|tsp|ounces?|oz|pounds?|lbs?|"
+        r"inch(?:es)?|cloves?|cans?|sticks?|heads?|stalks?|bags?|bottles?|containers?|"
+        r"packages?|sheets?|loaf|loaves|slices?|pieces?|pinch(?:es)?|dash(?:es)?|"
+        r"large|medium|small|whole"
+        r")?"
+        r"\s*(?:of\s+)?",
+        "", low,
+    )
+
+    # Leading "of ", "one ", "cup ", "half of ", "half a ", "quarter of ", etc.
+    low = _re.sub(r"^of\s+", "", low)
+    low = _re.sub(r"^one\s+", "", low)
+    low = _re.sub(r"^cup\s+", "", low)
+    low = _re.sub(r"^half\s+(?:of\s+)?(?:a\s+)?(?:an?\s+)?", "", low)
+    low = _re.sub(r"^quarter\s+(?:of\s+)?(?:a\s+)?(?:an?\s+)?", "", low)
+
+    # Leading "and " artifact from bad CSV parsing
+    low = _re.sub(r"^and\s+", "", low)
+
+    # Repeatedly strip prep / cooking words (handles chains like
+    # "cooked shredded chicken" -> "chicken").
+    # NOTE: dried, frozen, canned are intentionally NOT stripped.
+    changed = True
+    while changed:
+        prev = low
+        low = _re.sub(
+            r"^(?:finely|freshly|thinly|roughly|coarsely|lightly|gently)\s+",
+            "", low,
+        )
+        low = _re.sub(
+            r"^(?:chopped|diced|minced|sliced|grated|shredded|crushed|melted|"
+            r"cooked|roasted|toasted|packed|peeled|softened|warm|cold|"
+            r"cubed|crumbled|ripe|pure)\s+",
+            "", low,
+        )
+        # Descriptors with hyphens: "inch-thick", etc.
+        low = _re.sub(r"^[\w-]*-(?:thick|thin|long|wide|cut)\s+", "", low)
+        changed = low != prev
+
+    # "squeezed X juice" -> just the fruit
+    low = _re.sub(r"^squeezed\s+(\w+)\s+juice$", r"\1", low)
+
+    # Strip "and " again (may appear after prep-word removal)
+    low = _re.sub(r"^and\s+", "", low)
+
+    # Trailing artifacts
+    low = low.strip(" ,;:()&+")
+
+    # "room temperature" suffix
+    low = _re.sub(r"\s*room temperature\)?$", "", low)
+
+    # Size words remaining after "one" removal
+    low = _re.sub(r"^(?:large|medium|small)\s+", "", low)
+
+    return low if low else name.lower().strip()
