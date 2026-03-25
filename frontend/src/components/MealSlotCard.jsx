@@ -69,6 +69,16 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, user
 
   // Ingredients for expanded view
   const ingredientKeys = (() => {
+    const raw = dishDetail?.recipe?.ingredients_raw || dishDetail?.recipe?.ingredients;
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed.map(String).slice(0, 10);
+        if (parsed && typeof parsed === 'object') return Object.keys(parsed).slice(0, 10);
+      } catch {}
+      const lines = String(raw).split(/\n/).map(s => s.trim()).filter(Boolean);
+      if (lines.length > 0) return lines.slice(0, 10);
+    }
     const fromDetail = dishDetail?.ingredients;
     if (fromDetail && Object.keys(fromDetail).length > 0) return Object.keys(fromDetail).slice(0, 10);
     return Object.keys(entry.dishIngredients || {}).slice(0, 10);

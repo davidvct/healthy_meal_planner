@@ -72,6 +72,7 @@ def init_db() -> None:
         _seed_from_dataset(conn)
         _backfill_recipe_nutrients(conn)
         _backfill_recipe_ingredients(conn)
+        _backfill_recipe_ingredients_raw(conn)
         _backfill_recipe_diet_flags(conn)
         _backfill_strip_ingredient_bullets(conn)
         _backfill_health_categories(conn)
@@ -523,6 +524,7 @@ def _migrate_schema(conn: DBConnection) -> None:
     _add_column_if_missing(conn, "recipes", "cuisine", "TEXT")
     _add_column_if_missing(conn, "recipes", "keywords", "TEXT")
     _add_column_if_missing(conn, "recipes", "ingredients", "TEXT")
+    _add_column_if_missing(conn, "recipes", "ingredients_raw", "TEXT")
     _add_column_if_missing(conn, "recipes", "instructions", "TEXT")
     _add_column_if_missing(conn, "recipes", "image_url", "TEXT")
     _add_column_if_missing(conn, "recipes", "calories", "TEXT")
@@ -610,9 +612,10 @@ def _seed_from_dataset(conn: DBConnection) -> None:
             id, name, prep_time, cook_time, category, keywords, ingredients, instructions,
             description, url, image_url, servings, calories, protein, fat, total_carbs, fiber, sugar, cholesterol, sodium,
             is_vegetarian, is_vegan, is_low_carb, is_high_protein, is_spicy, is_sweet, is_salty,
-            allergies, dietary_habits, hypertension_category, diabetes_category, cholesterol_category, gout_category
+            allergies, dietary_habits, hypertension_category, diabetes_category, cholesterol_category, gout_category,
+            ingredients_raw
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
             (
@@ -649,6 +652,7 @@ def _seed_from_dataset(conn: DBConnection) -> None:
                 r.get("diabetesCategory") or "",
                 r.get("cholesterolCategory") or "",
                 r.get("goutCategory") or "",
+                r.get("ingredientsRaw") or "",
             )
             for recipe_id, r in seed_data["recipes"].items()
         ],
@@ -724,6 +728,33 @@ def _backfill_recipe_ingredients(conn: DBConnection) -> None:
         )
 
     _write_meta(conn, "ingredients_backfilled", "1")
+
+
+def _backfill_recipe_ingredients_raw(conn: DBConnection) -> None:
+    """Populate ingredients_raw for recipes that don't have it yet."""
+    if _read_meta(conn, "ingredients_raw_backfilled"):
+        return
+
+    row = conn.execute(
+        "SELECT COUNT(*) AS c FROM recipes WHERE ingredients_raw IS NULL OR ingredients_raw = ''"
+    ).fetchone()
+    if not row or row["c"] == 0:
+        _write_meta(conn, "ingredients_raw_backfilled", "1")
+        return
+
+    try:
+        seed_data = load_seed_data()
+    except FileNotFoundError:
+        return
+
+    for recipe_id, r in seed_data["recipes"].items():
+        numeric_id = recipe_id.removeprefix("r")
+        conn.execute(
+            "UPDATE recipes SET ingredients_raw = ? WHERE id::text = ?",
+            (r.get("ingredientsRaw") or "", numeric_id),
+        )
+
+    _write_meta(conn, "ingredients_raw_backfilled", "1")
 
 
 def _backfill_recipe_diet_flags(conn: DBConnection) -> None:

@@ -411,7 +411,8 @@ def load_seed_data() -> dict[str, Any]:
             dish_id = f"d{idx}"
             recipe_id = f"r{idx}"
 
-            ingredients = _parse_ingredients(row.get("ingredients", ""))
+            ingredients_raw = row.get("ingredients", "")
+            ingredients = _parse_ingredients(ingredients_raw)
             ingredient_names.update(ingredients.keys())
 
             tags = _build_tags(row)
@@ -465,6 +466,7 @@ def load_seed_data() -> dict[str, Any]:
                 "cookTime": int(_parse_float(row.get("cook_time"))),
                 "steps": _parse_steps(row.get("instructions", "")),
                 "ingredients": ingredients,
+                "ingredientsRaw": ingredients_raw,
                 "servingsCount": servings_count,
                 "calories": _parse_float(row.get("calories")),
                 "protein": _parse_float(row.get("protein")),
