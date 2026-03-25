@@ -366,11 +366,11 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   }, [loadPlan]);
   useEffect(() => { loadNutrients(); }, [loadNutrients]);
 
-  // Load personalized nutrition targets from user profile
+  // Load condition-aware nutrition targets from backend
   useEffect(() => {
     if (!userId) return;
-    api.getProfile(userId).then(p => {
-      if (p?.recommendedTargets) setRecommendedTargets(p.recommendedTargets);
+    api.getRecommendedLimits(userId).then(res => {
+      if (res?.recommended) setRecommendedTargets(res.recommended);
     }).catch(() => {});
   }, [userId]);
 

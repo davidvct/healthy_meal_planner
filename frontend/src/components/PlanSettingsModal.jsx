@@ -29,26 +29,23 @@ const MEAL_ICONS  = { breakfast: "☀️", lunch: "🌿", dinner: "🌙" };
 const DEFAULT_NUTRIENTS = ["calories", "protein", "carbs"];
 const STORAGE_KEY = "mealwise_plan_settings";
 
-// Condition → recommended MOH limits + nutrients to auto-add
-// These match CONDITION_CONFIG on the backend and NutritionPanel's CONDITION_MAP
+// Condition → display styling + which nutrients are relevant.
+// Actual limit VALUES come from backend via getRecommendedLimits().
 const CONDITION_PROFILES = {
   "High Blood Sugar": {
     cls: "cp-amber", tagCls: "tg-amber",
-    icon: "🩸", rule: "Sugar ≤ 25g/day",
+    icon: "🩸",
     nutrients: ["sugar", "fiber", "carbs"],
-    limits: { sugar: { daily: 25, per: "daily" }, carbs: { daily: 250, per: "daily" }, fiber: { daily: 30, per: "daily" } },
   },
   "High Cholesterol": {
     cls: "cp-purple", tagCls: "tg-purple",
-    icon: "💜", rule: "Fat ≤ 44g/day",
+    icon: "💜",
     nutrients: ["fat", "cholesterol"],
-    limits: { fat: { daily: 55, per: "daily" }, cholesterol: { daily: 300, per: "daily" } },
   },
   "Hypertension": {
     cls: "cp-red", tagCls: "tg-red",
-    icon: "❤️‍🩹", rule: "Sodium ≤ 1,500mg/day",
+    icon: "❤️‍🩹",
     nutrients: ["sodium"],
-    limits: { sodium: { daily: 1500, per: "daily" } },
   },
 };
 
@@ -67,6 +64,7 @@ function saveToDisk(s) {
 
 export default function PlanSettingsModal({ userId, weekStart, onClose, onGenerated }) {
   const [profile, setProfile]           = useState(null);
+  const [recTargets, setRecTargets]     = useState(null);
   const [dishesPerMeal, setDishesPerMeal] = useState({ breakfast: 1, lunch: 1, dinner: 1 });
   const [intensities, setIntensities]   = useState({ breakfast: "balanced", lunch: "balanced", dinner: "balanced" });
   const [thresholds, setThresholds]     = useState([]);
@@ -85,7 +83,8 @@ export default function PlanSettingsModal({ userId, weekStart, onClose, onGenera
       api.getAvailableNutrients(),
       api.getThresholds(userId),
       api.getProfile(userId),
-    ]).then(([nutrients, savedThresholds, prof]) => {
+      api.getRecommendedLimits(userId),
+    ]).then(([nutrients, savedThresholds, prof, recLimits]) => {
       setAllNutrients(nutrients);
       setProfile(prof);
 
@@ -102,16 +101,24 @@ export default function PlanSettingsModal({ userId, weekStart, onClose, onGenera
         if (saved.strictMode !== undefined) setStrictMode(saved.strictMode);
       }
 
-      const profileCal = prof?.recommendedTargets?.calories || null;
+      const profileCal = recLimits?.recommended?.calories || prof?.recommendedTargets?.calories || null;
       const conditions = prof?.conditions || [];
+      const backendTargets = recLimits?.recommended || {};
+      setRecTargets(backendTargets);
 
-      // Build condition-aware recommended limits lookup
+      // Build condition-aware recommended limits from backend targets
       const condLimits = {};
       for (const cond of conditions) {
         const cp = CONDITION_PROFILES[cond];
-        if (cp) Object.entries(cp.limits).forEach(([k, v]) => {
-          if (!condLimits[k] || v.daily < condLimits[k].daily) condLimits[k] = v;
-        });
+        if (!cp) continue;
+        for (const key of cp.nutrients) {
+          if (backendTargets[key] != null) {
+            const daily = backendTargets[key];
+            if (!condLimits[key] || daily < condLimits[key].daily) {
+              condLimits[key] = { daily, per: "daily" };
+            }
+          }
+        }
       }
 
       let initial;
@@ -140,7 +147,7 @@ export default function PlanSettingsModal({ userId, weekStart, onClose, onGenera
         const cp = CONDITION_PROFILES[cond];
         if (!cp) continue;
         for (const key of cp.nutrients) {
-          const limit = cp.limits[key];
+          const limit = condLimits[key];
           if (existingKeys.has(key)) {
             // Update existing threshold with condition limit if stricter
             initial = initial.map(t => {
@@ -377,11 +384,21 @@ export default function PlanSettingsModal({ userId, weekStart, onClose, onGenera
                           {cond}
                         </div>
                       );
+                      // Build rule text from backend targets
+                      const ruleParts = cp.nutrients
+                        .filter(k => recTargets?.[k] != null)
+                        .map(k => {
+                          const v = Math.round(recTargets[k]);
+                          const unit = k === 'sodium' ? 'mg' : 'g';
+                          const dir = (k === 'fiber' || k === 'protein') ? '≥' : '≤';
+                          return `${k.charAt(0).toUpperCase() + k.slice(1)} ${dir} ${v}${unit}`;
+                        });
+                      const ruleText = ruleParts.length > 0 ? ruleParts.join(' · ') + '/day' : '';
                       return (
                         <div key={cond} className={`cpill ${cp.cls}`}>
                           <div className="cp-ic" style={{ background: "currentColor", opacity: 0.2 }} />
                           {cp.icon} {cond}
-                          <span className="cp-rule">{cp.rule}</span>
+                          {ruleText && <span className="cp-rule">{ruleText}</span>}
                         </div>
                       );
                     })}

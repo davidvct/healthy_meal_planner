@@ -5,21 +5,33 @@ const CONDITION_MAP = {
     label: 'High Blood Sugar',
     cls: 'cp-amber',
     icBg: 'rgba(217,95,59,.2)',
-    rule: 'Sugar ≤ 25g/day',
+    nutrients: ['sugar', 'carbs'],
   },
   'high cholesterol': {
     label: 'High Cholesterol',
     cls: 'cp-purple',
     icBg: 'rgba(109,63,160,.2)',
-    rule: 'Fat ≤ 44g/day',
+    nutrients: ['fat', 'fiber'],
   },
   hypertension: {
     label: 'Hypertension',
     cls: 'cp-red',
     icBg: 'rgba(220,38,38,.2)',
-    rule: 'Sodium ≤ 1,500mg/day',
+    nutrients: ['sodium', 'fat'],
   },
 };
+
+function buildConditionRule(nutrients, targets) {
+  return nutrients
+    .filter(k => targets?.[k] != null)
+    .map(k => {
+      const v = Math.round(targets[k]);
+      const unit = k === 'sodium' ? 'mg' : 'g';
+      const dir = (k === 'fiber' || k === 'protein') ? '≥' : '≤';
+      return `${k.charAt(0).toUpperCase() + k.slice(1)} ${dir} ${v.toLocaleString()}${unit}`;
+    })
+    .join(' · ') + '/day';
+}
 
 const DIET_RULES = {
   vegetarian: 'Meat dishes excluded',
@@ -31,18 +43,16 @@ const DIET_RULES = {
 };
 
 function getTargets(condList, recTargets) {
-  const t = {
+  // recTargets comes from backend's get_condition_targets() —
+  // already condition-aware with all nutrients including sodium, sugar, fiber.
+  return {
     calories: recTargets?.calories || 2000,
-    protein:  recTargets?.protein  || 70,
-    carbs:    recTargets?.carbs    || 225,
-    fat:      recTargets?.fat      || 78,
-    sodium:   2300,
-    sugar:    50,
+    protein:  recTargets?.protein  || 60,
+    carbs:    recTargets?.carbs    || 275,
+    fat:      recTargets?.fat      || 65,
+    sodium:   recTargets?.sodium   || 2000,
+    sugar:    recTargets?.sugar    || 50,
   };
-  if (condList.includes('high blood sugar')) t.sugar = 25;
-  if (condList.includes('high cholesterol')) t.fat = Math.min(t.fat, 44);
-  if (condList.includes('hypertension')) t.sodium = 1500;
-  return t;
 }
 
 function buildSummary(nutrients, targets, mealCount) {
@@ -192,7 +202,7 @@ export default function NutritionPanel({ nutrients, conditions, diet, dinerName,
             <div key={cond.label} className={`cpill ${cond.cls}`}>
               <div className="cp-ic" style={{ background: cond.icBg }} />
               {cond.label}
-              <span className="cp-rule">{cond.rule}</span>
+              <span className="cp-rule">{buildConditionRule(cond.nutrients, targets)}</span>
             </div>
           ))}
           {showDietPill && (
