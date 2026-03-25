@@ -1,7 +1,10 @@
 import json
+import logging
 import re
 from datetime import date, datetime, timedelta
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def get_current_week_start(today: date | None = None) -> str:
@@ -211,6 +214,9 @@ def _parse_ingredient_line(line: str) -> tuple[str, float]:
             matched_unit = unit
             text = text[len(unit):].strip()
             break
+
+    if matched_unit is None:
+        logger.warning(f"Unit not found for ingredient token: '{text}'")
 
     # ── Stage 4: clean up name ───────────────────────────────────────────────
     # Strip leading "of" / "of one" / "one"
