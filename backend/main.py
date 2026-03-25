@@ -7,7 +7,7 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 
 from .db import init_db
-from .routers import auth, caretakers, dishes, favourites, health, mealplan, shopping_list, thresholds, users
+from .routers import admin, auth, caretakers, dishes, favourites, health, mealplan, shopping_list, thresholds, users
 from .security import verify_access_token
 
 
@@ -36,6 +36,7 @@ async def require_jwt_for_api(request: Request, call_next):
         or not path.startswith("/api")
         or path.startswith("/api/auth")
         or path.startswith("/api/health")
+        or path.startswith("/api/admin")
     ):
         return await call_next(request)
 
@@ -61,6 +62,7 @@ app.include_router(caretakers.router, prefix="/api")
 app.include_router(health.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(thresholds.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 
 @app.exception_handler(FastAPIHTTPException)
