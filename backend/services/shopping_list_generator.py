@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 
 from ..constants import MEAL_CUTOFF
 from ..utils import get_current_week_start, parse_ingredients_map, parse_json
+from .ingredient_categories import categorise_ingredient
 
 
 def is_slot_expired(week_start: str, day_index: int, meal_type: str) -> bool:
@@ -62,7 +63,7 @@ def get_shopping_list(
             totals[ingredient] = totals.get(ingredient, 0) + float(amount)
 
     return [
-        {"name": ingredient, "grams": int(round(grams))}
+        {"name": ingredient, "grams": int(round(grams)), "category": categorise_ingredient(ingredient)}
         for ingredient, grams in sorted(totals.items(), key=lambda kv: kv[0])
     ]
 
