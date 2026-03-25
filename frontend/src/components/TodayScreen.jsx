@@ -278,7 +278,8 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [genProgress, setGenProgress] = useState(0); // 0-7 days completed
   const [showAiPlanModal, setShowAiPlanModal] = useState(false);
-  const [aiPlanMode, setAiPlanMode] = useState('week'); // 'week' = 7 days, 'day' = today only
+  const [aiPlanMode, setAiPlanMode] = useState('week'); // 'week' = 7 days, 'day' = selected days
+  const [aiSelectedDays, setAiSelectedDays] = useState([]);
   const [aiDishesPerMeal, setAiDishesPerMeal] = useState({ breakfast: 1, lunch: 1, dinner: 1 });
   const [aiLimits, setAiLimits] = useState(null);       // {calories, protein, carbs, fat, sodium, sugar}
   const [aiRecommended, setAiRecommended] = useState(null); // from backend
@@ -429,8 +430,29 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
     }
   }, []);
 
+  const handleClearDay = async () => {
+    if (!confirm('Clear all meals for this day?')) return;
+    try {
+      const result = await api.clearDayMealPlan(userId, weekStart, activeDayIndex);
+      const plan = await loadPlan();
+      if (plan) loadDishDetails(plan);
+      await loadNutrients();
+      showToast(`${result.removed || 0} meal${result.removed === 1 ? '' : 's'} removed`);
+    } catch (err) {
+      console.error('Clear day failed:', err);
+      showToast('Failed to clear meals');
+    }
+  };
+
+  const toggleAiDay = (di) => {
+    setAiSelectedDays(prev =>
+      prev.includes(di) ? prev.filter(d => d !== di) : [...prev, di].sort()
+    );
+  };
+
   const openAiPlanModal = async (mode = 'week') => {
     setAiPlanMode(mode);
+    if (mode === 'day') setAiSelectedDays([activeDayIndex]);
     setShowAiPlanModal(true);
     if (!aiRecommended && userId) {
       try {
@@ -456,19 +478,23 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
     let totalAdded = 0;
     try {
       if (mode === 'day') {
-        // Plan today only
-        const result = await api.generateMealPlan(userId, {
-          weekStart,
-          numDays: 1,
-          timeLimitSeconds: 15,
-          dayIndex: activeDayIndex,
-          maxDishesPerSlot: aiDishesPerMeal,
-          nutrientLimits: aiLimits,
-        });
-        if (result.success === false) {
-          showToast(result.error || 'Could not generate plan');
-        } else {
-          totalAdded = result.entriesWritten || 0;
+        // Plan selected days
+        const days = aiSelectedDays.length > 0 ? aiSelectedDays : [activeDayIndex];
+        for (let i = 0; i < days.length; i++) {
+          setGenProgress(i);
+          const result = await api.generateMealPlan(userId, {
+            weekStart,
+            numDays: 1,
+            timeLimitSeconds: 15,
+            dayIndex: days[i],
+            maxDishesPerSlot: aiDishesPerMeal,
+            nutrientLimits: aiLimits,
+          });
+          if (result.success === false) {
+            console.warn(`Day ${days[i]} failed: ${result.error}`);
+            continue;
+          }
+          totalAdded += result.entriesWritten || 0;
         }
       } else {
         // Plan full week — clear then day-by-day
@@ -493,7 +519,8 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
       const plan = await loadPlan();
       if (plan) loadDishDetails(plan);
       await loadNutrients();
-      const label = mode === 'day' ? 'Today planned' : 'Week planned';
+      const dayCount = mode === 'day' ? (aiSelectedDays.length || 1) : 7;
+      const label = mode === 'day' ? (dayCount === 1 ? 'Day planned' : `${dayCount} days planned`) : 'Week planned';
       if (totalAdded > 0) {
         showToast(`${label}! ${totalAdded} meals added`);
         if (mode === 'day') trackMealPlanDayGenerated(activeDayIndex);
@@ -542,6 +569,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
 
   const dayMeals  = mealPlan?.[activeDayIndex] || {};
   const mealCount = MEAL_TYPES.filter(mt => (dayMeals[mt] || []).length > 0).length;
+  const dayHasMeals = mealCount > 0;
 
   const activeDate = weekDates[activeDayIndex] || weekDates[0];
   // Check if all meal slots for the active day are locked (past cutoff)
@@ -643,17 +671,71 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
           </button>
         </div>
 
-        {/* Plan today button */}
-        <div style={{ marginBottom: 12 }}>
+        {/* Action strip — Plan days + Clear day */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          background: 'var(--bg, #f4f6f8)', borderRadius: 12,
+          padding: 6, marginBottom: 12,
+          position: 'relative', overflow: 'hidden',
+          minHeight: 44,
+        }}>
+          {/* Progress bar background — fills during generation */}
+          {generatingPlan && aiPlanMode === 'day' && (
+            <div style={{
+              position: 'absolute', left: 0, top: 0, bottom: 0,
+              width: `${((genProgress + 1) / (aiSelectedDays.length || 1)) * 100}%`,
+              background: 'rgba(6,155,142,0.10)',
+              transition: 'width .4s ease',
+              borderRadius: 12,
+            }} />
+          )}
+
+          {/* Plan days — left */}
           <button
-            className="af-action-btn af-btn-primary"
-            disabled={allSlotsLocked}
+            disabled={allSlotsLocked || (generatingPlan && aiPlanMode === 'day')}
             onClick={allSlotsLocked ? undefined : userTier === 'paid' ? () => openAiPlanModal('day') : () => setUpgradeFeature('Plan Today')}
-            style={userTier !== 'paid' || allSlotsLocked ? { opacity: 0.5, cursor: 'default' } : undefined}
+            style={{
+              position: 'relative',
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'var(--teal)', color: '#fff', border: 'none',
+              borderRadius: 8, padding: '10px 20px',
+              fontSize: 14, fontWeight: 700, fontFamily: 'var(--font)',
+              cursor: (allSlotsLocked || (generatingPlan && aiPlanMode === 'day')) ? 'default' : 'pointer',
+              opacity: (userTier !== 'paid' || allSlotsLocked) ? 0.5 : 1,
+              transition: 'all 0.15s', whiteSpace: 'nowrap',
+            }}
             title={allSlotsLocked ? 'All meal slots have passed their cutoff time' : ''}
           >
-            {allSlotsLocked ? '🔒 Past cutoff' : userTier !== 'paid' ? '🔒 Plan today' : '⚡ Plan today'}
+            {allSlotsLocked
+              ? '🔒 Past cutoff'
+              : generatingPlan && aiPlanMode === 'day'
+                ? `Planning ${genProgress + 1} of ${aiSelectedDays.length || 1}…`
+                : userTier !== 'paid' ? '🔒 Plan days' : '⚡ Plan days'}
           </button>
+
+          {/* Clear day — right, ghost style */}
+          {dayHasMeals && !allSlotsLocked && (
+            <button
+              onClick={handleClearDay}
+              style={{
+                position: 'relative',
+                display: 'flex', alignItems: 'center', gap: 5,
+                background: 'var(--white)', border: '1.5px solid var(--border2)',
+                color: 'var(--navy)',
+                borderRadius: 8, padding: '10px 20px',
+                fontSize: 14, fontWeight: 700, fontFamily: 'var(--font)',
+                cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}
+              title="Clear all meals for this day"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--navy)'; e.currentTarget.style.background = 'var(--bg)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.background = 'var(--white)'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M2.5 4h9M5.5 4V2.5h3V4M3.5 4v7.5a1 1 0 001 1h5a1 1 0 001-1V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Clear day
+            </button>
+          )}
         </div>
 
         {/* Two-column grid */}
@@ -845,7 +927,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                   AI Planner
                 </div>
                 <div style={{ color: '#fff', fontSize: 16, fontWeight: 800 }}>
-                  {aiPlanMode === 'day' ? 'Plan today' : 'Plan week'}
+                  {aiPlanMode === 'day' ? 'Plan days' : 'Plan week'}
                   {aiConditions.length > 0 && (
                     <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 8, color: 'rgba(255,255,255,0.5)' }}>
                       {aiConditions.join(' · ')}
@@ -858,6 +940,34 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
 
             {/* Body */}
             <div style={{ padding: 'clamp(12px, 3vw, 20px)', maxHeight: '70vh', overflowY: 'auto' }}>
+
+              {/* Day picker — only in 'day' mode */}
+              {aiPlanMode === 'day' && (
+                <>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
+                    Select days
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, di) => {
+                      const selected = aiSelectedDays.includes(di);
+                      return (
+                        <button
+                          key={di}
+                          onClick={() => toggleAiDay(di)}
+                          style={{
+                            flex: 1, padding: '8px 0', borderRadius: 8, textAlign: 'center',
+                            border: `1.5px solid ${selected ? 'var(--teal)' : 'var(--border)'}`,
+                            background: selected ? 'var(--teal)' : 'var(--white)',
+                            color: selected ? '#fff' : 'var(--text2)',
+                            fontWeight: 700, fontSize: 11, fontFamily: 'var(--font)', cursor: 'pointer',
+                            transition: 'all 0.12s',
+                          }}
+                        >{label}</button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
 
               {/* Dishes per meal — compact table */}
               <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>
@@ -1012,19 +1122,23 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
               {/* Generate button */}
               <button
                 onClick={handleGeneratePlan}
-                disabled={generatingPlan}
+                disabled={generatingPlan || (aiPlanMode === 'day' && aiSelectedDays.length === 0)}
                 style={{
                   width: '100%', padding: 14, borderRadius: 'var(--r-sm)', border: 'none',
-                  background: generatingPlan ? 'var(--border)' : 'var(--navy)',
-                  color: generatingPlan ? 'var(--text3)' : '#fff',
+                  background: (generatingPlan || (aiPlanMode === 'day' && aiSelectedDays.length === 0)) ? 'var(--border)' : 'var(--navy)',
+                  color: (generatingPlan || (aiPlanMode === 'day' && aiSelectedDays.length === 0)) ? 'var(--text3)' : '#fff',
                   fontWeight: 800, fontSize: 14, fontFamily: 'var(--font)',
                   cursor: generatingPlan ? 'default' : 'pointer',
                   marginTop: 14, transition: 'all 0.15s',
                 }}
               >
                 {generatingPlan
-                  ? (aiPlanMode === 'day' ? 'Planning today…' : `Planning day ${genProgress + 1} of 7…`)
-                  : (aiPlanMode === 'day' ? 'Plan today ✨' : 'Plan week ✨')}
+                  ? (aiPlanMode === 'day'
+                    ? `Planning day ${genProgress + 1} of ${aiSelectedDays.length || 1}…`
+                    : `Planning day ${genProgress + 1} of 7…`)
+                  : (aiPlanMode === 'day'
+                    ? `Plan ${aiSelectedDays.length || 1} day${aiSelectedDays.length > 1 ? 's' : ''} ✨`
+                    : 'Plan week ✨')}
               </button>
             </div>
           </div>
