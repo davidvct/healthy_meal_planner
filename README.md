@@ -134,3 +134,77 @@ The frontend runs at `http://localhost:3000` and proxies `/api/*` requests to th
 | Database | PostgreSQL 16 on Cloud SQL | Managed cloud database (GCP asia-southeast1) |
 | Solver | OR-Tools CP-SAT | Meal plan generation |
 | Containerisation | Docker + Docker Compose | Local and cloud deployment |
+
+## Deploying To GCP
+
+The repo now includes a backend deployment wrapper for Cloud Run:
+
+```powershell
+.\scripts\deploy-gcp.ps1 -ProjectId cs5224-project-489002
+```
+
+What it does:
+
+- deploys the root `Dockerfile` to Cloud Run with `gcloud run deploy --source`
+- defaults to service `meal-planner-api` in region `asia-southeast1`
+- automatically mounts the Cloud SQL instance if `DATABASE_URL` contains `host=/cloudsql/...`
+- keeps the upload small via `.gcloudignore`
+
+Optional flags:
+
+```powershell
+.\scripts\deploy-gcp.ps1 `
+  -ProjectId cs5224-project-489002 `
+  -ServiceName meal-planner-api `
+  -Region asia-southeast1 `
+  -EnvVarsFile .\deploy.env.yaml
+```
+
+Notes:
+
+- `gcloud` must be installed and authenticated first
+- without `-EnvVarsFile`, the container falls back to the checked-in `application.properties`
+- for production, move secrets out of `application.properties` and into Cloud Run env vars or Secret Manager
+
+To deploy both services together:
+
+```powershell
+.\scripts\deploy-fullstack-gcp.ps1 -ProjectId cs5224-project-489002
+```
+
+That deploys:
+
+- backend service `meal-planner-api` from the repo root
+- frontend service `meal-planner-web` from `frontend/`
+- frontend build with `VITE_API_BASE_URL` set to the freshly deployed backend URL
+
+## GitHub Actions Deployment
+
+The repo now includes [deploy-gcp.yml](C:\Users\jiajunpoh\Desktop\CS5224\healthy_meal_planner\.github\workflows\deploy-gcp.yml), which deploys on pushes to `main` and via manual dispatch.
+
+Required GitHub secrets:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`
+- `GCP_SERVICE_ACCOUNT`
+- `GCP_PROJECT_ID` if you do not want to store it as a repo variable
+- `CLOUD_RUN_BACKEND_ENV_VARS` optional multi-line YAML for backend runtime env vars
+
+Recommended GitHub variables:
+
+- `GCP_PROJECT_ID`
+- `GCP_REGION`
+- `BACKEND_SERVICE_NAME`
+- `FRONTEND_SERVICE_NAME`
+
+Example `CLOUD_RUN_BACKEND_ENV_VARS` secret value:
+
+```yaml
+DATABASE_URL: postgresql://postgres:password@/meal_planner?host=/cloudsql/your-project:asia-southeast1:meal-planner
+JWT_SECRET: replace-me
+SMTP_HOST: smtp-relay.brevo.com
+SMTP_PORT: "587"
+SMTP_USER: replace-me
+SMTP_PASSWORD: replace-me
+SMTP_FROM: replace-me@example.com
+JWT_EXP_MINUTES: "1440"
+```

@@ -1,0 +1,58 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID != '' && vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+      GCP_REGION: ${{ vars.GCP_REGION != '' && vars.GCP_REGION || 'asia-southeast1' }}
+      BACKEND_SERVICE_NAME: ${{ vars.BACKEND_SERVICE_NAME != '' && vars.BACKEND_SERVICE_NAME || 'meal-planner-api' }}
+      FRONTEND_SERVICE_NAME: ${{ vars.FRONTEND_SERVICE_NAME != '' && vars.FRONTEND_SERVICE_NAME || 'meal-planner-web' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Write backend env vars file
+        if: ${{ secrets.CLOUD_RUN_BACKEND_ENV_VARS != '' }}
+        shell: bash
+        run: |
+          cat <<'EOF' > backend.env.yaml
+          ${{ secrets.CLOUD_RUN_BACKEND_ENV_VARS }}
+          EOF
+
+      - name: Deploy backend and frontend
+        shell: pwsh
+        run: |
+          $params = @{
+            ProjectId = "${{ env.GCP_PROJECT_ID }}"
+            Region = "${{ env.GCP_REGION }}"
+            BackendServiceName = "${{ env.BACKEND_SERVICE_NAME }}"
+            FrontendServiceName = "${{ env.FRONTEND_SERVICE_NAME }}"
+          }
+          if (Test-Path backend.env.yaml) {
+            $params["BackendEnvVarsFile"] = "backend.env.yaml"
+          }
+          ./scripts/deploy-fullstack-gcp.ps1 @params
+
