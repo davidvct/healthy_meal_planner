@@ -90,6 +90,52 @@ function Get-CloudSqlInstanceFromDatabaseUrl {
     return $null
 }
 
+function Convert-EnvVarsFileToJson {
+    param([string]$Path)
+
+    $raw = Get-Content -Path $Path -Raw
+    $envMap = [ordered]@{}
+
+    foreach ($line in ($raw -split "`r?`n")) {
+        $trimmed = $line.Trim()
+        if (-not $trimmed -or $trimmed.StartsWith("#")) {
+            continue
+        }
+
+        if ($trimmed.Contains("=")) {
+            $parts = $trimmed.Split("=", 2)
+            $key = $parts[0].Trim()
+            $value = $parts[1].Trim()
+        }
+        elseif ($trimmed.Contains(":")) {
+            $parts = $trimmed.Split(":", 2)
+            $key = $parts[0].Trim()
+            $value = $parts[1].Trim()
+        }
+        else {
+            throw "Unsupported env vars file line: $trimmed"
+        }
+
+        if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+            $value = $value.Substring(1, $value.Length - 2)
+        }
+
+        if (-not $key) {
+            throw "Invalid env vars file entry: $trimmed"
+        }
+
+        $envMap[$key] = $value
+    }
+
+    if ($envMap.Count -eq 0) {
+        throw "Env vars file $Path did not contain any parseable entries."
+    }
+
+    $tempJson = Join-Path ([System.IO.Path]::GetTempPath()) ("cloudrun-env-" + [System.Guid]::NewGuid().ToString("N") + ".json")
+    $envMap | ConvertTo-Json -Compress | Set-Content -Path $tempJson -Encoding UTF8
+    return $tempJson
+}
+
 if (-not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
     throw "gcloud CLI is required but was not found in PATH."
 }
@@ -102,6 +148,7 @@ if ([string]::IsNullOrWhiteSpace($CloudSqlInstance)) {
 }
 
 $resolvedSourcePath = Resolve-Path -Path (Join-Path $repoRoot $SourcePath)
+$normalizedEnvFile = $null
 
 Write-Host "Deploying $ServiceName to Cloud Run in project $ProjectId ($Region)..."
 if ($CloudSqlInstance) {
@@ -148,13 +195,20 @@ if (-not [string]::IsNullOrWhiteSpace($CloudSqlInstance)) {
     $deployArgs += @("--add-cloudsql-instances", $CloudSqlInstance)
 }
 
-if (-not [string]::IsNullOrWhiteSpace($EnvVarsFile)) {
-    $resolvedEnvFile = Resolve-Path -Path (Join-Path $repoRoot $EnvVarsFile)
-    $deployArgs += @("--env-vars-file", $resolvedEnvFile.Path)
-}
+try {
+    if (-not [string]::IsNullOrWhiteSpace($EnvVarsFile)) {
+        $resolvedEnvFile = Resolve-Path -Path (Join-Path $repoRoot $EnvVarsFile)
+        $normalizedEnvFile = Convert-EnvVarsFileToJson -Path $resolvedEnvFile.Path
+        $deployArgs += @("--env-vars-file", $normalizedEnvFile)
+    }
 
-& gcloud @deployArgs
-if ($LASTEXITCODE -ne 0) {
-    throw "gcloud run deploy failed with exit code $LASTEXITCODE."
+    & gcloud @deployArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw "gcloud run deploy failed with exit code $LASTEXITCODE."
+    }
 }
-
+finally {
+    if ($normalizedEnvFile -and (Test-Path $normalizedEnvFile)) {
+        Remove-Item -Path $normalizedEnvFile -Force
+    }
+}
