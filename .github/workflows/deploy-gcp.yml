@@ -13,11 +13,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID != '' && vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
-      GCP_REGION: ${{ vars.GCP_REGION != '' && vars.GCP_REGION || 'asia-southeast1' }}
-      BACKEND_SERVICE_NAME: ${{ vars.BACKEND_SERVICE_NAME != '' && vars.BACKEND_SERVICE_NAME || 'meal-planner-api' }}
-      FRONTEND_SERVICE_NAME: ${{ vars.FRONTEND_SERVICE_NAME != '' && vars.FRONTEND_SERVICE_NAME || 'meal-planner-web' }}
 
     steps:
       - name: Check out repository
@@ -32,27 +27,32 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: ${{ env.GCP_PROJECT_ID }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Write backend env vars file
-        if: ${{ secrets.CLOUD_RUN_BACKEND_ENV_VARS != '' }}
         shell: bash
+        env:
+          CLOUD_RUN_BACKEND_ENV_VARS: ${{ secrets.CLOUD_RUN_BACKEND_ENV_VARS }}
         run: |
-          cat <<'EOF' > backend.env.yaml
-          ${{ secrets.CLOUD_RUN_BACKEND_ENV_VARS }}
-          EOF
+          if [ -n "$CLOUD_RUN_BACKEND_ENV_VARS" ]; then
+            printf '%s\n' "$CLOUD_RUN_BACKEND_ENV_VARS" > backend.env.yaml
+          fi
 
       - name: Deploy backend and frontend
         shell: pwsh
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          GCP_REGION: ${{ vars.GCP_REGION }}
+          BACKEND_SERVICE_NAME: ${{ vars.BACKEND_SERVICE_NAME }}
+          FRONTEND_SERVICE_NAME: ${{ vars.FRONTEND_SERVICE_NAME }}
         run: |
           $params = @{
-            ProjectId = "${{ env.GCP_PROJECT_ID }}"
-            Region = "${{ env.GCP_REGION }}"
-            BackendServiceName = "${{ env.BACKEND_SERVICE_NAME }}"
-            FrontendServiceName = "${{ env.FRONTEND_SERVICE_NAME }}"
+            ProjectId = $env:GCP_PROJECT_ID
+            Region = $(if ($env:GCP_REGION) { $env:GCP_REGION } else { "asia-southeast1" })
+            BackendServiceName = $(if ($env:BACKEND_SERVICE_NAME) { $env:BACKEND_SERVICE_NAME } else { "meal-planner-api" })
+            FrontendServiceName = $(if ($env:FRONTEND_SERVICE_NAME) { $env:FRONTEND_SERVICE_NAME } else { "meal-planner-web" })
           }
           if (Test-Path backend.env.yaml) {
             $params["BackendEnvVarsFile"] = "backend.env.yaml"
           }
           ./scripts/deploy-fullstack-gcp.ps1 @params
-
