@@ -133,7 +133,10 @@ function Convert-EnvVarsFileToJson {
 
     $tempJson = Join-Path ([System.IO.Path]::GetTempPath()) ("cloudrun-env-" + [System.Guid]::NewGuid().ToString("N") + ".json")
     $envMap | ConvertTo-Json -Compress | Set-Content -Path $tempJson -Encoding UTF8
-    return $tempJson
+    return @{
+        Path = $tempJson
+        Keys = @($envMap.Keys)
+    }
 }
 
 if (-not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
@@ -149,6 +152,7 @@ if ([string]::IsNullOrWhiteSpace($CloudSqlInstance)) {
 
 $resolvedSourcePath = Resolve-Path -Path (Join-Path $repoRoot $SourcePath)
 $normalizedEnvFile = $null
+$normalizedEnvKeys = @()
 
 Write-Host "Deploying $ServiceName to Cloud Run in project $ProjectId ($Region)..."
 if ($CloudSqlInstance) {
@@ -198,7 +202,12 @@ if (-not [string]::IsNullOrWhiteSpace($CloudSqlInstance)) {
 try {
     if (-not [string]::IsNullOrWhiteSpace($EnvVarsFile)) {
         $resolvedEnvFile = Resolve-Path -Path (Join-Path $repoRoot $EnvVarsFile)
-        $normalizedEnvFile = Convert-EnvVarsFileToJson -Path $resolvedEnvFile.Path
+        $normalizedEnvInfo = Convert-EnvVarsFileToJson -Path $resolvedEnvFile.Path
+        $normalizedEnvFile = $normalizedEnvInfo.Path
+        $normalizedEnvKeys = $normalizedEnvInfo.Keys
+        if ($normalizedEnvKeys.Count -gt 0) {
+            $deployArgs += @("--remove-secrets", ($normalizedEnvKeys -join ","))
+        }
         $deployArgs += @("--env-vars-file", $normalizedEnvFile)
     }
 
