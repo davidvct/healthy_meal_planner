@@ -90,6 +90,7 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($backendUrl)) {
 
 $frontendApiBaseUrl = "$($backendUrl.TrimEnd('/'))/api"
 Write-Host "Deploying frontend service $FrontendServiceName with API base URL $frontendApiBaseUrl ..."
+$backendOrigin = $backendUrl.TrimEnd('/')
 
 $frontendDeployArgs = @(
     "run"
@@ -117,6 +118,8 @@ $frontendDeployArgs = @(
     "$FrontendMaxInstances"
     "--set-build-env-vars"
     "VITE_API_BASE_URL=$frontendApiBaseUrl"
+    "--set-env-vars"
+    "BACKEND_ORIGIN=$backendOrigin"
 )
 
 if ($FrontendRequireInvokerAuth) {
