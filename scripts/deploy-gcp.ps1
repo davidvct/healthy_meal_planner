@@ -205,10 +205,27 @@ try {
         $normalizedEnvInfo = Convert-EnvVarsFileToJson -Path $resolvedEnvFile.Path
         $normalizedEnvFile = $normalizedEnvInfo.Path
         $normalizedEnvKeys = $normalizedEnvInfo.Keys
-        if ($normalizedEnvKeys.Count -gt 0) {
-            $deployArgs += @("--remove-secrets", ($normalizedEnvKeys -join ","))
-        }
         $deployArgs += @("--env-vars-file", $normalizedEnvFile)
+    }
+
+    if ($normalizedEnvKeys.Count -gt 0) {
+        $removeSecretsArgs = @(
+            "run"
+            "services"
+            "update"
+            $ServiceName
+            "--region"
+            $Region
+            "--platform"
+            "managed"
+            "--remove-secrets"
+            ($normalizedEnvKeys -join ",")
+        )
+
+        & gcloud @removeSecretsArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Failed removing existing secret-backed env vars before deploy. Continuing with deploy attempt."
+        }
     }
 
     & gcloud @deployArgs
