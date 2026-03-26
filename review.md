@@ -6,7 +6,7 @@ Beyond scaling, security (DDoS), and cost control:
 
 | Concern | Why It Matters for MealWise |
 |---|---|
-| **Secrets management** | `JWT_SECRET` defaults to `"dev-change-this-secret"` in `backend/security.py`. SMTP creds are in plaintext `.txt` files. Use GCP Secret Manager instead. |
+| **Secrets management** | `JWT_SECRET` should be supplied via environment variables or Secret Manager. SMTP credentials should not be committed to source. |
 | **Password hashing** | `backend/security.py` uses **plain SHA-256** — no salt, no iteration. This is insecure. Switch to `bcrypt` or `argon2`. |
 | **Database connection pooling** | `backend/db.py` uses direct psycopg connections. Under load, you'll exhaust Cloud SQL connections. Need a connection pool (e.g., `psycopg_pool` or Cloud SQL Auth Proxy with pgbouncer). |
 | **Observability** | No structured logging, no metrics, no tracing. Add Cloud Logging / Cloud Trace integration for debugging production issues. |

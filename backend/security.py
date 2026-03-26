@@ -27,7 +27,9 @@ def _b64url_decode(data: str) -> bytes:
 
 
 def _secret() -> bytes:
-    secret = get_setting("JWT_SECRET", "dev-change-this-secret") or "dev-change-this-secret"
+    secret = get_setting("JWT_SECRET")
+    if not secret:
+        raise RuntimeError("JWT_SECRET must be set via environment, .env, or application.properties")
     return secret.encode("utf-8")
 
 

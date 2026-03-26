@@ -100,7 +100,7 @@ Client                        Backend
 
 **JWT Payload fields:** `sub` (auth_user_id), `email`, `tier`, `iat`, `exp`
 **Algorithm:** HS256
-**Secret:** `JWT_SECRET` env var (default dev: `dev-change-this-secret`)
+**Secret:** `JWT_SECRET` env var (required; no hardcoded fallback)
 **Expiry:** Configurable; default 1440 min (24 h)
 
 ### 2.2 Subscription Tier Gating

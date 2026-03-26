@@ -112,8 +112,9 @@ Configuration:
 - the backend loads `.env` in the project root automatically (via `python-dotenv`), then falls back to `application.properties`
 - environment variables always take priority over both files
 - `DATABASE_URL` must be a PostgreSQL URL
-- for local development, create a `.env` file with your database connection (see `.env.example`)
+- for local development, create a `.env` file with your local secrets and connection values (see `.env.example`)
 - on startup, the backend runs schema initialization/migrations via `backend.db.init_db()`
+- `JWT_SECRET` is required and is no longer allowed to fall back to a hardcoded default
 
 ### Frontend
 
