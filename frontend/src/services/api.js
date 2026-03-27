@@ -246,3 +246,24 @@ export async function saveThresholds(userId, thresholds) {
     body: JSON.stringify({ thresholds }),
   });
 }
+
+// ---- Health Metrics ----
+
+export async function getHealthMetrics(userId, dateFrom, dateTo) {
+  const params = new URLSearchParams();
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo) params.set("date_to", dateTo);
+  const qs = params.toString();
+  return request(`/health-metrics/${userId}${qs ? `?${qs}` : ""}`);
+}
+
+export async function addHealthMetric(userId, data) {
+  return request(`/health-metrics/${userId}`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteHealthMetric(userId, entryId) {
+  return request(`/health-metrics/${userId}/${entryId}`, { method: "DELETE" });
+}
