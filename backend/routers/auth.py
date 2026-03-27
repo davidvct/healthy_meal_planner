@@ -65,10 +65,6 @@ def _send_otp_email(email: str, otp_code: str) -> str:
         print(f"[auth] OTP for {email}: {otp_code}", flush=True)
         return "console"
 
-    # For local development, uncomment the next two lines to skip SMTP:
-    print(f"[auth] OTP for {email}: {otp_code}", flush=True)
-    return "console"
-
     message = EmailMessage()
     message["Subject"] = "MealWise OTP Verification"
     message["From"] = smtp_from

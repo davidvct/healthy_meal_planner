@@ -49,9 +49,10 @@ export default function AuthScreen({ onAuthenticated }) {
     setError(""); setMessage(""); setLoading(true);
     try {
       const res = await api.requestOtp(email);
-      setMessage(res.delivery === "console"
-        ? "OTP generated. SMTP not configured, check backend terminal logs for OTP."
-        : "OTP sent to your email address.");
+      const nextMessage = res.delivery === "email"
+        ? "OTP sent to your email address."
+        : "OTP generated. SMTP not configured, check backend terminal logs for OTP.";
+      setMessage(nextMessage);
     } catch (err) {
       setError(err.message || "Failed to send OTP");
     } finally { setLoading(false); }
