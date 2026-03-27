@@ -65,6 +65,8 @@ function CustomTooltip({ active, payload, label, mealsByDate, dishDetails }) {
       padding: '10px 14px', fontFamily: 'var(--font)',
       boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
       maxWidth: 280,
+      position: 'relative',
+      zIndex: 1000,
     }}>
       <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'rgba(255,255,255,0.6)' }}>
         {label}
@@ -124,13 +126,13 @@ function HealthChart({ title, data, lines, unit, referenceAreas, referenceLines,
           <div style={{ fontSize: 11, color: 'var(--text3)' }}>Add measurements to see trends here</div>
         </div>
       ) : (
-        <div style={{ width: '100%', height: 220 }}>
+        <div style={{ width: '100%', height: 220, overflow: 'visible' }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
               <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#8A9BB0' }} />
               <YAxis tick={{ fontSize: 10, fill: '#8A9BB0' }} width={40} />
-              <Tooltip content={<CustomTooltip mealsByDate={mealsByDate} dishDetails={dishDetails} />} />
+              <Tooltip content={<CustomTooltip mealsByDate={mealsByDate} dishDetails={dishDetails} />} wrapperStyle={{ zIndex: 1000 }} />
               {referenceAreas?.map((ra, i) => (
                 <ReferenceArea key={i} y1={ra.y1} y2={ra.y2} fill={ra.fill} />
               ))}
@@ -587,6 +589,9 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
           mealsByDate={mealsByDate}
           dishDetails={dishDetails}
         />
+
+        {/* Spacer so the cholesterol tooltip doesn't get clipped at the bottom */}
+        <div style={{ height: 220 }} />
 
       </div>
     </div>
