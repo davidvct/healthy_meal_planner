@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, ReferenceArea, ReferenceLine,
 } from 'recharts';
 import * as api from '../services/api';
+import DateRangePicker from './DateRangePicker';
 
 // ── Healthy range constants ──
 const RANGES = {
@@ -180,6 +181,9 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
   const [dishDetails, setDishDetails] = useState({});
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+  const [customStart, setCustomStart] = useState(() => toDateStr(new Date()));
+  const [customEnd, setCustomEnd] = useState(() => toDateStr(new Date()));
+  const [showPicker, setShowPicker] = useState(false);
 
   // Form state — #4: removed formTime
   const [formDate, setFormDate] = useState(toDateStr(new Date()));
@@ -196,13 +200,15 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
   const saveTimerRef = useRef(null);
 
   const getDateRange = useCallback(() => {
+    if (range === 'custom' && customStart && customEnd) {
+      return { from: customStart, to: customEnd };
+    }
     const to = new Date();
     const from = new Date();
     if (range === '7d') from.setDate(from.getDate() - 6);
     else if (range === '30d') from.setDate(from.getDate() - 29);
-    else from.setFullYear(from.getFullYear() - 1);
     return { from: toDateStr(from), to: toDateStr(to) };
-  }, [range]);
+  }, [range, customStart, customEnd]);
 
   const loadMetrics = useCallback(async () => {
     if (!userId) return;
@@ -361,9 +367,9 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
   })();
 
   const rangePills = [
-    { id: '7d', label: '7 days' },
-    { id: '30d', label: '30 days' },
-    { id: '1y', label: '1 year' },
+    { id: '7d', label: 'Week' },
+    { id: '30d', label: 'Month' },
+    { id: 'custom', label: 'Custom' },
   ];
 
   return (
@@ -479,6 +485,39 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
                 {p.label}
               </button>
             ))}
+            {range === 'custom' && (
+              <div style={{ position: 'relative', marginLeft: 8 }}>
+                <button
+                  onClick={() => setShowPicker(v => !v)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    fontSize: 11, fontWeight: 600, padding: '4px 10px',
+                    border: `1.5px solid ${showPicker ? 'var(--teal)' : 'var(--border2)'}`,
+                    borderRadius: 7, background: showPicker ? 'var(--teal-xl)' : 'var(--white)',
+                    color: 'var(--text)', cursor: 'pointer', fontFamily: 'var(--font)',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                    <rect x="1" y="3" width="14" height="12" rx="2" stroke="var(--text3)" strokeWidth="1.5"/>
+                    <path d="M5 1v4M11 1v4M1 7h14" stroke="var(--text3)" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  {customStart && customEnd ? (() => {
+                    const s = new Date(customStart), e = new Date(customEnd);
+                    const days = Math.round((e - s) / 86400000) + 1;
+                    const fmt = d => d.toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
+                    return <>{fmt(s)}<span style={{ color: 'var(--text3)' }}>{'\u2192'}</span>{fmt(e)}<span style={{ color: 'var(--teal)', fontWeight: 700 }}>{days}d</span></>;
+                  })() : 'Select dates'}
+                </button>
+                {showPicker && (
+                  <DateRangePicker
+                    startDate={customStart}
+                    endDate={customEnd}
+                    onChange={({ start, end }) => { setCustomStart(start); setCustomEnd(end); }}
+                    onClose={() => setShowPicker(false)}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -538,7 +577,7 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
             { key: 'trigly', name: 'Triglycerides (mmol/L)', color: COLORS.trigly },
           ]}
           unit="mmol/L"
-          rangeLabel={`Total ${RANGES.totalChol.label}, LDL ${RANGES.ldl.label}`}
+          rangeLabel={`Total ${RANGES.totalChol.label}, LDL ${RANGES.ldl.label}, HDL ${RANGES.hdl.label}, TG ${RANGES.trigly.label}`}
           referenceLines={[
             { y: RANGES.totalChol.high, stroke: COLORS.totalChol, label: 'TC max' },
             { y: RANGES.ldl.high, stroke: COLORS.ldl, label: 'LDL max' },
