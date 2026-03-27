@@ -222,6 +222,10 @@ def login(body: LoginBody, conn: Any = Depends(get_db)) -> dict:
     ).fetchone()
     tier = ct_row["subscription_tier"] if ct_row else "free"
 
+    # Track login timestamp for engagement metrics
+    conn.execute("UPDATE users SET last_login_at = NOW() WHERE id = ?", (row["id"],))
+    conn.commit()
+
     token = create_access_token(auth_user_id=row["id"], email=row["email"], tier=tier)
     return {
         "success": True,

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import NutritionChart from './NutritionChart';
 import DateRangePicker from './DateRangePicker';
 import * as api from '../services/api';
+import { trackProfileSaved, trackConditionChanged, trackDinerAdded, trackDinerRemoved } from '../services/analytics';
 
 const AV_CLASSES = ['dcav-t', 'dcav-p', 'dcav-b'];
 
@@ -54,24 +55,20 @@ function conditionTagClass(cond) {
   return 'tg-amber';
 }
 
-// Base nutrient tab definitions (targets adjusted per conditions later)
+// Base nutrient tab definitions — actual targets come from backend via getRecommendedLimits()
 const NUTRIENT_TABS = [
-  { key: 'calories', label: 'Calories', unit: 'kcal', color: '#B45309', baseTarget: 2000, higherIsBetter: true },
-  { key: 'sodium',   label: 'Sodium',   unit: 'mg',   color: '#0369A1', baseTarget: 2300, higherIsBetter: false },
-  { key: 'sugar',    label: 'Sugar',    unit: 'g',    color: '#BE185D', baseTarget: 50,   higherIsBetter: false },
-  { key: 'protein',  label: 'Protein',  unit: 'g',    color: '#0B2240', baseTarget: 70,   higherIsBetter: true  },
-  { key: 'fat',      label: 'Fat',      unit: 'g',    color: '#6D3FA0', baseTarget: 78,   higherIsBetter: false },
+  { key: 'calories', label: 'Calories', unit: 'kcal', color: '#B45309', fallback: 2000, higherIsBetter: true },
+  { key: 'sodium',   label: 'Sodium',   unit: 'mg',   color: '#0369A1', fallback: 2000, higherIsBetter: false },
+  { key: 'sugar',    label: 'Sugar',    unit: 'g',    color: '#BE185D', fallback: 50,   higherIsBetter: false },
+  { key: 'protein',  label: 'Protein',  unit: 'g',    color: '#0B2240', fallback: 60,   higherIsBetter: true  },
+  { key: 'fat',      label: 'Fat',      unit: 'g',    color: '#6D3FA0', fallback: 65,   higherIsBetter: false },
 ];
 
-// Derive per-diner adjusted targets and condition flags
-function getDinerTabs(condList) {
+// Derive per-diner adjusted targets from backend-provided recommended limits
+function getDinerTabs(backendTargets) {
   return NUTRIENT_TABS.map(t => {
-    let target = t.baseTarget;
-    let flag = null;
-    if (t.key === 'sugar'  && (condList.includes('diabetes') || condList.includes('high blood sugar'))) { target = 25; flag = 'Diabetes'; }
-    if (t.key === 'fat'    && (condList.includes('cholesterol') || condList.includes('high cholesterol'))) { target = 44; flag = 'Chol.'; }
-    if (t.key === 'sodium' && (condList.includes('hypertension') || condList.includes('high blood pressure'))) { target = 1500; flag = 'Hypert.'; }
-    return { ...t, target, flag };
+    const target = backendTargets?.[t.key] || t.fallback;
+    return { ...t, target, baseTarget: t.fallback };
   });
 }
 
@@ -136,10 +133,19 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
   // Raw data: array of { label, nutrients, active, hasMeals }
   const [rawPoints,    setRawPoints]    = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
+  const [backendTargets, setBackendTargets] = useState(null);
 
   useEffect(() => {
     setSelected(activeDiner || diners[0] || null);
   }, [activeDiner, diners]);
+
+  // Load condition-aware nutrient targets from backend
+  useEffect(() => {
+    if (!selected?.userId) return;
+    api.getRecommendedLimits(selected.userId).then(res => {
+      if (res?.recommended) setBackendTargets(res.recommended);
+    }).catch(() => {});
+  }, [selected?.userId]);
 
   // Reset offset when switching modes
   const handleSetRangeMode = (mode) => {
@@ -242,6 +248,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
     if (!confirm(`Delete ${diner.name}? This cannot be undone.`)) return;
     try {
       await api.deleteDiner(diner.userId);
+      trackDinerRemoved();
       onDinersChanged();
     } catch (err) {
       console.error('Delete failed:', err);
@@ -249,8 +256,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
   };
 
   // Derived chart data
-  const condList  = parseTags(selected?.conditions).map(c => c.toLowerCase());
-  const dinerTabs = getDinerTabs(condList);
+  const dinerTabs = getDinerTabs(backendTargets);
   const nutTab    = dinerTabs.find(t => t.key === ndNut) || dinerTabs[0];
   const chartData = rawPoints.map(d => ({ label: d.label, value: d.nutrients?.[ndNut] || 0, active: d.active }));
   const hasData   = chartData.some(d => d.value > 0);

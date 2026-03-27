@@ -176,6 +176,11 @@ export async function clearWeekMealPlan(userId, weekStart) {
   return request(`/mealplan/${userId}/clear${params}`, { method: "DELETE" });
 }
 
+export async function clearDayMealPlan(userId, weekStart, dayIndex) {
+  const params = `?weekStart=${encodeURIComponent(weekStart)}&dayIndex=${dayIndex}`;
+  return request(`/mealplan/${userId}/clear${params}`, { method: "DELETE" });
+}
+
 export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLimitSeconds = 10, dayIndex, maxDishesPerSlot, nutrientLimits } = {}) {
   return request(`/mealplan/${userId}/generate`, {
     method: "POST",

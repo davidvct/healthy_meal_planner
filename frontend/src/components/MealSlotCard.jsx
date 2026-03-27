@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from '../services/api';
+import { trackDishSwapped, trackDishRemoved, trackDishFavourited, trackServingsChanged } from '../services/analytics';
 
 /**
  * Compact meal-slot card — renders all dishes for a single meal type
@@ -13,7 +14,7 @@ const MEAL_THEME = {
   dinner:    { accent: '#069B8E', bg: '#EFF6FF', border: '#BFDBFE', emoji: '🌙', label: 'Dinner' },
 };
 
-function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, userId, locked, isLast, canRemove }) {
+function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, userId, locked, canRemove }) {
   const [fav, setFav] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const dishId = entry.dishId || entry.id;
@@ -27,6 +28,7 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, user
     e.stopPropagation();
     const next = !fav;
     setFav(next);
+    trackDishFavourited(entry.dishName || dishId, next);
     try {
       if (next) await api.addFavourite(userId, dishId);
       else await api.removeFavourite(userId, dishId);
@@ -88,10 +90,13 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, user
   const steps = dishDetail?.recipe?.steps || [];
 
   return (
-    <div style={{ borderBottom: isLast ? 'none' : '1px solid var(--border)' }}>
+    <div style={{
+      margin: '10px 10px 12px', border: '1px solid var(--border)', borderRadius: 10,
+      overflow: 'hidden', background: 'var(--white)',
+    }}>
       {/* Main row */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
         cursor: 'pointer',
       }} onClick={() => setExpanded(e => !e)}>
 
@@ -124,37 +129,39 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, user
         </div>
 
         {/* Kcal + qty stepper */}
-        <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+        <div style={{ textAlign: 'right', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--navy)' }}>
             {kcal} <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)' }}>kcal</span>
           </div>
           {/* Qty stepper */}
           {!locked && onServingsChange && (
-            <div style={{
+            <div className="qty-stepper" style={{
               display: 'flex', alignItems: 'center', gap: 0,
               border: '1.5px solid var(--border)', borderRadius: 8, overflow: 'hidden',
             }} onClick={e => e.stopPropagation()}>
               <button
-                onClick={() => { if (qty > 1) onServingsChange(entry.id, qty - 1); }}
+                onClick={() => { if (qty > 1) { onServingsChange(entry.id, qty - 1); trackServingsChanged(entry.dishName || '', qty - 1); } }}
                 disabled={qty <= 1}
+                className="qty-stepper-btn"
                 style={{
-                  width: 24, height: 24, border: 'none', background: qty <= 1 ? 'var(--bg)' : 'var(--white)',
-                  color: qty <= 1 ? 'var(--border2)' : 'var(--text2)', fontSize: 14, fontWeight: 700,
+                  minWidth: 32, minHeight: 32, border: 'none', background: qty <= 1 ? 'var(--bg)' : 'var(--white)',
+                  color: qty <= 1 ? 'var(--border2)' : 'var(--text2)', fontSize: 16, fontWeight: 700,
                   cursor: qty <= 1 ? 'default' : 'pointer', fontFamily: 'var(--font)', lineHeight: 1,
                 }}
               >−</button>
               <span style={{
-                width: 28, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 800, color: 'var(--navy)',
+                minWidth: 32, minHeight: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 800, color: 'var(--navy)',
                 borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)',
                 background: 'var(--bg)',
               }}>{qty}</span>
               <button
-                onClick={() => { if (qty < 10) onServingsChange(entry.id, qty + 1); }}
+                onClick={() => { if (qty < 10) { onServingsChange(entry.id, qty + 1); trackServingsChanged(entry.dishName || '', qty + 1); } }}
                 disabled={qty >= 10}
+                className="qty-stepper-btn"
                 style={{
-                  width: 24, height: 24, border: 'none', background: qty >= 10 ? 'var(--bg)' : 'var(--white)',
-                  color: qty >= 10 ? 'var(--border2)' : 'var(--teal)', fontSize: 14, fontWeight: 700,
+                  minWidth: 32, minHeight: 32, border: 'none', background: qty >= 10 ? 'var(--bg)' : 'var(--white)',
+                  color: qty >= 10 ? 'var(--border2)' : 'var(--teal)', fontSize: 16, fontWeight: 700,
                   cursor: qty >= 10 ? 'default' : 'pointer', fontFamily: 'var(--font)', lineHeight: 1,
                 }}
               >+</button>
@@ -166,39 +173,11 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, user
             </div>
           )}
         </div>
-
-        {/* Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-          {!locked && canRemove && onRemove && (
-            <button
-              onClick={e => { e.stopPropagation(); onRemove(entry); }}
-              title="Remove dish"
-              style={{
-                background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--r-xs)',
-                padding: '3px 7px', fontSize: 10, fontWeight: 600, color: 'var(--text3)',
-                cursor: 'pointer', fontFamily: 'var(--font)', lineHeight: 1,
-                transition: 'all 0.12s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color = 'var(--coral)'; e.currentTarget.style.borderColor = 'var(--coral)'; }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
-            >Remove</button>
-          )}
-          {!locked && onBrowse && (
-            <button className="mc-swap-inline" onClick={e => { e.stopPropagation(); onBrowse(); }}
-              style={{ color: 'var(--teal)', padding: '4px 8px', fontSize: 11 }}>
-              Change
-            </button>
-          )}
-          <button className={`mc-fav-btn${fav ? ' on' : ''}`} onClick={handleFav}
-            style={{ fontSize: 14, padding: '2px 4px' }}>
-            {fav ? '♥' : '♡'}
-          </button>
-        </div>
       </div>
 
-      {/* Macros bar — always visible, large text */}
+      {/* Macros bar — always visible */}
       <div style={{
-        display: 'flex', gap: 0, padding: '0 14px 8px 72px',
+        display: 'flex', gap: 0, padding: '0 14px 6px 72px',
         fontSize: 12, color: 'var(--text3)',
       }}>
         {[
@@ -214,6 +193,60 @@ function DishRow({ entry, dishDetail, onBrowse, onServingsChange, onRemove, user
           </span>
         ))}
       </div>
+
+      {/* Action pills — compact, right-aligned */}
+      {!locked && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          gap: 6, padding: '4px 12px 8px 72px',
+        }}>
+          {canRemove && onRemove && (
+            <button
+              onClick={e => { e.stopPropagation(); trackDishRemoved(entry.mealType || 'unknown'); onRemove(entry); }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', borderRadius: 20,
+                border: '1px solid var(--border)', background: 'var(--white)',
+                fontSize: 10, fontWeight: 600, color: 'var(--text3)',
+                cursor: 'pointer', fontFamily: 'var(--font)',
+                transition: 'all 0.15s', lineHeight: 1,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--red-l)'; e.currentTarget.style.color = 'var(--coral)'; e.currentTarget.style.borderColor = 'var(--coral)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--white)'; e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.borderColor = 'var(--border)'; }}
+            >✕ Remove</button>
+          )}
+          {onBrowse && (
+            <button
+              onClick={e => { e.stopPropagation(); trackDishSwapped(entry.mealType || 'unknown'); onBrowse(); }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', borderRadius: 20,
+                border: '1px solid var(--teal)', background: 'var(--teal-xl)',
+                fontSize: 10, fontWeight: 600, color: 'var(--teal)',
+                cursor: 'pointer', fontFamily: 'var(--font)',
+                transition: 'all 0.15s', lineHeight: 1,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--teal)'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'var(--teal-xl)'; e.currentTarget.style.color = 'var(--teal)'; }}
+            >↻ Change</button>
+          )}
+          <button
+            onClick={handleFav}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '4px 10px', borderRadius: 20,
+              border: fav ? '1px solid var(--red)' : '1px solid var(--border)',
+              background: fav ? 'var(--red-l)' : 'var(--white)',
+              fontSize: 10, fontWeight: 600,
+              color: fav ? 'var(--red)' : 'var(--text3)',
+              cursor: 'pointer', fontFamily: 'var(--font)',
+              transition: 'all 0.15s', lineHeight: 1,
+            }}
+            onMouseEnter={e => { if (!fav) { e.currentTarget.style.borderColor = 'var(--red)'; e.currentTarget.style.color = 'var(--red)'; } }}
+            onMouseLeave={e => { if (!fav) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text3)'; } }}
+          >{fav ? '♥ Saved' : '♡ Save'}</button>
+        </div>
+      )}
 
       {/* Expanded: ingredients + preparation */}
       {expanded && (
@@ -310,7 +343,7 @@ export default function MealSlotCard({ mealType, entries, dishDetails, onBrowse,
       </div>
 
       {/* Dish rows */}
-      {entries.map((entry, i) => (
+      {entries.map((entry) => (
         <DishRow
           key={entry.id}
           entry={entry}
@@ -321,7 +354,6 @@ export default function MealSlotCard({ mealType, entries, dishDetails, onBrowse,
           canRemove={true}
           userId={userId}
           locked={locked}
-          isLast={!locked && entries.length < MAX_DISHES_PER_SLOT ? true : i === entries.length - 1}
         />
       ))}
 

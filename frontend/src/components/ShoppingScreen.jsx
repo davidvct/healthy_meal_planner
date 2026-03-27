@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../services/api';
+import { trackShoppingItemChecked } from '../services/analytics';
 
 const RANGE_OPTIONS = [
   { id: 'today', label: 'Today' },
@@ -174,7 +175,7 @@ export default function ShoppingScreen({ diners, activeDiner, onGoToPlan }) {
 
   const toggleCheck = (key) => {
     const next = new Set(checked);
-    if (next.has(key)) next.delete(key); else next.add(key);
+    if (next.has(key)) next.delete(key); else { next.add(key); trackShoppingItemChecked(key); }
     saveChecked(next);
   };
 

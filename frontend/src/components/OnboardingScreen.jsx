@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { trackOnboardingStarted, trackOnboardingCompleted } from "../services/analytics";
 
 const conditionOptions = [
   { value: "High Blood Sugar",  label: "High blood sugar",    sub: "Diabetes",       emoji: "🩸" },
@@ -53,6 +54,9 @@ export default function OnboardingScreen({ onComplete, onCancel, onDelete, initi
   const initials = (name || "?").slice(0, 2).toUpperCase();
   const avatarBg = GRADIENTS[dinerIndex % GRADIENTS.length];
 
+  // Track when onboarding screen opens (once)
+  useEffect(() => { if (!isEdit) trackOnboardingStarted(); }, []);
+
   const toggleCondition = (val) => {
     setNoneSelected(false);
     setConditions(prev =>
@@ -70,6 +74,7 @@ export default function OnboardingScreen({ onComplete, onCancel, onDelete, initi
   };
 
   const handleSave = () => {
+    trackOnboardingCompleted(conditions);
     onComplete({
       name: name.trim() || "Diner",
       age: age !== "" ? Number(age) : null,
@@ -133,7 +138,7 @@ export default function OnboardingScreen({ onComplete, onCancel, onDelete, initi
       <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px 8px", display: "flex", flexDirection: "column", gap: 22, minHeight: 0 }}>
 
         {/* Name / Age / Weight row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+        <div className="onb-name-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
           <div className="field">
             <div className="field-lbl">Name</div>
             <input

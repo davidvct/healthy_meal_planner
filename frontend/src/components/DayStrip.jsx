@@ -85,24 +85,20 @@ export default function DayStrip({ weekDates, activeDayIndex, mealPlan, onSelect
                       title={filled ? tooltip : locked ? 'Past deadline' : ''}
                     >
                       <div className="ds-slot-ic">{locked && !filled ? '🔒' : sl.label}</div>
-                      <div className="ds-slot-name" style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      <div className="ds-slot-name" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                         {filled ? (
-                          allNames.map((name, i) => (
-                            <span key={i} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', lineHeight: 1.2 }}>
-                              {name}
+                          <>
+                            <span style={{ display: 'block', lineHeight: 1.25, wordBreak: 'break-word' }}>
+                              {allNames[0]}
                             </span>
-                          ))
+                            {allNames.length > 1 && (
+                              <span style={{ fontSize: 9, color: 'var(--text3)', fontStyle: 'italic', lineHeight: 1.2 }}>
+                                +{allNames.length - 1} more
+                              </span>
+                            )}
+                          </>
                         ) : locked ? 'Closed' : 'Not planned'}
                       </div>
-                      {filled && entries.length > 1 && (
-                        <span style={{
-                          fontSize: 8, fontWeight: 700, background: 'rgba(0,0,0,0.08)',
-                          borderRadius: 6, padding: '0 4px', lineHeight: '14px',
-                          flexShrink: 0, marginLeft: 'auto',
-                        }}>
-                          {entries.length}
-                        </span>
-                      )}
                     </div>
                   );
                 })}

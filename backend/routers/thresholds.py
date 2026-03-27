@@ -50,11 +50,24 @@ def get_recommended_limits(user_id: str, conn: Any = Depends(get_db)) -> dict:
     conditions = profile.conditions if profile else []
     condition_limits = get_condition_targets(conditions)
     healthy = dict(HEALTHY_DAILY_TARGETS)
-    # Add calories from profile
+    # Overlay user's demographic-specific targets (same logic as solver)
     if profile:
         from ..utils import parse_float
-        condition_limits["calories"] = parse_float(profile.recommended_calories, 2000.0)
-        healthy["calories"] = condition_limits["calories"]
+        cal = parse_float(profile.recommended_calories, 2000.0)
+        condition_limits["calories"] = cal
+        healthy["calories"] = cal
+        # Protein: use the higher of user demographic vs condition target
+        user_protein = parse_float(profile.recommended_protein, 0.0)
+        if user_protein > 0:
+            condition_limits["protein"] = max(user_protein, condition_limits["protein"])
+        # Carbs: use the stricter (lower) of user demographic vs condition target
+        user_carbs = parse_float(profile.recommended_carbs, 0.0)
+        if user_carbs > 0:
+            condition_limits["carbs"] = min(user_carbs, condition_limits["carbs"])
+        # Fat: use the stricter (lower) of user demographic vs condition target
+        user_fat = parse_float(profile.recommended_fat, 0.0)
+        if user_fat > 0:
+            condition_limits["fat"] = min(user_fat, condition_limits["fat"])
     return {
         "conditions": conditions,
         "healthy": healthy,

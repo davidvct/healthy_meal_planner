@@ -138,11 +138,10 @@ export default function ThresholdSettingsModal({ userId, onClose }) {
     >
       <div
         style={{
-          background: "#FEF0EB",
+          background: "var(--white)",
           borderRadius: 16,
-          padding: 28,
-          width: 440,
-          maxWidth: "90vw",
+          padding: "clamp(16px, 4vw, 28px)",
+          width: "min(440px, 92vw)",
           maxHeight: "80vh",
           overflowY: "auto",
           boxShadow: "0 8px 32px rgba(6,155,142,0.25)",

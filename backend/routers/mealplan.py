@@ -337,19 +337,30 @@ def update_entry_servings(
 def clear_week_meal_plan(
     user_id: str,
     weekStart: str | None = None,
+    dayIndex: int | None = None,
     conn: Any = Depends(get_db),
 ) -> dict[str, int | bool]:
     if not weekStart:
         raise HTTPException(status_code=400, detail="weekStart is required")
 
-    rows = conn.execute(
-        """
-        SELECT id, day_index, meal_type
-        FROM meal_plans
-        WHERE user_id = ? AND week_start = ?
-        """,
-        (user_id, weekStart),
-    ).fetchall()
+    if dayIndex is not None:
+        rows = conn.execute(
+            """
+            SELECT id, day_index, meal_type
+            FROM meal_plans
+            WHERE user_id = ? AND week_start = ? AND day_index = ?
+            """,
+            (user_id, weekStart, dayIndex),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, day_index, meal_type
+            FROM meal_plans
+            WHERE user_id = ? AND week_start = ?
+            """,
+            (user_id, weekStart),
+        ).fetchall()
 
     removable_ids = [
         int(row["id"])
