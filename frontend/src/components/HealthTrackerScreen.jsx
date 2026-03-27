@@ -373,8 +373,8 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px 20px', minHeight: 0 }}>
+    <div style={{ height: '100%', overflowY: 'auto', padding: '16px 18px 20px' }}>
+      <div style={{ maxWidth: '80%', margin: '0 auto' }}>
 
         {/* ── Input form card ── */}
         <div className="ht-form-card">
@@ -396,10 +396,10 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
             </div>
 
             {/* Date row — #4: removed Time field */}
-            <div className="ht-form-row" style={{ gridTemplateColumns: '1fr' }}>
+            <div className="ht-form-row">
               <div className="ht-field">
                 <label className="ht-field-lbl">Date</label>
-                <input type="date" className="ht-field-input" value={formDate} onChange={e => setFormDate(e.target.value)} />
+                <input type="date" className="ht-field-input ht-date" value={formDate} onChange={e => setFormDate(e.target.value)} />
               </div>
             </div>
 
