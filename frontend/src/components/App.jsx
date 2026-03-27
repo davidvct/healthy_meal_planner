@@ -6,10 +6,11 @@ import TodayScreen from "./TodayScreen";
 import ShoppingScreen from "./ShoppingScreen";
 import ProfilesScreen from "./ProfilesScreen";
 import DiscoverScreen from "./DiscoverScreen";
+import HealthTrackerScreen from "./HealthTrackerScreen";
 import * as api from "../services/api";
 
 const VIEWS = { AUTH: 'auth', SETUP: 'setup', APP: 'app' };
-const TABS = { TODAY: 'today', SHOP: 'shop', PROFILES: 'profiles', DISCOVER: 'discover' };
+const TABS = { TODAY: 'today', SHOP: 'shop', HEALTH: 'health', PROFILES: 'profiles', DISCOVER: 'discover' };
 
 const AVATAR_GRADIENTS = [
   'linear-gradient(135deg, #069B8E, #07B5A5)',
@@ -181,6 +182,7 @@ export default function App() {
   const tabs = [
     { id: TABS.TODAY,    label: "Today's plan",  icon: <GridIcon /> },
     { id: TABS.SHOP,     label: "Shopping list", icon: <ListIcon /> },
+    { id: TABS.HEALTH,   label: "Health",        icon: <HeartIcon /> },
     { id: TABS.PROFILES, label: "Profiles",      icon: <UserIcon /> },
   ];
 
@@ -270,7 +272,7 @@ export default function App() {
         </div>
 
         {/* Nav grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, 1fr)`, borderTop: '1px solid var(--border)' }}>
           {tabs.map((tab, i) => {
             const isOn = visibleTab === tab.id;
             return (
@@ -313,6 +315,9 @@ export default function App() {
         )}
         {activeTab === TABS.SHOP && (
           <ShoppingScreen diners={diners} activeDiner={activeDiner} onGoToPlan={() => setActiveTab(TABS.TODAY)} />
+        )}
+        {activeTab === TABS.HEALTH && activeDiner && (
+          <HealthTrackerScreen activeDiner={activeDiner} userId={activeDiner.userId} />
         )}
         {activeTab === TABS.PROFILES && (
           <ProfilesScreen
@@ -391,6 +396,13 @@ function UserIcon() {
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
       <circle cx="7.5" cy="5.5" r="2.5" stroke="currentColor" strokeWidth="1.2"/>
       <path d="M2.5 13c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  );
+}
+function HeartIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+      <path d="M7.5 13S2 9.5 2 6c0-2 1.5-3.5 3.25-3.5C6.5 2.5 7.5 3.5 7.5 3.5S8.5 2.5 9.75 2.5C11.5 2.5 13 4 13 6c0 3.5-5.5 7-5.5 7z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
 }

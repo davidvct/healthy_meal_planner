@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from typing import Any, Iterator
@@ -222,8 +222,25 @@ def _init_schema(conn: DBConnection) -> None:
           CONSTRAINT family_members_caretaker_id_fkey
             FOREIGN KEY (caretaker_id) REFERENCES caretakers(id)
         );
+
+        CREATE TABLE IF NOT EXISTS health_metrics (
+          id BIGSERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          date DATE NOT NULL,
+          measurement_time TIME,
+          blood_sugar DOUBLE PRECISION,
+          systolic_bp DOUBLE PRECISION,
+          diastolic_bp DOUBLE PRECISION,
+          total_cholesterol DOUBLE PRECISION,
+          ldl DOUBLE PRECISION,
+          hdl DOUBLE PRECISION,
+          triglycerides DOUBLE PRECISION,
+          notes TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
         """,
     )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_health_metrics_user_date ON health_metrics(user_id, date)")
 
 
 def _has_column(conn: DBConnection, table: str, column: str) -> bool:
@@ -449,6 +466,27 @@ def _migrate_schema(conn: DBConnection) -> None:
             )
         """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_nutrient_thresholds_user ON nutrient_thresholds(user_id)")
+
+    # -- health_metrics table --
+    if not _table_exists(conn, "health_metrics"):
+        _executescript(conn, """
+            CREATE TABLE IF NOT EXISTS health_metrics (
+              id BIGSERIAL PRIMARY KEY,
+              user_id TEXT NOT NULL,
+              date DATE NOT NULL,
+              measurement_time TIME,
+              blood_sugar DOUBLE PRECISION,
+              systolic_bp DOUBLE PRECISION,
+              diastolic_bp DOUBLE PRECISION,
+              total_cholesterol DOUBLE PRECISION,
+              ldl DOUBLE PRECISION,
+              hdl DOUBLE PRECISION,
+              triglycerides DOUBLE PRECISION,
+              notes TEXT,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_health_metrics_user_date ON health_metrics(user_id, date)")
 
     conn.execute("DROP INDEX IF EXISTS idx_meal_plans_user")
     conn.execute(
