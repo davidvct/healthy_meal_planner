@@ -176,7 +176,6 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
   const [range, setRange] = useState('7d');
   const [metrics, setMetrics] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showMeals, setShowMeals] = useState(true);
   const [mealsByDate, setMealsByDate] = useState({});
   const [dishDetails, setDishDetails] = useState({});
   const [saving, setSaving] = useState(false);
@@ -223,7 +222,7 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
 
   // Load meal plans for dates in the range
   useEffect(() => {
-    if (!userId || !showMeals) return;
+    if (!userId) return;
     let cancelled = false;
     async function loadMeals() {
       const { from, to } = getDateRange();
@@ -281,7 +280,7 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
     }
     loadMeals();
     return () => { cancelled = true; };
-  }, [userId, showMeals, getDateRange]);
+  }, [userId, getDateRange]);
 
   // #3 - Auto-save: trigger on Enter or blur, no Save button
   const doSave = useCallback(async () => {
@@ -327,15 +326,6 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
     }, 200);
   }, [doSave]);
 
-  const handleDelete = async (entryId) => {
-    try {
-      await api.deleteHealthMetric(userId, entryId);
-      await loadMetrics();
-    } catch (err) {
-      console.error('Failed to delete:', err);
-    }
-  };
-
   // Build chart data
   const chartData = (() => {
     const byDate = {};
@@ -349,11 +339,9 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
       }
     }
 
-    if (showMeals) {
-      for (const dateStr of Object.keys(mealsByDate)) {
-        if (!byDate[dateStr]) {
-          byDate[dateStr] = { date: dateStr };
-        }
+    for (const dateStr of Object.keys(mealsByDate)) {
+      if (!byDate[dateStr]) {
+        byDate[dateStr] = { date: dateStr };
       }
     }
 
@@ -492,12 +480,6 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
               </button>
             ))}
           </div>
-          <label className="ht-meals-toggle">
-            <span className="ht-toggle-label">Show meals</span>
-            <div className={`ht-toggle-switch${showMeals ? ' on' : ''}`} onClick={() => setShowMeals(v => !v)}>
-              <div className="ht-toggle-knob" />
-            </div>
-          </label>
         </div>
 
         {loading && (
@@ -519,7 +501,7 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
             { y: RANGES.bloodSugar.low, stroke: '#069B8E', label: 'Min' },
             { y: RANGES.bloodSugar.high, stroke: '#069B8E', label: 'Max' },
           ]}
-          mealsByDate={showMeals ? mealsByDate : null}
+          mealsByDate={mealsByDate}
           dishDetails={dishDetails}
         />
 
@@ -542,7 +524,7 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
             { y: RANGES.diastolic.low, stroke: '#6D3FA0' },
             { y: RANGES.diastolic.high, stroke: '#6D3FA0' },
           ]}
-          mealsByDate={showMeals ? mealsByDate : null}
+          mealsByDate={mealsByDate}
           dishDetails={dishDetails}
         />
 
@@ -563,38 +545,10 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
             { y: RANGES.trigly.high, stroke: COLORS.trigly, label: 'TG max' },
             { y: RANGES.hdl.low, stroke: COLORS.hdl, label: 'HDL min' },
           ]}
-          mealsByDate={showMeals ? mealsByDate : null}
+          mealsByDate={mealsByDate}
           dishDetails={dishDetails}
         />
 
-        {/* ── Recent entries list ── */}
-        {metrics.length > 0 && (
-          <div className="ht-entries-card">
-            <div className="ht-entries-hdr">Recent Entries</div>
-            <div className="ht-entries-list">
-              {[...metrics].reverse().slice(0, 10).map(m => (
-                <div key={m.id} className="ht-entry">
-                  <div className="ht-entry-date">
-                    {formatDateLabel(m.date)}
-                  </div>
-                  <div className="ht-entry-vals">
-                    {m.blood_sugar != null && <span className="ht-entry-pill" style={{ background: 'rgba(6,155,142,0.1)', color: COLORS.bloodSugar }}>BS: {m.blood_sugar}</span>}
-                    {m.systolic_bp != null && <span className="ht-entry-pill" style={{ background: 'rgba(21,96,160,0.1)', color: COLORS.systolic }}>BP: {m.systolic_bp}/{m.diastolic_bp || '–'}</span>}
-                    {m.total_cholesterol != null && <span className="ht-entry-pill" style={{ background: 'rgba(217,95,59,0.1)', color: COLORS.totalChol }}>TC: {m.total_cholesterol}</span>}
-                    {m.ldl != null && <span className="ht-entry-pill" style={{ background: 'rgba(185,28,140,0.1)', color: COLORS.ldl }}>LDL: {m.ldl}</span>}
-                    {m.hdl != null && <span className="ht-entry-pill" style={{ background: 'rgba(34,197,94,0.1)', color: COLORS.hdl }}>HDL: {m.hdl}</span>}
-                    {m.triglycerides != null && <span className="ht-entry-pill" style={{ background: 'rgba(37,99,235,0.1)', color: COLORS.trigly }}>TG: {m.triglycerides}</span>}
-                  </div>
-                  <button className="ht-entry-del" onClick={() => handleDelete(m.id)} title="Delete entry">
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
