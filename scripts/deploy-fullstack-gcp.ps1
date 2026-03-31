@@ -35,7 +35,11 @@ param(
 
     [switch]$BackendRequireInvokerAuth,
 
-    [switch]$FrontendRequireInvokerAuth
+    [switch]$FrontendRequireInvokerAuth,
+
+    [string]$AdminApiKey = "",
+
+    [string]$SchedulerServiceAccount = ""
 )
 
 Set-StrictMode -Version Latest
@@ -145,4 +149,69 @@ $frontendUrl = & gcloud run services describe $FrontendServiceName `
 
 if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($frontendUrl)) {
     Write-Host "Frontend URL: $frontendUrl"
+}
+
+# ── Cloud Scheduler: survey email cron job ────────────────────────
+if ([string]::IsNullOrWhiteSpace($AdminApiKey)) {
+    Write-Host "WARNING: AdminApiKey not provided — skipping Cloud Scheduler job setup."
+    Write-Host "  Pass -AdminApiKey to create the scheduled survey email job."
+}
+else {
+    $schedulerJobName = "send-survey-monthly"
+    $surveyEndpoint = "$($backendUrl.TrimEnd('/'))/admin/send-survey"
+
+    # Resolve service account for OIDC authentication
+    if ([string]::IsNullOrWhiteSpace($SchedulerServiceAccount)) {
+        $SchedulerServiceAccount = & gcloud iam service-accounts list `
+            --project $ProjectId `
+            --filter "displayName:Default compute" `
+            --format "value(email)" 2>$null
+    }
+
+    Write-Host "Creating/updating Cloud Scheduler job '$schedulerJobName'..."
+
+    $schedulerArgs = @(
+        "scheduler"
+        "jobs"
+        "update"
+        "http"
+        $schedulerJobName
+        "--project"
+        $ProjectId
+        "--location"
+        $Region
+        "--schedule"
+        "0 9 1 * *"
+        "--time-zone"
+        "Asia/Singapore"
+        "--uri"
+        $surveyEndpoint
+        "--http-method"
+        "POST"
+        "--headers"
+        "X-Admin-Key=$AdminApiKey,Content-Type=application/json"
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($SchedulerServiceAccount)) {
+        $schedulerArgs += "--oidc-service-account-email"
+        $schedulerArgs += $SchedulerServiceAccount
+    }
+
+    & gcloud @schedulerArgs 2>$null
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Scheduler job not found, creating new job..."
+        $schedulerArgs[2] = "create"
+        & gcloud @schedulerArgs
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "WARNING: Failed to create Cloud Scheduler job '$schedulerJobName'. Create it manually."
+        }
+        else {
+            Write-Host "Cloud Scheduler job '$schedulerJobName' created successfully."
+        }
+    }
+    else {
+        Write-Host "Cloud Scheduler job '$schedulerJobName' updated successfully."
+    }
 }
