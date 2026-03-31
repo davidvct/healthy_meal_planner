@@ -957,22 +957,29 @@ def generate_plan(
         print(f"[generate] solver_error: {exc}")
         return {"success": False, "error": str(exc)}
 
-    # For the target day(s), clear ALL existing entries first to prevent duplicates,
-    # then insert the new plan entries.
     if target_day is not None:
-        conn.execute(
-            "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ?",
-            (user_id, ws, target_day),
-        )
+        for meal_type in SOLVER_MEALS:
+            if _is_slot_locked(ws, target_day, meal_type):
+                continue
+            conn.execute(
+                "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?",
+                (user_id, ws, target_day, meal_type),
+            )
     else:
-        conn.execute(
-            "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ?",
-            (user_id, ws),
-        )
+        for day_index in range(num_days):
+            for meal_type in SOLVER_MEALS:
+                if _is_slot_locked(ws, day_index, meal_type):
+                    continue
+                conn.execute(
+                    "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ?",
+                    (user_id, ws, day_index, meal_type),
+                )
 
     entries_written = 0
     for entry in result.entries:
         actual_day = (target_day if target_day is not None else entry.day_index)
+        if _is_slot_locked(ws, actual_day, entry.meal_type):
+            continue
         conn.execute(
             "INSERT INTO meal_plans (user_id, week_start, day_index, meal_type, dish_id, servings, entry_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (user_id, ws, actual_day, entry.meal_type, entry.recipe_id, entry.servings, entry.entry_order),
