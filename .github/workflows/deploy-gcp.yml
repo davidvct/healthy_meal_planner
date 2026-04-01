@@ -44,6 +44,8 @@ jobs:
           GCP_REGION: ${{ vars.GCP_REGION }}
           BACKEND_SERVICE_NAME: ${{ vars.BACKEND_SERVICE_NAME }}
           FRONTEND_SERVICE_NAME: ${{ vars.FRONTEND_SERVICE_NAME }}
+          ADMIN_API_KEY: ${{ secrets.ADMIN_API_KEY }}
+          SCHEDULER_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
         run: |
           $params = @{
             ProjectId = $env:GCP_PROJECT_ID
@@ -53,5 +55,11 @@ jobs:
           }
           if (Test-Path backend.env.yaml) {
             $params["BackendEnvVarsFile"] = "backend.env.yaml"
+          }
+          if ($env:ADMIN_API_KEY) {
+            $params["AdminApiKey"] = $env:ADMIN_API_KEY
+          }
+          if ($env:SCHEDULER_SERVICE_ACCOUNT) {
+            $params["SchedulerServiceAccount"] = $env:SCHEDULER_SERVICE_ACCOUNT
           }
           ./scripts/deploy-fullstack-gcp.ps1 @params
