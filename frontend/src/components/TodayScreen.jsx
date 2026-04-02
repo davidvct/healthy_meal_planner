@@ -808,9 +808,10 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                         <span className="ewc-meal">Personalised to your health profile</span>
                       </div>
                     </div>
-                    <button className="ewc-btn ewc-btn-navy" disabled={generatingPlan || allWeekPast} onClick={allWeekPast ? undefined : () => openAiPlanModal('week')}
-                      style={{ position: 'relative', overflow: 'hidden', ...(allWeekPast ? { opacity: 0.5, cursor: 'default' } : {}) }}
-                      title={allWeekPast ? 'This week has already passed' : ''}>
+                    <button className="ewc-btn ewc-btn-navy" disabled={generatingPlan || allWeekPast}
+                      onClick={allWeekPast ? undefined : userTier === 'paid' ? () => openAiPlanModal('week') : () => setUpgradeFeature('Plan with AI')}
+                      style={{ position: 'relative', overflow: 'hidden', ...((allWeekPast || userTier !== 'paid') ? { opacity: 0.5, cursor: 'default' } : {}) }}
+                      title={allWeekPast ? 'This week has already passed' : userTier !== 'paid' ? 'Upgrade to use AI planner' : ''}>
                       {generatingPlan && (
                         <div style={{
                           position: 'absolute', left: 0, top: 0, bottom: 0,
@@ -820,7 +821,7 @@ export default function TodayScreen({ activeDiner, userId, onBrowse, weekOffset:
                         }} />
                       )}
                       <span style={{ position: 'relative' }}>
-                        {allWeekPast ? '🔒 Week has passed' : generatingPlan ? `Planning day ${genProgress + 1} of 7…` : 'Plan with AI ✨'}
+                        {allWeekPast ? '🔒 Week has passed' : userTier !== 'paid' ? '🔒 Plan with AI' : generatingPlan ? `Planning day ${genProgress + 1} of 7…` : 'Plan with AI ✨'}
                       </span>
                     </button>
                   </div>

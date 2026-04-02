@@ -14,6 +14,7 @@ backend/datasets/
 *.db-shm
 *.db-wal
 archive/
+check_scripts/
 *.mp4
 brainstorm.md
 dev_phase.md
