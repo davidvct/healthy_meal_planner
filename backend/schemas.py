@@ -79,6 +79,16 @@ class ToggleShoppingSelectionBody(BaseModel):
     mealType: str
 
 
+class ShoppingSelectionItem(BaseModel):
+    dayIndex: int
+    mealType: str
+
+
+class SetShoppingSelectionsBody(BaseModel):
+    weekStart: str
+    selections: list[ShoppingSelectionItem]
+
+
 class RequestOtpBody(BaseModel):
     email: str = Field(min_length=3)
 

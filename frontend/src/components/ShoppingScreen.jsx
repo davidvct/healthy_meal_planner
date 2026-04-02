@@ -131,31 +131,18 @@ export default function ShoppingScreen({ diners, activeDiner, onGoToPlan }) {
       const allItems = [];
 
       for (const userId of activeDiners) {
-        const [plan, shoppingRes] = await Promise.all([
-          api.getMealPlan(userId, ws),
-          api.getShoppingList(userId, ws),
-        ]);
-        const existingSelections = new Set(
-          (shoppingRes?.selections || []).map(s => `${s.dayIndex}:${s.mealType}`)
-        );
-        const desiredSelections = new Set();
+        const plan = await api.getMealPlan(userId, ws);
+        const selections = [];
         for (const dayIndex of rangeDays) {
           const dayMeals = plan?.[dayIndex] || {};
           for (const [mealType, entries] of Object.entries(dayMeals)) {
             if (Array.isArray(entries) && entries.length > 0) {
-              desiredSelections.add(`${dayIndex}:${mealType}`);
+              selections.push({ dayIndex, mealType });
             }
           }
         }
-        const toAdd = [...desiredSelections].filter(k => !existingSelections.has(k));
-        const toRemove = [...existingSelections].filter(k => !desiredSelections.has(k));
-        const toggles = [
-          ...toAdd.map(k => { const [di, mt] = k.split(':'); return api.toggleShoppingSelection(userId, ws, Number(di), mt); }),
-          ...toRemove.map(k => { const [di, mt] = k.split(':'); return api.toggleShoppingSelection(userId, ws, Number(di), mt); }),
-        ];
-        if (toggles.length > 0) await Promise.allSettled(toggles);
-        const finalRes = await api.getShoppingList(userId, ws);
-        allItems.push(...(finalRes?.items || (Array.isArray(finalRes) ? finalRes : [])));
+        const res = await api.setShoppingSelections(userId, ws, selections);
+        allItems.push(...(res?.items || []));
       }
       setItems(categorise(allItems));
     } catch (err) {

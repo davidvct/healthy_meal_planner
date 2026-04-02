@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from ..db import get_db
-from ..schemas import ToggleShoppingSelectionBody
+from ..schemas import SetShoppingSelectionsBody, ToggleShoppingSelectionBody
 from ..services.shopping_list_generator import get_shopping_list, is_slot_expired
 
 router = APIRouter(prefix="/shopping-list", tags=["shopping-list"])
@@ -98,4 +98,35 @@ def toggle_shopping_selection(
     ]
 
     return {"selections": selections}
+
+
+@router.put("/{user_id}/selections")
+def set_shopping_selections(
+    user_id: str,
+    body: SetShoppingSelectionsBody,
+    conn: Any = Depends(get_db),
+) -> dict:
+    """Replace all shopping selections for a user+week in a single transaction."""
+    # Delete all existing selections for this week
+    conn.execute(
+        "DELETE FROM shopping_selections WHERE user_id = ? AND week_start = ?",
+        (user_id, body.weekStart),
+    )
+    # Insert all desired selections
+    for sel in body.selections:
+        conn.execute(
+            "INSERT INTO shopping_selections (user_id, week_start, day_index, meal_type) VALUES (?, ?, ?, ?)",
+            (user_id, body.weekStart, sel.dayIndex, sel.mealType),
+        )
+    conn.commit()
+
+    # Return the shopping list with the new selections
+    valid = [
+        {"dayIndex": sel.dayIndex, "mealType": sel.mealType}
+        for sel in body.selections
+        if not is_slot_expired(body.weekStart, sel.dayIndex, sel.mealType)
+    ]
+
+    items = get_shopping_list(conn, user_id, body.weekStart, valid)
+    return {"items": items, "selections": valid}
 

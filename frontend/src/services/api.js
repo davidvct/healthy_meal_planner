@@ -226,6 +226,13 @@ export async function toggleShoppingSelection(userId, weekStart, dayIndex, mealT
   });
 }
 
+export async function setShoppingSelections(userId, weekStart, selections) {
+  return request(`/shopping-list/${userId}/selections`, {
+    method: "PUT",
+    body: JSON.stringify({ weekStart, selections }),
+  });
+}
+
 // ---- Nutrient Thresholds ----
 
 export async function getAvailableNutrients() {
