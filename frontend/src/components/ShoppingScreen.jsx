@@ -65,7 +65,8 @@ function getRangeDays(range, monday) {
   const isCurrentWeek = todayIdx >= 0 && todayIdx < 7;
   if (range === 'today')  return isCurrentWeek ? [todayIdx] : [];
   if (range === '3days')  return isCurrentWeek ? [0, 1, 2].map(i => todayIdx + i).filter(d => d < 7) : [];
-  return [0, 1, 2, 3, 4, 5, 6];
+  const start = isCurrentWeek ? todayIdx : 0;
+  return [0, 1, 2, 3, 4, 5, 6].filter(d => d >= start);
 }
 
 function fmtQty(amount, unit = 'g') {
@@ -227,14 +228,14 @@ export default function ShoppingScreen({ diners, activeDiner, onGoToPlan }) {
           })}
 
           <div className="shop-sep" />
-          <button onClick={() => setWeekOffset(o => o - 1)}
-            style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 14, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0 }}
+          <button onClick={() => setWeekOffset(o => o - 1)} disabled={weekOffset <= 0}
+            style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--white)', cursor: weekOffset <= 0 ? 'default' : 'pointer', fontSize: 14, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0, opacity: weekOffset <= 0 ? 0.35 : 1 }}
           >‹</button>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', whiteSpace: 'nowrap', minWidth: 110, textAlign: 'center' }}>
             {weekOffset === 0 ? 'This week' : weekLabel}
           </span>
-          <button onClick={() => setWeekOffset(o => o + 1)} disabled={weekOffset >= 0}
-            style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--white)', cursor: weekOffset >= 0 ? 'default' : 'pointer', fontSize: 14, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0, opacity: weekOffset >= 0 ? 0.35 : 1 }}
+          <button onClick={() => setWeekOffset(o => o + 1)}
+            style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--border2)', background: 'var(--white)', cursor: 'pointer', fontSize: 14, color: 'var(--text2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font)', flexShrink: 0 }}
           >›</button>
 
           {diners.length > 0 && (
