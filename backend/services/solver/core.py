@@ -134,9 +134,23 @@ def _apply_constraints(
     model: Any,
     candidates: dict[str, list[SolverRecipe]],
     x: dict, servings: dict,
+    targets: dict[str, float],
     config: SolverConfig,
     fixed: dict[tuple[int, str], list[FixedMealAssignment]],
+    hard_limit_keys: set[str] | None = None,
 ):
+    nutrient_getters = {
+        "calories": lambda r: r.calories,
+        "protein": lambda r: r.protein,
+        "carbs": lambda r: r.carbs,
+        "fat": lambda r: r.fat,
+        "fiber": lambda r: r.fiber,
+        "sodium": lambda r: r.sodium,
+        "sugar": lambda r: r.sugar,
+        "cholesterol": lambda r: r.cholesterol,
+    }
+    hard_limit_keys = set(hard_limit_keys or ())
+
     for day in range(config.num_days):
         for meal in MEALS:
             meal_recipes = candidates[meal]
@@ -168,6 +182,20 @@ def _apply_constraints(
 
                 # Main course preference is handled in the objective (soft),
                 # not as a hard constraint, to avoid infeasibility.
+
+        # Frontend overrides are intended as hard daily caps. Profile-derived
+        # defaults remain soft objective targets unless explicitly overridden.
+        for nutrient in hard_limit_keys:
+            getter = nutrient_getters.get(nutrient)
+            daily_limit = to_int(targets.get(nutrient, 0))
+            if getter is None or daily_limit <= 0:
+                continue
+            day_total = model.NewIntVar(0, 10**9, f"hard_{nutrient}_d{day}")
+            model.Add(day_total == sum(
+                to_int(getter(r)) * servings[(day, meal, r.recipe_id)]
+                for meal in MEALS for r in candidates[meal]
+            ))
+            model.Add(day_total <= daily_limit)
 
 
 def _build_objective(
@@ -203,7 +231,7 @@ def _build_objective(
             neg = model.NewIntVar(0, 10**9, f"dn_{nutrient}_d{day}")
             model.Add(day_total - daily_target == pos - neg)
             weight = max(1, int(round(1000 / daily_target)))
-            terms.append(weight * (pos + neg) * 100)
+            terms.append(weight * (pos + neg) * 1000)
 
     # ── Priority 2: Condition-safe nutrients (soft caps) ──
     # Fat, sodium, sugar — penalise exceeding condition limits.
@@ -316,6 +344,7 @@ def solve_meal_plan(
     recipes: list[SolverRecipe],
     config: SolverConfig | None = None,
     fixed_assignments: list[FixedMealAssignment] | None = None,
+    hard_limit_keys: set[str] | None = None,
 ) -> list[PlanResult]:
     import random
 
@@ -336,7 +365,16 @@ def solve_meal_plan(
 
     model = cp_model_mod.CpModel()
     x, servings = _create_decision_variables(model, candidates, config.num_days)
-    _apply_constraints(model, candidates, x, servings, config, fixed)
+    _apply_constraints(
+        model,
+        candidates,
+        x,
+        servings,
+        targets,
+        config,
+        fixed,
+        hard_limit_keys,
+    )
     objective = _build_objective(model, candidates, x, servings, targets, config, fixed)
     model.Minimize(objective)
 
@@ -484,6 +522,7 @@ def generate_meal_plan_for_week(
 ) -> MealGenerationResult:
     inputs = load_solver_inputs_from_db(conn, patient_id)
     solver_targets = dict(targets_override or inputs.targets)
+    hard_limit_keys = set((targets_override or {}).keys())
 
     # Compute cross-week recency penalties
     recency_penalties = _compute_recency_penalties(conn, patient_id, week_start)
@@ -519,6 +558,7 @@ def generate_meal_plan_for_week(
         recipes=recipes,
         config=effective_config,
         fixed_assignments=fixed_assignments,
+        hard_limit_keys=hard_limit_keys,
     ))
     selected_plan = plans[0]
     entries = plan_result_to_entries(selected_plan, week_start=week_start)
