@@ -188,6 +188,10 @@ export async function generateMealPlan(userId, { weekStart, numDays = 7, timeLim
   });
 }
 
+export async function hasRecentData(userId) {
+  return request(`/mealplan/${userId}/has-recent-data`);
+}
+
 export async function getWeekNutrients(userId, weekStart) {
   const params = weekStart ? `?weekStart=${weekStart}` : "";
   return request(`/mealplan/${userId}/nutrients/week${params}`);

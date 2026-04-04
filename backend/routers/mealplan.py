@@ -393,6 +393,20 @@ def clear_week_meal_plan(
     return {"success": True, "removed": removed}
 
 
+@router.get("/{user_id}/has-recent-data")
+def has_recent_data(
+    user_id: str,
+    conn: Any = Depends(get_db),
+) -> dict:
+    """Return whether the user has any meal-plan entries in the last 90 days."""
+    cutoff = (date.today() - timedelta(days=90)).isoformat()
+    row = conn.execute(
+        "SELECT 1 FROM meal_plans WHERE user_id = ? AND week_start >= ? LIMIT 1",
+        (user_id, cutoff),
+    ).fetchone()
+    return {"hasRecentData": row is not None}
+
+
 @router.get("/{user_id}/nutrients/week")
 def get_weekly_nutrients(
     user_id: str,

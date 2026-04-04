@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer, ReferenceArea, ReferenceLine,
@@ -198,8 +198,6 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
   const [formTG, setFormTG] = useState('');
   const [showCholDetail, setShowCholDetail] = useState(false);
 
-  // Track pending save to debounce blur events
-  const saveTimerRef = useRef(null);
 
   const getDateRange = useCallback(() => {
     if (range === 'custom' && customStart && customEnd) {
@@ -209,8 +207,11 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
     const from = new Date();
     if (range === '7d') from.setDate(from.getDate() - 6);
     else if (range === '30d') from.setDate(from.getDate() - 29);
+    // Extend range to include the form date if it's in the future
+    const fd = new Date(formDate + 'T00:00:00');
+    if (fd > to) to.setTime(fd.getTime());
     return { from: toDateStr(from), to: toDateStr(to) };
-  }, [range, customStart, customEnd]);
+  }, [range, customStart, customEnd, formDate]);
 
   const loadMetrics = useCallback(async () => {
     if (!userId) return;
@@ -290,7 +291,6 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
     return () => { cancelled = true; };
   }, [userId, getDateRange]);
 
-  // #3 - Auto-save: trigger on Enter or blur, no Save button
   const doSave = useCallback(async () => {
     if (!formBS && !formSys && !formDia && !formTC && !formLDL && !formHDL && !formTG) return;
     if (saving) return;
@@ -306,6 +306,14 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
         hdl: formHDL ? parseFloat(formHDL) : null,
         triglycerides: formTG ? parseFloat(formTG) : null,
       });
+      // Clear form after successful save so user can enter next day's data
+      setFormBS('');
+      setFormSys('');
+      setFormDia('');
+      setFormTC('');
+      setFormLDL('');
+      setFormHDL('');
+      setFormTG('');
       setSavedMsg(true);
       setTimeout(() => setSavedMsg(false), 2000);
       await loadMetrics();
@@ -321,17 +329,6 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
       e.preventDefault();
       doSave();
     }
-  }, [doSave]);
-
-  const handleBlur = useCallback((e) => {
-    // Only save if focus is leaving the form entirely (not moving between form fields)
-    clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      const formCard = document.querySelector('.ht-form-body');
-      if (formCard && !formCard.contains(document.activeElement)) {
-        doSave();
-      }
-    }, 200);
   }, [doSave]);
 
   // Build chart data
@@ -392,10 +389,11 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
           </div>
 
           <div className="ht-form-body">
-            {/* #3 - auto-save hint */}
-            <div style={{ fontSize: 10, marginBottom: 12, fontStyle: 'italic', color: savedMsg ? '#22C55E' : 'var(--text3)' }}>
-              {savedMsg ? 'Saved!' : saving ? 'Saving...' : 'Press Enter or click outside to save'}
-            </div>
+            {savedMsg && (
+              <div style={{ fontSize: 11, marginBottom: 8, fontWeight: 600, color: '#22C55E' }}>
+                ✓ Saved!
+              </div>
+            )}
 
             {/* Date row — #4: removed Time field */}
             <div className="ht-form-row">
@@ -412,7 +410,7 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
                 Fasting Blood Sugar
               </div>
               <div className="ht-field-inline">
-                <input type="number" step="0.1" className="ht-field-input ht-num" value={formBS} onChange={e => setFormBS(e.target.value)} placeholder="e.g. 5.2" onKeyDown={handleKeyDown} onBlur={handleBlur} />
+                <input type="number" step="0.1" className="ht-field-input ht-num" value={formBS} onChange={e => setFormBS(e.target.value)} placeholder="e.g. 5.2" onKeyDown={handleKeyDown} />
                 <span className="ht-field-unit">mmol/L</span>
               </div>
             </div>
@@ -425,12 +423,12 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
               </div>
               <div className="ht-bp-row">
                 <div className="ht-field-inline">
-                  <input type="number" className="ht-field-input ht-num" value={formSys} onChange={e => setFormSys(e.target.value)} placeholder="120" onKeyDown={handleKeyDown} onBlur={handleBlur} />
+                  <input type="number" className="ht-field-input ht-num" value={formSys} onChange={e => setFormSys(e.target.value)} placeholder="120" onKeyDown={handleKeyDown} />
                   <span className="ht-field-unit">systolic</span>
                 </div>
                 <span className="ht-bp-slash">/</span>
                 <div className="ht-field-inline">
-                  <input type="number" className="ht-field-input ht-num" value={formDia} onChange={e => setFormDia(e.target.value)} placeholder="80" onKeyDown={handleKeyDown} onBlur={handleBlur} />
+                  <input type="number" className="ht-field-input ht-num" value={formDia} onChange={e => setFormDia(e.target.value)} placeholder="80" onKeyDown={handleKeyDown} />
                   <span className="ht-field-unit">diastolic</span>
                 </div>
                 <span className="ht-bp-mmhg">mmHg</span>
@@ -444,7 +442,7 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
                 Cholesterol
               </div>
               <div className="ht-field-inline">
-                <input type="number" step="0.1" className="ht-field-input ht-num" value={formTC} onChange={e => setFormTC(e.target.value)} placeholder="e.g. 4.8" onKeyDown={handleKeyDown} onBlur={handleBlur} />
+                <input type="number" step="0.1" className="ht-field-input ht-num" value={formTC} onChange={e => setFormTC(e.target.value)} placeholder="e.g. 4.8" onKeyDown={handleKeyDown} />
                 <span className="ht-field-unit">Total (mmol/L)</span>
               </div>
               <button
@@ -456,22 +454,42 @@ export default function HealthTrackerScreen({ activeDiner, userId }) {
               {showCholDetail && (
                 <div className="ht-chol-details">
                   <div className="ht-field-inline">
-                    <input type="number" step="0.1" className="ht-field-input ht-num" value={formLDL} onChange={e => setFormLDL(e.target.value)} placeholder="LDL" onKeyDown={handleKeyDown} onBlur={handleBlur} />
+                    <input type="number" step="0.1" className="ht-field-input ht-num" value={formLDL} onChange={e => setFormLDL(e.target.value)} placeholder="LDL" onKeyDown={handleKeyDown} />
                     <span className="ht-field-unit">mmol/L</span>
                   </div>
                   <div className="ht-field-inline">
-                    <input type="number" step="0.1" className="ht-field-input ht-num" value={formHDL} onChange={e => setFormHDL(e.target.value)} placeholder="HDL" onKeyDown={handleKeyDown} onBlur={handleBlur} />
+                    <input type="number" step="0.1" className="ht-field-input ht-num" value={formHDL} onChange={e => setFormHDL(e.target.value)} placeholder="HDL" onKeyDown={handleKeyDown} />
                     <span className="ht-field-unit">mmol/L</span>
                   </div>
                   <div className="ht-field-inline">
-                    <input type="number" step="0.1" className="ht-field-input ht-num" value={formTG} onChange={e => setFormTG(e.target.value)} placeholder="Triglycerides" onKeyDown={handleKeyDown} onBlur={handleBlur} />
+                    <input type="number" step="0.1" className="ht-field-input ht-num" value={formTG} onChange={e => setFormTG(e.target.value)} placeholder="Triglycerides" onKeyDown={handleKeyDown} />
                     <span className="ht-field-unit">mmol/L</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* #3 - Save button removed */}
+            <button
+              onClick={doSave}
+              disabled={saving || (!formBS && !formSys && !formDia && !formTC && !formLDL && !formHDL && !formTG)}
+              style={{
+                marginTop: 16,
+                width: '100%',
+                padding: '10px 0',
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: 'var(--font)',
+                color: '#fff',
+                background: saving || (!formBS && !formSys && !formDia && !formTC && !formLDL && !formHDL && !formTG)
+                  ? 'var(--text3)' : 'var(--coral)',
+                border: 'none',
+                borderRadius: 8,
+                cursor: saving ? 'wait' : 'pointer',
+                transition: 'background 0.15s',
+              }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </div>
 

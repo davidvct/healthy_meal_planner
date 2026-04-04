@@ -134,6 +134,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
   const [rawPoints,    setRawPoints]    = useState([]);
   const [chartLoading, setChartLoading] = useState(false);
   const [backendTargets, setBackendTargets] = useState(null);
+  const [hasRecentData, setHasRecentData] = useState(false);
 
   useEffect(() => {
     setSelected(activeDiner || diners[0] || null);
@@ -145,6 +146,9 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
     api.getRecommendedLimits(selected.userId).then(res => {
       if (res?.recommended) setBackendTargets(res.recommended);
     }).catch(() => {});
+    api.hasRecentData(selected.userId).then(res => {
+      setHasRecentData(!!res?.hasRecentData);
+    }).catch(() => setHasRecentData(false));
   }, [selected?.userId]);
 
   // Reset offset when switching modes
@@ -377,7 +381,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
 
 
               {/* Card 3: Nutrition dashboard */}
-              {hasData ? (
+              {(hasData || hasRecentData) ? (
               <div className="prof-card">
 
                 {/* Range filter row */}
