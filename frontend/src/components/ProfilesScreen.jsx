@@ -179,7 +179,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
         const ref = new Date(today.getFullYear(), today.getMonth() + rangeOffset, 1);
         const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
         const firstMonday = getMonday(ref);
-        const monthStart = firstMonday < ref ? addDays(firstMonday, 7) : firstMonday;
+        const monthStart = firstMonday;
         const weeks = getWeeksInRange(monthStart, lastDay);
         const responses = await Promise.all(
           weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))
@@ -208,7 +208,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
         const endDate   = new Date(customEnd);   endDate.setHours(0,0,0,0);
         if (endDate < startDate) { setRawPoints([]); return; }
         const firstMonday = getMonday(startDate);
-        const startMonday = firstMonday < startDate ? addDays(firstMonday, 7) : firstMonday;
+        const startMonday = firstMonday;
         const weeks = getWeeksInRange(startMonday, endDate).slice(0, 12);
         const responses = await Promise.all(
           weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))

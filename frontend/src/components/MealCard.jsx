@@ -145,10 +145,10 @@ export default function MealCard({ entry, mealType, onBrowse, dishDetail, userId
         {/* Left zone: thumb + info + actions */}
         <div className="mc-zone-left">
           <div className={`mc-thumb ${style.thumbCls}`}>
-            {(dishDetail?.image_url || dishDetail?.imageUrl) ? (
+            {(entry.imageUrl || dishDetail?.image_url || dishDetail?.imageUrl) ? (
               <>
                 <img
-                  src={dishDetail.image_url || dishDetail.imageUrl}
+                  src={entry.imageUrl || dishDetail?.image_url || dishDetail?.imageUrl}
                   alt=""
                   loading="lazy"
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', borderRadius: 'inherit' }}

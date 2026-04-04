@@ -366,6 +366,7 @@ export default function DiscoverScreen({ slotCtx, userId, activeDiner, onBack, o
         dishId,
         servings:  1,
         weekStart: slotCtx.weekStart,
+        entryId:   slotCtx.entryId,
       });
       trackDishAdded(slotCtx.mealType, dish.name || dishId);
       onAdded();
