@@ -348,7 +348,7 @@ export default function MealSlotCard({ mealType, entries, dishDetails, onBrowse,
           key={entry.id}
           entry={entry}
           dishDetail={dishDetails[entry.dishId]}
-          onBrowse={locked ? undefined : () => onBrowse?.({ userId, dayIndex: dayIndex ?? entry.dayIndex, mealType, label: theme.label, weekStart })}
+          onBrowse={locked ? undefined : () => onBrowse?.({ userId, dayIndex: dayIndex ?? entry.dayIndex, mealType, label: theme.label, weekStart, entryId: entry.id })}
           onServingsChange={locked ? undefined : onServingsChange}
           onRemove={locked ? undefined : onRemove}
           canRemove={true}

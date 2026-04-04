@@ -219,7 +219,7 @@ def get_meal_plan(
         SELECT mp.*, r.id AS recipe_id, r.name AS recipe_name, r.ingredients AS recipe_ingredients,
                r.category, r.keywords, r.cuisine, r.servings AS recipe_servings,
                r.calories, r.protein, r.total_carbs AS carbs, r.fat,
-               r.fiber, r.sodium, r.cholesterol, r.sugar
+               r.fiber, r.sodium, r.cholesterol, r.sugar, r.image_url
         FROM meal_plans mp
         JOIN recipes r ON (r.id::text = mp.dish_id OR ('r' || r.id::text) = mp.dish_id)
         WHERE mp.user_id = ? AND mp.week_start = ?
@@ -258,6 +258,7 @@ def get_meal_plan(
                 "fiber": round(parse_float(row.get("fiber"), 0.0) * scale, 1),
                 "cholesterol": round(parse_float(row.get("cholesterol"), 0.0) * scale, 1),
                 "sugar": round(parse_float(row.get("sugar"), 0.0) * scale, 1),
+                "imageUrl": row.get("image_url") or None,
             }
         )
 
@@ -273,22 +274,37 @@ def add_dish_to_plan(
     ws = body.weekStart or get_current_week_start()
     MAX_DISHES_PER_SLOT = 3
 
-    # Check how many entries already exist in this slot
-    existing = conn.execute(
-        "SELECT entry_order FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ? ORDER BY entry_order",
-        (user_id, ws, body.dayIndex, body.mealType),
-    ).fetchall()
-
-    if len(existing) >= MAX_DISHES_PER_SLOT:
-        # Slot is full — replace the last entry
-        next_order = existing[-1]["entry_order"]
-        conn.execute(
-            "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ? AND entry_order = ?",
-            (user_id, ws, body.dayIndex, body.mealType, next_order),
-        )
+    if body.entryId is not None:
+        # Replacing a specific entry — keep its entry_order
+        replaced = conn.execute(
+            "SELECT entry_order FROM meal_plans WHERE id = ? AND user_id = ?",
+            (body.entryId, user_id),
+        ).fetchone()
+        if replaced:
+            next_order = replaced["entry_order"]
+            conn.execute(
+                "DELETE FROM meal_plans WHERE id = ? AND user_id = ?",
+                (body.entryId, user_id),
+            )
+        else:
+            next_order = 0
     else:
-        # Append — use next available entry_order
-        next_order = (existing[-1]["entry_order"] + 1) if existing else 0
+        # Check how many entries already exist in this slot
+        existing = conn.execute(
+            "SELECT entry_order FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ? ORDER BY entry_order",
+            (user_id, ws, body.dayIndex, body.mealType),
+        ).fetchall()
+
+        if len(existing) >= MAX_DISHES_PER_SLOT:
+            # Slot is full — replace the last entry
+            next_order = existing[-1]["entry_order"]
+            conn.execute(
+                "DELETE FROM meal_plans WHERE user_id = ? AND week_start = ? AND day_index = ? AND meal_type = ? AND entry_order = ?",
+                (user_id, ws, body.dayIndex, body.mealType, next_order),
+            )
+        else:
+            # Append — use next available entry_order
+            next_order = (existing[-1]["entry_order"] + 1) if existing else 0
 
     conn.execute(
         """

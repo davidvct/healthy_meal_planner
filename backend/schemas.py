@@ -27,6 +27,7 @@ class AddMealPlanBody(BaseModel):
     servings: float = 1.0
     customIngredients: dict[str, float] | None = None
     weekStart: str | None = None
+    entryId: int | None = None
 
 
 class GenerateMealPlanBody(BaseModel):

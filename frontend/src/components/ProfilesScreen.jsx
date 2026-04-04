@@ -179,7 +179,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
         const ref = new Date(today.getFullYear(), today.getMonth() + rangeOffset, 1);
         const lastDay = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
         const firstMonday = getMonday(ref);
-        const monthStart = firstMonday < ref ? addDays(firstMonday, 7) : firstMonday;
+        const monthStart = firstMonday;
         const weeks = getWeeksInRange(monthStart, lastDay);
         const responses = await Promise.all(
           weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))
@@ -208,7 +208,7 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
         const endDate   = new Date(customEnd);   endDate.setHours(0,0,0,0);
         if (endDate < startDate) { setRawPoints([]); return; }
         const firstMonday = getMonday(startDate);
-        const startMonday = firstMonday < startDate ? addDays(firstMonday, 7) : firstMonday;
+        const startMonday = firstMonday;
         const weeks = getWeeksInRange(startMonday, endDate).slice(0, 12);
         const responses = await Promise.all(
           weeks.map(w => api.getWeekNutrients(selected.userId, toWeekStart(w)))
@@ -302,35 +302,6 @@ export default function ProfilesScreen({ diners, activeDiner, onSelectDiner, onA
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: '16px 18px' }}>
       <div style={{ maxWidth: '80%', margin: '0 auto', paddingTop: 4 }}>
-
-        {/* Centered diner switcher strip */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 14 }}>
-          {diners.map((d, i) => {
-            const isActive = selected?.userId === d.userId;
-            const avClass  = AV_CLASSES[i % AV_CLASSES.length];
-            return (
-              <button
-                key={d.userId}
-                className={`prof-chip${isActive ? ' prof-chip-on' : ''}`}
-                onClick={() => { setSelected(d); onSelectDiner(d); }}
-                title={d.name}
-              >
-                <div className={`prof-pav ${avClass}`} style={{ width: 28, height: 28, fontSize: 11 }}>{avatarLabel(d.name)}</div>
-                <span className="prof-chip-name">{d.name?.split(' ')[0]}</span>
-              </button>
-            );
-          })}
-          {diners.length < 5 ? (
-            <button className="prof-chip prof-chip-add" onClick={onAddDiner} title="Add diner">
-              <span style={{ fontSize: 16, lineHeight: 1, color: 'var(--text3)' }}>+</span>
-              <span className="prof-chip-name" style={{ color: 'var(--text3)' }}>Add</span>
-            </button>
-          ) : (
-            <button className="prof-chip" title="Maximum 5 diners reached" style={{ opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)' }}>5/5</span>
-            </button>
-          )}
-        </div>
 
         {/* Main panel */}
         <div className="prof-panel">

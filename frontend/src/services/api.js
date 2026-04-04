@@ -139,10 +139,10 @@ export async function getMealPlan(userId, weekStart) {
   return request(`/mealplan/${userId}${params}`);
 }
 
-export async function addDishToPlan(userId, { dayIndex, mealType, dishId, servings, customIngredients, weekStart }) {
+export async function addDishToPlan(userId, { dayIndex, mealType, dishId, servings, customIngredients, weekStart, entryId }) {
   return request(`/mealplan/${userId}/add`, {
     method: "POST",
-    body: JSON.stringify({ dayIndex, mealType, dishId, servings, customIngredients, weekStart }),
+    body: JSON.stringify({ dayIndex, mealType, dishId, servings, customIngredients, weekStart, entryId }),
   });
 }
 
