@@ -267,6 +267,19 @@ export default function App() {
                   </button>
                 );
               })}
+              {diners.length < 5 && (
+                <button
+                  onClick={() => setEditingDiner(null)}
+                  title="Add diner"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 24, height: 24, borderRadius: '50%',
+                    background: 'transparent', border: '1.5px dashed var(--border)',
+                    cursor: 'pointer', fontSize: 14, color: 'var(--text3)',
+                    flexShrink: 0, padding: 0, lineHeight: 1,
+                  }}
+                >+</button>
+              )}
             </div>
           )}
 
@@ -369,7 +382,7 @@ export default function App() {
         )}
 
         {/* No diner yet */}
-        {!activeDiner && activeTab !== TABS.PROFILES && (
+        {!activeDiner && activeTab !== TABS.PROFILES && activeTab !== TABS.SHOP && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text3)' }}>
             <div style={{ fontSize: 14, fontWeight: 600 }}>No diner selected</div>
             <button
