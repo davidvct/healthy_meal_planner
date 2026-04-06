@@ -33,3 +33,6 @@ user_flow_full.md
 
 # OS files
 .DS_Store
+
+# Terraform
+.terraform/
