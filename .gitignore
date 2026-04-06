@@ -34,5 +34,4 @@ user_flow_full.md
 .DS_Store
 
 # Terraform
-.terraform.lock.hcl
 .terraform/
