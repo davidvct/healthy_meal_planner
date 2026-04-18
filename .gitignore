@@ -36,3 +36,4 @@ user_flow_full.md
 
 # Terraform
 .terraform/
+docs/mermaid-config.json
