@@ -1,0 +1,86 @@
+sequenceDiagram
+    autonumber
+
+    actor User
+
+    participant FE@{ "type": "boundary", "alias": "Frontend" }
+    participant BE@{ "type": "control", "alias": "Backend" }
+    participant SS@{ "type": "entity", "alias": "Solver" }
+    participant DB@{ "type": "database", "alias": "Database" }
+
+
+    User ->>+ FE: Generate meal plan
+    FE ->> FE: Read settings from localStorage
+
+    rect rgba(100, 150, 255, 0.08)
+        Note over FE, BE: HTTPS
+        FE ->>+ BE: POST /api/mealplan/{userId}/autofill
+        BE ->> BE: verify_access_token(jwt)
+        alt Invalid or expired JWT
+            BE -->> FE: 401 Unauthorized { "error": "Invalid or expired token" }
+            FE -->> User: Redirect to login
+        end
+        BE ->>+ SS: autofill_plan(userId)
+    end
+
+    rect rgba(80, 200, 120, 0.08)
+        Note over SS, DB: SQL
+        SS ->>+ DB: SELECT * FROM users WHERE id = $1
+        DB -->>- SS: UserProfile
+        SS ->>+ DB: SELECT SS.*, r.* FROM meal_plans SS JOIN recipes r ON r.id = SS.dish_id WHERE SS.user_id = $1
+        DB -->>- SS: MealPlan
+        SS ->> SS: validate_meal_plan(meal_plan)
+        alt Constraint violations found
+            SS -->> BE: 409 Conflict { "violations": ... }
+            BE -->> FE: 409 Conflict { "violations": ... }
+            FE -->> User: Render error
+        end
+    end
+
+    rect rgba(255, 180, 50, 0.08)
+        Note over SS, SS: OR-Tools::CP-Sat Solver
+        SS ->>+ SS: generate_meal_plan_for_week()
+        SS ->>+ DB: SELECT * FROM recipes
+        DB -->>- SS: Recipe
+        SS ->>+ DB: SELECT dish_id FROM favourites WHERE user_id = $1
+        DB -->>- SS: DishID
+        SS ->>+ DB: SELECT DISTINCT dish_id FROM meal_plans WHERE user_id = $1
+        DB -->>- SS: DishID
+        SS ->>+ SS: CpModel.Minimize(objective)
+        SS ->> SS: CpSolver.Solve()
+        alt No feasible solution
+            SS -->> BE: 422 Unprocessable Content 
+            BE -->> FE: 422 Unprocessable Content
+            FE -->> User: Render error
+        end
+        SS -->>- SS: MealGenerationResult
+    end
+
+    rect rgba(80, 200, 120, 0.08)
+        Note over SS, DB: SQL
+        loop For each (day, meal)
+            SS ->>+ DB: INSERT INTO meal_plans ... RETURNING *
+            DB -->>- SS: MealPlan
+        end
+    end
+
+    SS -->>- BE: 200 OK { "success": true, "added": "N" }
+    BE -->>- FE: 200 OK
+
+    FE ->>+ BE: GET /api/mealplan/{userId}?weekStart=...
+    BE ->>+ SS: get_meal_plan(userId)
+    SS ->>+ DB: SELECT SS.*, r.* FROM meal_plans SS JOIN recipes r WHERE SS.user_id = $1
+    DB -->>- SS: MealPlan
+    SS -->>- BE: 200 OK { 0: { breakfast: [ ... ], ... }, ... }
+    BE -->>- FE: 200 OK { 0: { breakfast: [ ... ], ... }, ... }
+
+    FE ->>+ BE: GET /api/mealplan/{userId}/nutrients/week?weekStart=...
+    BE ->>+ SS: get_weekly_nutrients(userId)
+    SS ->>+ DB: SELECT SS.*, r.nutrients WHERE SS.user_id = $1
+    DB -->>- SS: Nutrients
+    SS ->> SS: Compute weekNutrients, weekRDA, daily warnings
+    SS -->>- BE: 200 OK { "weekNutrients": ..., "weekRDA": ..., "daily": [ ... ] }
+    BE -->>- FE: 200 OK { "weekNutrients": ..., "weekRDA": ..., "daily": [ ... ] }
+
+    FE ->> FE: Update UI state
+    FE -->>- User: Render UI
