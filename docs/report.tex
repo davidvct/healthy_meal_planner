@@ -34,7 +34,7 @@
 \maketitle
 
 \begin{abstract}
-One in three Singapore residents live with chronic hyperlipidaemia or hypertension, a rate higher than the OECD average and one which remains stubbornly unchanged even as residents adopt healthier lifestyles post-COVID. We propose \textit{MealVitals}, a cloud-native Software-as-a-Service application that enables users to track nutritional intake, generate personalized meal plans, and produce grocery lists -- supporting every step of the dietary management journey.
+One in three Singapore residents live with chronic hyperlipidemia or hypertension, a rate higher than the OECD average and one which remains stubbornly unchanged even as residents adopt healthier lifestyles post-COVID. We propose \textit{MealVitals}, a cloud-native Software-as-a-Service application that enables users to track nutritional intake, generate personalized meal plans, and produce grocery lists -- supporting every step of the dietary management journey.
 \end{abstract}
 
 %-----------------------------------------------------------------------
@@ -42,7 +42,7 @@ One in three Singapore residents live with chronic hyperlipidaemia or hypertensi
 
 \subsection{Context \& Problem Statement}
 
-The 2024 National Population Health Survey~\cite{b1} conducted by the Ministry of Health (MOH) reports that approximately one in three Singapore residents suffer from hyperlipidaemia or hypertension, despite a rise in the proportion of residents engaged in sufficient total physical activity from 75\% to 85\% since 2022. The same report also raises alarm at a rising obesity prevalence, and these figures present an opportunity to improve dietary management through technology-enabled nutrition tracking.
+The 2024 National Population Health Survey~\cite{b1} conducted by the Ministry of Health (MOH) reports that approximately one in three Singapore residents live with hyperlipidemia or hypertension, despite a rise in the proportion of residents engaged in sufficient total physical activity from 75\% to 85\% since 2022. The same report also raises alarm at a rising obesity prevalence, and these figures present an opportunity to improve dietary management through technology-enabled nutrition tracking.
 
 To date, MOH has actively promoted healthy living through a range of campaigns. Its initiatives~\cite{b2} primarily focus on:
 \begin{enumerate}
@@ -152,7 +152,7 @@ Cloud TCO is 28\% lower than on-premises over three years (Table~\ref{tab:tco}),
 \toprule
 \textbf{Component} & \textbf{Monthly Cost (\$)} \\
 \midrule
-CAPEX Amortisation & 272 \\
+CAPEX Amortization & 272 \\
 Electricity & 96 \\
 Broadband subscription & 150 \\
 Maintenance and others & 50 \\
@@ -221,7 +221,7 @@ Rack switches & 1,000 \\
 %-----------------------------------------------------------------------
 \section{Architecture \& Implementation}
 
-\subsection{System Architecture \& Data Modelling}
+\subsection{System Architecture \& Data Modeling}
 
 \subsubsection{Application Design}
 The application follows a three-tier architecture:
@@ -239,13 +239,13 @@ The application is deployed on Google Cloud Platform (GCP), as illustrated in Fi
     \item \textbf{Cloud SQL} -- stores all application and authentication data.
 \end{itemize}
 
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centerline{\includegraphics[width=\columnwidth]{architecture.pdf}}
 \caption{System architecture}
 \label{fig:arch}
 \end{figure}
 
-\subsubsection{Data Modelling}
+\subsubsection{Data Modeling}
 The data model comprises the following entities:
 \begin{enumerate}
     \item \textbf{Users} -- user accounts with demographic and dietary profile data.
@@ -274,7 +274,7 @@ The meal recommender is built on \textit{Google OR-Tools CP-SAT}~\cite{b7}, a co
 Demand & Meal slots across 1--7 days for breakfast, lunch, and dinner \\
 Supply & Candidate recipes with per-serving nutrient profiles, eligible meal types, and health-suitability labels \\
 User constraints & Nutritional targets, dietary preferences, allergies, medical conditions, and thresholds specified at runtime \\
-Pre-processing & Recipes violating allergy, diet, or medical suitability rules are filtered prior to optimisation \\
+Pre-processing & Recipes violating allergy, diet, or medical suitability rules are filtered prior to optimization \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -297,7 +297,7 @@ When nutrient thresholds are provided as runtime inputs, they override profile-d
 \textbf{MealVitals} handles sensitive user data including email addresses, dietary preferences, allergies, and health-related profiles. As a multi-tenant SaaS platform, the system must ensure that only authenticated users can access the application and that each user's data is securely isolated. The security model follows the principle of defense-in-depth with five layers (Table~\ref{tab:security}).
 
 \begin{table*}[htbp]
-\caption{Security Model -- Five-Stage Process}
+\caption{Security Model -- Five-Layered Defense}
 \label{tab:security}
 \begin{center}
 \begin{tabular}{p{2cm}p{3.5cm}p{4.5cm}p{4.5cm}}
@@ -317,14 +317,14 @@ The JWT signing secret must be protected; its exposure would permit the forging 
 3. Request Handling &
 Enforces authentication on all privileged endpoints before executing business logic &
 A bearer token is required on every protected endpoint; Nginx enforces CORS by restricting allowed origins to the official frontend domain &
-Guarantees that users maintain a valid session before accessing resources and prevents unauthorised cross-origin API requests \\
+Guarantees that users maintain a valid session before accessing resources and prevents unauthorized cross-origin API requests \\
 \addlinespace
 4. Token Validation &
 Verifies token integrity on every request -- confirming proper signature, valid expiry, and legitimate session &
 Signature and expiry are checked per request by backend middleware; invalid or expired tokens return an appropriate error response &
 Any modification to the token payload invalidates the cryptographic signature, ensuring that tokens cannot be tampered with or forged \\
 \addlinespace
-5. Authorisation &
+5. Authorization &
 Restricts data access to the authenticated user's own records and explicitly linked household members &
 The backend enforces resource-level access control server-side, as client-side restrictions alone are insufficient &
 Provides strict per-user data isolation within the shared multi-tenant infrastructure \\
@@ -338,7 +338,7 @@ Provides strict per-user data isolation within the shared multi-tenant infrastru
 
 \subsection{User Engagement \& Evaluation}
 
-The growth of MealVitals is evaluated across three funnels: acquisition, retention, and monetisation~\cite{b8}. Acquisition employs leading indicators to measure onboarding velocity. Retention uses engagement and guardrail metrics to monitor sustained usage. Monetisation relies on lagging indicators to assess the health outcomes delivered to users. All metrics are collected through Google Analytics.
+The growth of MealVitals is evaluated across three funnels: acquisition, retention, and monetization~\cite{b8}. Acquisition employs leading indicators to measure onboarding velocity. Retention uses engagement and guardrail metrics to monitor sustained usage. Monetization relies on lagging indicators to assess the health outcomes delivered to users. All metrics are collected through Google Analytics.
 
 \textbf{North Star Metric:} Weekly count of users who generate at least one meal plan.
 
@@ -361,7 +361,7 @@ These metrics monitor ongoing usage and detect early signs of user dissatisfacti
 \subsubsection{Lagging Indicators}
 These metrics assess long-term health value:
 \begin{itemize}
-    \item \textit{Improved Cardiometabolic Health} -- proportion of active users who report reduced cholesterol, lower blood pressure, or improved glycaemic control after six months. Data is collected via a biannual survey distributed automatically through Google Cloud Scheduler.
+    \item \textit{Improved Cardiometabolic Health} -- proportion of active users who report reduced cholesterol, lower blood pressure, or improved glycemic control after six months. Data is collected via a biannual survey distributed automatically through Google Cloud Scheduler.
 \end{itemize}
 
 Active monitoring of these metrics informs the type of product work~\cite{b9} required and enables timely interventions -- such as user surveys or focus group discussions -- when any metric falls below the desired threshold.
@@ -394,13 +394,13 @@ User-facing metrics are meaningful only when the underlying system is operating 
 %-----------------------------------------------------------------------
 \section{Limitations and Recommendations}
 
-\textbf{Data Coverage.} The current meal dataset is not contextualised to Singapore's culinary culture. Future work could incorporate local dishes by enabling community-contributed recipes, with AI used to estimate nutritional values from user-submitted images or text descriptions.
+\textbf{Data Coverage.} The current meal dataset is not contextualized to Singapore's culinary culture. Future work could incorporate local dishes by enabling community-contributed recipes, with AI used to estimate nutritional values from user-submitted images or text descriptions.
 
 \textbf{Secondary Market.} MealVitals currently targets home cooks; however, a substantial proportion of Singaporeans prefer dining out. Extending the application to include a nearest hawker centre locator would improve relevancy for this demographic.
 
 \textbf{E-Commerce Integration.} Future development could explore integration with local supermarket platforms (e.g.\ NTUC FairPrice) for direct checkout functionality, streamlining the journey from meal planning to grocery purchase.
 
-\textbf{Solver Parallelisation.} The meal recommender currently generates recommendations sequentially across days. Parallelising the solver across independent day-partitions would improve generation latency and balance computational load under increasing user demand.
+\textbf{Solver Parallelization.} The meal recommender currently generates recommendations sequentially across days. Parallelizing the solver across independent day-partitions would improve generation latency and balance computational load under increasing user demand.
 
 \textbf{Runtime Secret Management.} While the current approach of injecting secrets via CI/CD is substantially more secure than hardcoded credentials, adopting runtime retrieval from a dedicated cloud secret manager (e.g.\ GCP Secret Manager's client library) would further reduce the risk of secret exposure.
 
@@ -429,14 +429,14 @@ The source code is available at \url{https://github.com/davidvct/healthy_meal_pl
 
 \begin{center}
 \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{sequence_registration.pdf}
-\captionof{figure}{Sequence diagram for user registration.}
+\captionof{figure}{User registration sequence}
 \label{fig:seq_reg}
 \end{center}
 
 \clearpage
 \begin{center}
 \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{sequence_meal_planning.pdf}
-\captionof{figure}{Sequence diagram for the meal plan auto-fill flow.}
+\captionof{figure}{Meal plan auto-fill sequence}
 \label{fig:seq_meal}
 \end{center}
 
