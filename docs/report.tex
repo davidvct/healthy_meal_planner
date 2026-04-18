@@ -244,7 +244,7 @@ The application is deployed on Google Cloud Platform (GCP), as illustrated in Fi
 \end{figure}
 
 \subsubsection{Data Modelling}
-The data model (Fig.~\ref{fig:er}) comprises the following entities:
+The data model comprises the following entities:
 \begin{enumerate}
     \item \textbf{Users} -- user accounts with demographic and dietary profile data.
     \item \textbf{Family Members} -- household members linked to a user or caretaker.
@@ -288,13 +288,9 @@ CP-SAT is preferable to simpler scoring-based approaches because it performs glo
 
 \subsection{System Interaction and Behavioural Design}
 
-MealVitals supports four primary use cases: (1)~managing health profiles, (2)~generating meal plans, (3)~retrieving shopping lists, and (4)~tracking health metrics. Fig.~\ref{fig:seq} presents the detailed interaction sequence for the meal plan autofill flow, which exercises the full stack from frontend through the CP-SAT solver.
+MealVitals supports four primary use cases: (1)~managing health profiles, (2)~generating meal plans, (3)~retrieving shopping lists, and (4)~tracking health metrics. Fig.~\ref{fig:seq} (Appendix~\ref{app:seq}) presents the detailed interaction sequence for the meal plan autofill flow, which exercises the full stack from frontend through the CP-SAT solver.
 
-\begin{figure}[htbp]
-\centerline{\includegraphics[width=\columnwidth]{sequence.pdf}}
-\caption{Sequence diagram for the meal plan autofill flow.}
-\label{fig:seq}
-\end{figure}
+The full sequence diagram is provided in Appendix~\ref{app:seq}.
 
 \subsection{Security, Authentication and Secret Management}
 
@@ -425,5 +421,16 @@ The source code is available at \url{https://github.com/davidvct/healthy_meal_pl
 \bibitem{b10} Lenovo, ``On-premise vs.\ cloud: Generative AI total cost of ownership analysis (2025 Edition),'' 2025. [Online]. Available: \url{https://lenovopress.lenovo.com/lp2225.pdf}
 \bibitem{b11} HashiCorp, ``Terraform provider for Google Cloud,'' [Online]. Available: \url{https://registry.terraform.io/providers/hashicorp/google/latest/docs}
 \end{thebibliography}
+
+\appendix
+\section{Sequence Diagram}
+\label{app:seq}
+
+\begin{figure*}[htbp]
+\centering
+\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{sequence.pdf}
+\caption{Sequence diagram for the meal plan autofill flow.}
+\label{fig:seq}
+\end{figure*}
 
 \end{document}
