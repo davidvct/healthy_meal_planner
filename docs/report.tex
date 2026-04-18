@@ -296,43 +296,6 @@ When nutrient thresholds are provided as runtime inputs, they override profile-d
 
 \textbf{MealVitals} handles sensitive user data including email addresses, dietary preferences, allergies, and health-related profiles. As a multi-tenant SaaS platform, the system must ensure that only authenticated users can access the application and that each user's data is securely isolated. The security model follows the principle of defense-in-depth with five layers (Table~\ref{tab:security}).
 
-\begin{table*}[htbp]
-\caption{Security Model -- Five-Layered Defense}
-\label{tab:security}
-\begin{center}
-\begin{tabular}{p{2cm}p{3.5cm}p{4.5cm}p{4.5cm}}
-\toprule
-\textbf{Stage} & \textbf{Purpose} & \textbf{Implementation} & \textbf{Rationale} \\
-\midrule
-1. Email Verification &
-Ensures that registered accounts correspond to valid, reachable email addresses, thereby reducing fraudulent registrations &
-One-time verification codes that are short-lived, single-use, and rate-limited; the account remains inactive until verification is complete &
-Prevents mass registration with invalid addresses and establishes a trusted communication channel for password resets and notifications \\
-\addlinespace
-2. JWT Minting &
-Provides stateless, token-based authentication suitable for a browser-based SPA &
-Upon successful login, the backend mints a signed JWT containing user identity (\texttt{sub}) and expiry (\texttt{exp}) claims; signing keys are stored in GitHub Secrets and injected during CI/CD &
-The JWT signing secret must be protected; its exposure would permit the forging of valid authentication tokens \\
-\addlinespace
-3. Request Handling &
-Enforces authentication on all privileged endpoints before executing business logic &
-A bearer token is required on every protected endpoint; Nginx enforces CORS by restricting allowed origins to the official frontend domain &
-Guarantees that users maintain a valid session before accessing resources and prevents unauthorized cross-origin API requests \\
-\addlinespace
-4. Token Validation &
-Verifies token integrity on every request -- confirming proper signature, valid expiry, and legitimate session &
-Signature and expiry are checked per request by backend middleware; invalid or expired tokens return an appropriate error response &
-Any modification to the token payload invalidates the cryptographic signature, ensuring that tokens cannot be tampered with or forged \\
-\addlinespace
-5. Authorization &
-Restricts data access to the authenticated user's own records and explicitly linked household members &
-The backend enforces resource-level access control server-side, as client-side restrictions alone are insufficient &
-Provides strict per-user data isolation within the shared multi-tenant infrastructure \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{table*}
-
 %-----------------------------------------------------------------------
 \section{Evaluation}
 
@@ -423,21 +386,61 @@ The source code is available at \url{https://github.com/davidvct/healthy_meal_pl
 \end{thebibliography}
 
 \clearpage
+\onecolumn
 \appendix
-\section{Sequence Diagrams}
-\label{app:seq}
 
 \begin{center}
-\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{sequence_registration.pdf}
-\captionof{figure}{User registration sequence}
-\label{fig:seq_reg}
+\captionof{table}{Security Model -- Five-Layered Defense}
+\label{tab:security}
+\begin{tabular}{p{3cm}p{4.5cm}p{4.5cm}p{4.5cm}}
+\toprule
+\textbf{Stage} & \textbf{Purpose} & \textbf{Implementation} & \textbf{Rationale} \\
+\midrule
+1. Email Verification &
+Ensures that registered accounts correspond to valid, reachable email addresses, thereby reducing fraudulent registrations &
+One-time verification codes that are short-lived, single-use, and rate-limited; the account remains inactive until verification is complete &
+Prevents mass registration with invalid addresses and establishes a trusted communication channel for password resets and notifications \\
+\addlinespace
+2. JWT Minting &
+Provides stateless, token-based authentication suitable for a browser-based SPA &
+Upon successful login, the backend mints a signed JWT containing user identity (\texttt{sub}) and expiry (\texttt{exp}) claims; signing keys are stored in GitHub Secrets and injected during CI/CD &
+The JWT signing secret must be protected; its exposure would permit the forging of valid authentication tokens \\
+\addlinespace
+3. Request Handling &
+Enforces authentication on all privileged endpoints before executing business logic &
+A bearer token is required on every protected endpoint; Nginx enforces CORS by restricting allowed origins to the official frontend domain &
+Guarantees that users maintain a valid session before accessing resources and prevents unauthorized cross-origin API requests \\
+\addlinespace
+4. Token Validation &
+Verifies token integrity on every request -- confirming proper signature, valid expiry, and legitimate session &
+Signature and expiry are checked per request by backend middleware; invalid or expired tokens return an appropriate error response &
+Any modification to the token payload invalidates the cryptographic signature, ensuring that tokens cannot be tampered with or forged \\
+\addlinespace
+5. Authorization &
+Restricts data access to the authenticated user's own records and explicitly linked household members &
+The backend enforces resource-level access control server-side, as client-side restrictions alone are insufficient &
+Provides strict per-user data isolation within the shared multi-tenant infrastructure \\
+\bottomrule
+\end{tabular}
 \end{center}
 
 \clearpage
-\begin{center}
+\section{Sequence Diagrams}
+\label{app:seq}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{sequence_registration.pdf}
+\caption{User registration sequence}
+\label{fig:seq_reg}
+\end{figure}
+
+\clearpage
+\begin{figure}[H]
+\centering
 \includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{sequence_meal_planning.pdf}
-\captionof{figure}{Meal plan auto-fill sequence}
+\caption{Meal plan auto-fill sequence}
 \label{fig:seq_meal}
-\end{center}
+\end{figure}
 
 \end{document}
