@@ -12,26 +12,29 @@
 \usepackage{array}
 \usepackage{makecell}
 \usepackage{tikz}
+\usepackage{placeins}
+\usepackage{float}
+\usepackage{caption}
 \usetikzlibrary{positioning, shapes.multipart, arrows.meta, calc}
 \pagestyle{plain} % page numbers
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
 
-\title{MealVitals: Market-to-Table Dietary Management}
+\title{MealVitals: Cloud-Native Dietary Management}
 \author{
 \begin{tabular}[t]{c}
 \bfseries Christopher Terence Ng, Heng Yan Si, Poh Jia Jun\\
-e1112601@u.nus.edu, e0572838@u.nus.edu, e0010964@u.nus.edu\\[0.5em]
+\{e1112601\textbar e0572838\textbar e0010964\}@u.nus.edu\\
 \bfseries Tan Xue Ying, Thien Vui Chia, Zheng Zhiqing\\
-e0313593@u.nus.edu, e0818043@u.nus.edu, e0293907@u.nus.edu
+\{e0313593\textbar e0818043\textbar e0293907\}@u.nus.edu
 \end{tabular}
 }
 
 \maketitle
 
 \begin{abstract}
-One in three Singapore residents live with chronic hyperlipidaemia or hypertension, a rate higher than OECD averages and one which remains stubbornly unchanged even as residents adopt healthier lifestyles post-COVID. We propose MealVitals, a cloud-native Software-as-a-Service application that enables users to track nutritional intake, generate personalised meal plans, and produce grocery lists -- supporting every step of the dietary management journey from market to table.
+One in three Singapore residents live with chronic hyperlipidaemia or hypertension, a rate higher than the OECD average and one which remains stubbornly unchanged even as residents adopt healthier lifestyles post-COVID. We propose \textit{MealVitals}, a cloud-native Software-as-a-Service application that enables users to track nutritional intake, generate personalized meal plans, and produce grocery lists -- supporting every step of the dietary management journey.
 \end{abstract}
 
 %-----------------------------------------------------------------------
@@ -39,12 +42,12 @@ One in three Singapore residents live with chronic hyperlipidaemia or hypertensi
 
 \subsection{Context \& Problem Statement}
 
-The 2024 National Population Health Survey~\cite{b1} conducted by the Ministry of Health (MOH) reports that approximately one in three Singapore residents have hyperlipidaemia or hypertension, despite a rise in the proportion of residents engaged in sufficient total physical activity from 75\% to 85\% since 2022. Coupled with rising obesity prevalence, these figures present an opportunity to improve dietary management through technology-enabled nutrition tracking.
+The 2024 National Population Health Survey~\cite{b1} conducted by the Ministry of Health (MOH) reports that approximately one in three Singapore residents suffer from hyperlipidaemia or hypertension, despite a rise in the proportion of residents engaged in sufficient total physical activity from 75\% to 85\% since 2022. The same report also raises alarm at a rising obesity prevalence, and these figures present an opportunity to improve dietary management through technology-enabled nutrition tracking.
 
 To date, MOH has actively promoted healthy living through a range of campaigns. Its initiatives~\cite{b2} primarily focus on:
 \begin{enumerate}
     \item Increasing awareness of healthy living through community events and online resources.
-    \item Helping residents make more informed choices through product labelling.
+    \item Helping residents make more informed choices through product labeling.
     \item Providing generic dietary recommendations (e.g.\ reducing sodium intake) through the Healthy~365 application.
 \end{enumerate}
 
@@ -54,40 +57,40 @@ However, translating such campaigns into better-informed dietary choices remains
     \item Nearly one-third (30\%) of participants reported confusion when reading the Nutrition Information Panel.
 \end{enumerate}
 
-Consequently, residents frequently select food based on ``experience and knowledge'' rather than on evidence-based labelling~\cite{b3}. Even when residents can correctly identify the healthier option, the cognitive effort required to apply this knowledge throughout the food consumption pipeline -- from meal planning to grocery shopping -- presents a significant barrier to adherence. A clear opportunity therefore exists for a solution that simplifies dietary decision-making.
+Consequently, residents frequently select food based on experience and common knowledge rather than on evidence-based labeling~\cite{b3}. Even when residents can correctly identify the healthier option, the cognitive effort required to apply this knowledge throughout the food consumption pipeline -- from meal planning to grocery shopping -- presents a significant barrier to adherence. A clear opportunity exists for a solution that simplifies dietary decision-making.
 
 \subsection{Proposed Solution}
 
-MealVitals addresses this gap by providing a cross-platform meal planning service that converts dietary constraints into personalised meal plans and grocery lists. The service targets two segments:
+\textbf{MealVitals} addresses this gap by providing a cross-platform meal planning service that converts dietary constraints into personalized meal plans and grocery lists. \textbf{MealVitals} addresses two distinct market segments:
 \begin{enumerate}
     \item The 1.1~million residents aged 18 and older diagnosed with or at risk of chronic conditions, who typically possess some nutritional knowledge but lack the tools to consistently make optimal dietary choices.
     \item Caregivers who plan meals on behalf of individuals with the aforementioned conditions.
 \end{enumerate}
 
-MealVitals generates personalised meal plans informed by health profiles, dietary constraints, and personal preferences, thereby improving adherence by simplifying meal planning and grocery purchasing. Studies~\cite{b4} have shown that elderly residents with chronic conditions often struggle with digital tools; MealVitals addresses this barrier by enabling a digitally proficient caregiver to plan meals on their behalf. Importantly, MealVitals provides dietary support rather than medical advice, which remains the responsibility of healthcare professionals.
+\textbf{MealVitals} generates personalized meal plans informed by health profiles, dietary constraints, and personal preferences, thereby improving adherence by simplifying meal planning and grocery purchasing. Studies~\cite{b4} have shown that elderly residents with chronic conditions often struggle with digital tools; \textbf{MealVitals} addresses this barrier by enabling a digitally proficient caregiver to plan meals on their behalf. Importantly, \textbf{MealVitals} provides dietary support rather than medical advice, which remains the responsibility of healthcare professionals.
 
 %-----------------------------------------------------------------------
 \section{Business Model}
 
 \subsection{Overview}
 
-MealVitals adopts a freemium model: all users receive access to core features for meal management and health monitoring at no cost, while advanced personalisation capabilities -- such as automated meal plan generation and adaptive recommendations -- are reserved for premium subscribers. Table~\ref{tab:tiers} summarises the feature set for each tier.
+\textbf{MealVitals} adopts a freemium model: all users receive access to core features for meal management and health monitoring at no cost, while advanced personalization capabilities -- such as automated meal plan generation and adaptive recommendations -- are reserved for premium subscribers. Table~\ref{tab:tiers} summarizes the feature set for each tier.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \caption{Feature Comparison by Tier}
 \label{tab:tiers}
 \begin{center}
-\begin{tabular}{p{2.8cm}p{2.2cm}p{2.5cm}}
+\begin{tabular}{p{2.8cm}>{\centering\arraybackslash}p{2.2cm}>{\centering\arraybackslash}p{2.5cm}}
 \toprule
 \textbf{Feature} & \textbf{Free} & \textbf{Premium} \\
 \midrule
 Profile Limit & \multicolumn{2}{c}{Maximum of 5 profiles} \\
 Health \& Dietary Filters & \checkmark & \checkmark \\
-Meal Actions (swap, remove, favourite) & \checkmark & \checkmark \\
+Meal Actions (swap, remove, favorite) & \checkmark & \checkmark \\
 Grocery Cart \& Shopping List & \checkmark & \checkmark \\
 Health Dashboard & \checkmark & \checkmark \\
 Health Measurements Logging & \checkmark & \checkmark \\
-Meal Selection & Pre-filtered by profile & Personalised recommendations \\
+Meal Selection & Pre-filtered by profile & Personalized recommendations \\
 Meal Plan Creation & Manual & Automated (day/week) \\
 \bottomrule
 \end{tabular}
@@ -96,7 +99,11 @@ Meal Plan Creation & Manual & Automated (day/week) \\
 
 \subsection{Competitive Analysis}
 
-\begin{table}[htbp]
+\textbf{MealVitals} differentiates itself through two capabilities absent from competing products: constraint-based meal planning -- accounting for dietary restrictions, nutritional targets, user preferences, and recent consumption history -- and automated grocery list generation.
+
+\textbf{MealVitals} does not currently offer dish recognition; however, integration with the FoodAI API~\cite{b5}, the same service integrated with Healthy~365, would enable rapid feature parity with competitors.
+
+\begin{table}[H]
 \caption{Competitive Landscape}
 \label{tab:competitors}
 \begin{center}
@@ -108,16 +115,12 @@ Meal Plan Creation & Manual & Automated (day/week) \\
 Healthy 365 (MOH) & Free & Yes & Yes & No & No \\
 Food (NUS-ISS) & Free & Yes & Yes & No & No \\
 Ventrickle & \$13/mo & Yes & Yes & No & No \\
-MealVitals & \$9.9/mo & No & Yes & Yes & Yes \\
+\textbf{MealVitals} & \$9.90/mo & No & Yes & Yes & Yes \\
 \bottomrule
 \end{tabular}
 \end{adjustbox}
 \end{center}
 \end{table}
-
-MealVitals differentiates itself through two capabilities absent from competing products: constraint-based meal planning -- accounting for dietary restrictions, nutritional targets, user preferences, and recent consumption history -- and automated grocery list generation. Together, these features support users throughout the entire dietary management journey, from market to table.
-
-MealVitals does not currently offer dish recognition; however, integration with the FoodAI API~\cite{b5}, the same service consumed by Healthy~365, would enable rapid feature parity with competitors.
 
 \subsection{Cloud versus On-Premises Cost Comparison}
 
@@ -129,17 +132,19 @@ The target audience of 1.1~million users is described in Section~I-B. Assuming a
 We further assume that activity is concentrated within a 12-hour window corresponding to waking hours in Singapore's single time zone, with the remaining 12 hours largely idle.
 
 \subsubsection{Cost Components and Assumptions}
-\textit{On-Premises Deployment:} Both Capital Expenditure (CAPEX) and Operating Expenditure (OPEX) are considered. CAPEX covers two server racks deployed in Singapore, depreciated over three years; Year~1 must be provisioned for the peak capacity projected in Year~3. OPEX includes electricity, broadband, and facility overheads.
 
-\textit{Cloud Deployment:} As noted by Lenovo~\cite{b10}, cloud deployment incurs only OPEX through pay-as-you-go subscription fees. No upfront CAPEX is required.
+\begin{itemize}
+    \item\textbf{On-Premises Deployment:} Both Capital Expenditure (CAPEX) and Operating Expenditure (OPEX) are considered. CAPEX covers two server racks deployed in Singapore, depreciated over three years; Year~1 must be provisioned for the peak capacity projected in Year~3. OPEX includes electricity, broadband, and facility overheads.
+    \item\textbf{Cloud Deployment:} As noted by Lenovo~\cite{b10}, cloud deployment incurs only OPEX through pay-as-you-go subscription fees. No upfront CAPEX is required.
+\end{itemize}
 
 Staffing costs are excluded from this analysis, as the project team operates under a start-up model.
 
 \subsubsection{Three-Year Cost Comparison}
 
-Cloud TCO is 28\% lower than on-premises over three years (Table~\ref{tab:tco}), driven primarily by the elimination of upfront capital expenditure.
+Cloud TCO is 28\% lower than on-premises over three years (Table~\ref{tab:tco}), driven primarily by the elimination of upfront capital expenditure. Monthly cloud cost scales with user growth, whereas an on-premises deployment must be provisioned for Year~3 peak capacity from the outset. Although the cloud's monthly cost eventually exceeds the on-premises monthly cost by Year~3, the cumulative three-year savings remain substantial.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \caption{Monthly On-Premises Cost}
 \label{tab:onprem_monthly}
 \begin{center}
@@ -158,7 +163,7 @@ Maintenance and others & 50 \\
 \end{center}
 \end{table}
 
-\begin{table}[htbp]
+\begin{table}[H]
 \caption{Monthly Cloud Cost (Year~2)}
 \label{tab:cloud_monthly}
 \begin{center}
@@ -177,7 +182,7 @@ Database & 323 \\
 \end{center}
 \end{table}
 
-\begin{table}[htbp]
+\begin{table}[H]
 \caption{Three-Year TCO Comparison}
 \label{tab:tco}
 \begin{center}
@@ -192,7 +197,7 @@ Cloud & 15,180 \\
 \end{center}
 \end{table}
 
-\begin{table}[htbp]
+\begin{table}[H]
 \caption{On-Premises CAPEX Upfront Cost}
 \label{tab:capex}
 \begin{center}
@@ -212,8 +217,7 @@ Rack switches & 1,000 \\
 \end{center}
 \end{table}
 
-Monthly cloud cost scales with user growth, whereas an on-premises deployment must be provisioned for Year~3 peak capacity from the outset. Although the cloud's monthly cost eventually exceeds the on-premises equivalent in Year~3, the cumulative three-year savings remain substantial.
-
+\FloatBarrier
 %-----------------------------------------------------------------------
 \section{Architecture \& Implementation}
 
@@ -223,23 +227,21 @@ Monthly cloud cost scales with user growth, whereas an on-premises deployment mu
 The application follows a three-tier architecture:
 \begin{itemize}
     \item \textbf{Presentation layer} -- a React single-page application built with Vite and served over HTTPS.
-    \item \textbf{Application layer} -- a FastAPI service exposing RESTful endpoints for authentication and business logic, running on Uvicorn.
-    \item \textbf{Database layer} -- PostgreSQL with raw SQL via psycopg for data access.
+    \item \textbf{Service layer} -- a FastAPI service exposing RESTful endpoints for authentication and business logic, running on Uvicorn.
+    \item \textbf{Data layer} -- PostgreSQL for data storage.
 \end{itemize}
 
 \subsubsection{System Design}
 The application is deployed on Google Cloud Platform (GCP), as illustrated in Fig.~\ref{fig:arch}:
 \begin{itemize}
-    \item \textbf{Cloud DNS} -- resolves the hostname \texttt{mealvitals.app} to the Cloud Load Balancer's public IPv4 address.
-    \item \textbf{Cloud Load Balancer} -- performs TLS termination and path-based routing, directing static asset requests to Cloud Storage and API requests to Cloud Run.
     \item \textbf{Cloud Storage} -- hosts the static website and stores Infrastructure-as-Code state files.
     \item \textbf{Cloud Run} -- provides serverless compute for API and authentication services; retrieves secrets from Secret Manager and builds from container images stored in Artifact Registry.
-    \item \textbf{Cloud SQL} -- stores all application and authentication data; deployed within a VPC to avoid public IP exposure.
+    \item \textbf{Cloud SQL} -- stores all application and authentication data.
 \end{itemize}
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\columnwidth]{architecture.pdf}}
-\caption{System architecture deployed on Google Cloud Platform.}
+\caption{System architecture}
 \label{fig:arch}
 \end{figure}
 
@@ -259,10 +261,10 @@ The data model comprises the following entities:
 
 \subsection{Meal Recommendation Algorithm}
 
-The meal recommender is built on Google OR-Tools CP-SAT~\cite{b7}, a constraint programming solver that serves as the optimisation engine. Premium users receive personalised meal recommendations accounting for dietary preferences, allergies, and health conditions. The recommender generates plans for breakfast, lunch, and dinner across horizons of one to seven days. Users may preserve previously accepted meals as fixed assignments and request recommendations only for remaining empty slots, enabling an interactive planning workflow. This formulation constitutes a constraint optimisation problem~\cite{b6}; CP-SAT is well suited because it natively handles binary and integer decision variables under both hard constraints and soft objective trade-offs.
+The meal recommender is built on \textit{Google OR-Tools CP-SAT}~\cite{b7}, a constraint programming solver that serves as the optimization engine. Premium users receive personalized meal recommendations accounting for dietary preferences, allergies, and health conditions. The recommender generates plans for breakfast, lunch, and dinner across time periods of one to seven days. Users may preserve previously accepted meals as fixed assignments and request recommendations only for remaining empty slots, enabling an interactive planning workflow. This formulation constitutes a constraint optimization problem~\cite{b6}. \textit{CP-SAT} is well suited because it natively handles binary and integer decision variables under both hard constraints and soft objective trade-offs.
 
-\begin{table}[htbp]
-\caption{Optimisation Components}
+\begin{table}[H]
+\caption{Optimization Components}
 \label{tab:optim}
 \begin{center}
 \begin{tabular}{p{1.8cm}p{5.8cm}}
@@ -280,21 +282,19 @@ Pre-processing & Recipes violating allergy, diet, or medical suitability rules a
 
 For each day~$d$, meal slot~$m$, candidate recipe~$r$, and nutrient type~$k$, the solver determines whether the recipe is selected and how many servings to assign. The daily nutrient total is computed as the sum of each selected recipe's per-serving nutrient value multiplied by its assigned servings.
 
-The primary objective is to minimise deviation from the user's target intake, with emphasis on calories, protein, and carbohydrates. Secondary penalties discourage exceeding fat, sodium, and sugar targets; repeating recipes excessively; selecting cautionary dishes; and reusing recently served meals.
+The primary objective is to minimize deviation from the user's target intake, with emphasis on calories, protein, and carbohydrates. Secondary penalties discourage exceeding fat, sodium, and sugar targets; repeating recipes excessively; selecting cautionary dishes; and reusing recently served meals.
 
 When nutrient thresholds are provided as runtime inputs, they override profile-derived defaults and are enforced as hard constraints. Structural feasibility constraints further ensure that each meal slot contains a valid number of dishes and that servings remain within permitted bounds.
 
-CP-SAT is preferable to simpler scoring-based approaches because it performs global optimisation over the entire plan, simultaneously satisfying nutritional targets, dietary restrictions, preserved assignments, partial-week generation, dish-count limits, and variety constraints within a unified framework.
+\textit{CP-SAT} is preferable to simpler scoring-based approaches because it performs global optimization over the entire plan, simultaneously satisfying nutritional targets, dietary restrictions, preserved assignments, partial-week generation, dish-count limits, and variety constraints within a unified framework.
 
-\subsection{System Interaction and Behavioural Design}
+\subsection{System Interaction and Behavioral Design}
 
-MealVitals supports four primary use cases: (1)~managing health profiles, (2)~generating meal plans, (3)~retrieving shopping lists, and (4)~tracking health metrics. Fig.~\ref{fig:seq} (Appendix~\ref{app:seq}) presents the detailed interaction sequence for the meal plan autofill flow, which exercises the full stack from frontend through the CP-SAT solver.
-
-The full sequence diagram is provided in Appendix~\ref{app:seq}.
+\textbf{MealVitals} supports four primary use cases: (1)~managing health profiles, (2)~generating meal plans, (3)~retrieving shopping lists, and (4)~tracking health metrics. Appendix~\ref{app:seq} presents detailed interaction sequences for user registration (Fig.~\ref{fig:seq_reg}) and the meal plan auto-fill flow (Fig.~\ref{fig:seq_meal}), which exercises the full stack from frontend through the CP-SAT solver.
 
 \subsection{Security, Authentication and Secret Management}
 
-MealVitals handles sensitive user data including email addresses, dietary preferences, allergies, and health-related profiles. As a multi-tenant SaaS platform, the system must ensure that only authenticated users can access the application and that each user's data is securely isolated. The security model follows a five-stage process (Table~\ref{tab:security}).
+\textbf{MealVitals} handles sensitive user data including email addresses, dietary preferences, allergies, and health-related profiles. As a multi-tenant SaaS platform, the system must ensure that only authenticated users can access the application and that each user's data is securely isolated. The security model follows the principle of defense-in-depth with five layers (Table~\ref{tab:security}).
 
 \begin{table*}[htbp]
 \caption{Security Model -- Five-Stage Process}
@@ -309,9 +309,9 @@ Ensures that registered accounts correspond to valid, reachable email addresses,
 One-time verification codes that are short-lived, single-use, and rate-limited; the account remains inactive until verification is complete &
 Prevents mass registration with invalid addresses and establishes a trusted communication channel for password resets and notifications \\
 \addlinespace
-2. JWT Issuance &
+2. JWT Minting &
 Provides stateless, token-based authentication suitable for a browser-based SPA &
-Upon successful login, the backend issues a signed JWT containing user identity (\texttt{sub}) and expiry (\texttt{exp}) claims; signing keys are stored in GitHub Secrets and injected during CI/CD &
+Upon successful login, the backend mints a signed JWT containing user identity (\texttt{sub}) and expiry (\texttt{exp}) claims; signing keys are stored in GitHub Secrets and injected during CI/CD &
 The JWT signing secret must be protected; its exposure would permit the forging of valid authentication tokens \\
 \addlinespace
 3. Request Handling &
@@ -370,7 +370,7 @@ Active monitoring of these metrics informs the type of product work~\cite{b9} re
 
 User-facing metrics are meaningful only when the underlying system is operating reliably. Rather than configuring alerts manually through the GCP Console, Terraform~\cite{b11} is used to declare monitoring resources as code, ensuring that alert thresholds and dashboards are reproducible and resistant to configuration drift. The monitoring plan addresses three dimensions: availability, performance, and reliability.
 
-\begin{table}[htbp]
+\begin{table}[H]
 \caption{Monitoring Resources}
 \label{tab:monitoring}
 \begin{center}
@@ -422,15 +422,22 @@ The source code is available at \url{https://github.com/davidvct/healthy_meal_pl
 \bibitem{b11} HashiCorp, ``Terraform provider for Google Cloud,'' [Online]. Available: \url{https://registry.terraform.io/providers/hashicorp/google/latest/docs}
 \end{thebibliography}
 
+\clearpage
 \appendix
-\section{Sequence Diagram}
+\section{Sequence Diagrams}
 \label{app:seq}
 
-\begin{figure*}[htbp]
-\centering
-\includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{sequence.pdf}
-\caption{Sequence diagram for the meal plan autofill flow.}
-\label{fig:seq}
-\end{figure*}
+\begin{center}
+\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{sequence_registration.pdf}
+\captionof{figure}{Sequence diagram for user registration.}
+\label{fig:seq_reg}
+\end{center}
+
+\clearpage
+\begin{center}
+\includegraphics[width=\textwidth,height=0.85\textheight,keepaspectratio]{sequence_meal_planning.pdf}
+\captionof{figure}{Sequence diagram for the meal plan auto-fill flow.}
+\label{fig:seq_meal}
+\end{center}
 
 \end{document}
